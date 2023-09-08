@@ -1,0 +1,43 @@
+{
+'generation_type': 'Biogas'
+'generation_type_copper': 'biomass'
+'description': 'biogas'
+'typical_plant_size_MW': 36
+'capital_cost_USD_per_kW': 1566.0
+'capital_cost_CAD_per_kW': 2035.8
+'capital_overhead_CAD_per_kW': 40.72
+'overnight_capital_cost_CAD_per_kW': 2076.52
+'interest_during_construction_CAD_per_kW': 214.66
+'implementation_costs_CAD_per_kW': 2291.18
+'project_definition_costs_CAD_per_kW': 181.54
+'total_project_cost_2020_CAD_per_kW': 2472.71
+'economic_life_years': 20
+'service_life_years': 40
+'annualized_capital_cost_CAD_per_MWyear': 233406.65
+'fixed_om_cost_USD_per_MWyear': 20200
+'fixed_om_cost_CAD_per_MWyear': 26260
+'variable_om_cost_USD_per_MWh': 6.23
+'variable_om_cost_CAD_per_MWh': 8.1
+'construction_time_years': 3
+'development_time_years': 5
+'average_fuel_price_USD_per_MMBtu': 2.33
+'average_fuel_price_CAD_per_MMBtu': 3.03
+'average_fuel_price_CAD_per_GJ': 2.87
+'carbon_emissions_lbs_per_MMBtu': 0
+'carbon_emissions_tCO2eq_per_MWh': 0.0
+'heat_rate_MMBtu_per_MWh': 8.51
+'efficiency': '0.4'
+'min_plant_load': '0.4'
+'min_capacity_factor': '0.55'
+'max_capacity_factor': '0.7'
+'time_to_full_capacity': 60
+'min_up_time_hours': 8
+'min_down_time_hours': 8
+'ramp_rate_percent_per_min': '0.08'
+'spinning_reserve_capability': '0'
+'forced_outage_rate': '0.09'
+'planned_outage_rate': '0.08'
+'cold_start_up_costs_$_per_MWcap': 8
+'shutdown_cost': 0.08
+'sources': 
+}

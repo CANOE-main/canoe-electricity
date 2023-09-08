@@ -1,0 +1,24 @@
+'gen_node_code': 'AB_AFG01_GEN'
+'project_name': 'APF Athabasca'
+'owner': 'Alberta-Pacific Forest Industries'
+'province': 'AB'
+'location': 'Boyle'
+'latitude': 54.921896
+'longitude': -112.859331
+'copper_balancing_area': 'alberta.a'
+'operating_region': 'Alberta'
+'connecting_node_code': 'AB_56S_DSS'
+'connecting_voltage_in_kv': 138
+'start_year': 2012
+'previous_renewal_year': 2012
+'possible_renewal_year': 2057
+'closure_year': None
+'gen_type': 'Biomass'
+'gen_type_copper': 'biomass'
+'install_capacity_in_mw': 131
+'capacity_adjustment_in_%': 0.97
+'effective_capacity_in_mw': 127
+'capacity_factor_in_%': 0.55
+'annual_avg_energy_unit_in_gwh/y': 631.16
+'num_of_units_represented': None
+'total_num_of_units': 4
