@@ -9,7 +9,7 @@ import requests
 import sqlite3
 import shutil
 import os
-import intertie_pricing
+import international_transfers
 from string_cleaner import string_cleaner
 from datetime import date
 import solar_capacity_factor
@@ -373,10 +373,9 @@ for interties in translator['transfer_regions'].keys():
     base_tech = translator['generator_types']['INTERTIE']['CANOE_tech']
     tech = base_tech + '-' + translator['transfer_regions'][interties]['tech']
 
-    # Only have variable costs for international interfaces
-    if translator['transfer_regions'][interties]['type'] == 'international':
-        price = intertie_pricing.get_price(region_1, region_2)
-        cost_variable = price * translator['units']['cost_variable']['conversion_factor']
+    # No hourly constraints for interties betweeen endogenous model regions
+    if translator['transfer_regions'][interties]['type'] == 'exogenous':
+        forward_MWh, backward_MWh = international_transfers.get_transfers(region_1, region_2)
     else:
         cost_variable = 0
 
