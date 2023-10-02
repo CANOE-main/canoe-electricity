@@ -9,11 +9,17 @@ import requests
 import sqlite3
 import shutil
 import os
-import international_transfers
+import intertie_transfers
 from string_cleaner import string_cleaner
 from datetime import date
 import solar_capacity_factor
 import numpy as np
+import coders_data
+
+
+
+# Pull CODERS data from the local cache or download it new
+from_cache = True
 
 
 
@@ -57,12 +63,11 @@ emis_comm = curs.fetchone()[0]
 fetch = curs.execute("""SELECT CANOE_unit, conversion_factor FROM units WHERE metric = 'capacity_to_activity'""").fetchone()
 c2a_unit, c2a = fetch[0], fetch[1]
 
-
-
-# TODO: replace with something in the translator db
-# times of day and season names for 8760 hours
-tofd_8760 = 1 + np.mod( np.arange(8760) , 24 )
-seas_8760 = 1 + np.int32(np.floor( np.arange(8760) / 24 ))
+# hour out of 8760 -> time of day or season name
+curs.execute("""SELECT time_of_day FROM time""")
+tofd_8760 = [tofd[0] for tofd in curs.fetchall()]
+curs.execute("""SELECT season FROM time""")
+seas_8760 = [seas[0] for seas in curs.fetchall()]
 
 
 
@@ -82,6 +87,7 @@ for table in all_tables:
 
         for c in range(len(column_names)):
             translator[table][rows[r][0]].update({column_names[c]: rows[r][c]})
+
 
 
 # Get global values
@@ -113,14 +119,14 @@ curs.execute("""SELECT t_day FROM time_of_day""")
 times_of_day = [t_day[0] for t_day in curs.fetchall()]
 
 # Collect generic tech data. Need this now to get lifetimes for viable existing vintages
-generic_json = requests.get('http://206.12.95.90/generation_generic').json()
+generic_json = coders_data.get_json(end_point='generation_generic',from_cache=from_cache)
 generic_techs = dict({translator['generator_types'][tech['generation_type'].upper()]['CANOE_tech']: tech for tech in generic_json})
 
 # Collect existing generator data
-existing_gen = requests.get('http://206.12.95.90/generators').json()
+existing_gen = coders_data.get_json(end_point='generators',from_cache=from_cache)
 
 # Collect evolving cost data
-cost_json = requests.get('http://206.12.95.90/generation_cost_evolution').json()
+cost_json = coders_data.get_json(end_point='generation_cost_evolution',from_cache=from_cache)
 evolving_cost = dict({translator['generator_types'][tech['gen_type'].upper()]['CANOE_tech']: tech for tech in cost_json})
 
 # Add future model periods
@@ -138,7 +144,7 @@ for region in all_regions:
 
 
 # Add storage technology data
-storage_exs = requests.get('http://206.12.95.90/storage').json()
+storage_exs = coders_data.get_json(end_point='storage',from_cache=from_cache)
 
 old_storage_techs = set() # Storage techs without duration disaggregation to be removed
 for storage in storage_exs:
@@ -364,85 +370,97 @@ for tech in list(generic_techs.keys()):
 # Regional interfaces
 # Get variable prices for each set of interties as defined in interface_capacities
 # Do this up here so it doesn't slam the CODERS database twice for no reason
-intertie_cost_vars = dict()
+intertie_flows = dict()
 for interties in translator['transfer_regions'].keys():
+
+    base_tech = translator['generator_types']['INTERTIE']['CANOE_tech']
+    tech = base_tech + "-" + translator['transfer_regions'][interties]['tech']
+
+    # There are multiple interties per some region boundaries so skip duplicates
+    if tech in intertie_flows.keys(): continue
 
     region_1 = translator['transfer_regions'][interties]['region_1']
     region_2 = translator['transfer_regions'][interties]['region_2']
 
-    base_tech = translator['generator_types']['INTERTIE']['CANOE_tech']
-    tech = base_tech + '-' + translator['transfer_regions'][interties]['tech']
+    region_1_CANOE = translator['regions'][region_1]['CANOE_region']
+    region_2_CANOE = translator['regions'][region_2]['CANOE_region']
 
-    # No hourly constraints for interties betweeen endogenous model regions
-    if translator['transfer_regions'][interties]['type'] == 'exogenous':
-        forward_MWh, backward_MWh = international_transfers.get_transfers(region_1, region_2)
-    else:
-        cost_variable = 0
+    # Do not represent interties outside the model
+    if region_1_CANOE == 'EX' and region_2_CANOE == 'EX': continue
 
-    intertie_cost_vars.update({tech: cost_variable})
+    from_region_1, from_region_2 = intertie_transfers.get_transfers(region_1, region_2, translator['transfer_regions'][interties]['type'], from_cache=from_cache)
+
+    intertie_flows.update({tech: {region_1_CANOE: from_region_1, region_2_CANOE: from_region_2}})
 
 
-interfaces = requests.get('http://206.12.95.90/interface_capacities').json()
+interfaces = coders_data.get_json(end_point='interface_capacities',from_cache=from_cache)
 
 interface_techs = dict() # keys are CANOE techs
 
 elc_comm = translator['generator_types']['INTERTIE']['input_comm']
-exist_cap_units = translator['units']['capacity']['CANOE_unit']
+ex_comm = translator['generator_types']['INTERTIE']['output_comm']
 
+# Remember that everything here runs twice, regions 1-2 then 2-1
 for interface in interfaces:
 
     interties = interface['associated_interties']
 
     base_tech = translator['generator_types']['INTERTIE']['CANOE_tech']
-    tech = base_tech + '-' + translator['transfer_regions'][interties]['tech']
+    tech = base_tech + "-" + translator['transfer_regions'][interties]['tech']
 
     from_region = translator['regions'][interface['export_from'].upper()]['CANOE_region']
     to_region = translator['regions'][interface['export_to'].upper()]['CANOE_region']
-    region = from_region + '-' + to_region
 
-    if from_region == 'EX' and to_region == 'EX': continue # if not representing all provinces
+    # Don't represent interties outside the model or interties with insufficient data
+    if from_region == 'EX' and to_region == 'EX': continue
+    if (from_region == 'EX') != (to_region == 'EX') and intertie_flows[tech][from_region] is None: continue
 
     if tech not in interface_techs.keys():
         interface_techs.update({
             tech: dict({
                 'description': string_cleaner(interties),
-                'capacities': dict(),
                 'regions': [from_region, to_region],
-                'cost_variable': intertie_cost_vars[tech],
-                'max_capacity': 0.0,
+                'transfers_from': {from_region: intertie_flows[tech][from_region], to_region: intertie_flows[tech][to_region]},
+                'capacity_from': {from_region: {'summer': 0, 'winter': 0}, to_region: {'summer': 0, 'winter': 0}},
                 'efficiency': 1.0
             })
         })
+    elif string_cleaner(interties) not in interface_techs[tech]['description']:
+        interface_techs[tech]['description'] += ' - ' + string_cleaner(interties)
 
     # CODERS gives different capacities for summer/winter and for directions of flow -> capacity factor
     summer_capacity = translator['units']['capacity']['conversion_factor'] * interface['summer_capacity_mw']
     winter_capacity = translator['units']['capacity']['conversion_factor'] * interface['winter_capacity_mw']
-    
-    interface_techs[tech]['capacities'].update({region+'SUM': summer_capacity})
-    interface_techs[tech]['capacities'].update({region+'WIN': winter_capacity})
 
-    # Both directions of an interface share one capacity variable so take the largest
-    max_capacity = max([summer_capacity, winter_capacity, interface_techs[tech]['max_capacity']])
-    interface_techs[tech]['max_capacity'] = max_capacity
+    # Take the largest of summer/winter capacity then aggregate all interties per region boundary
+    interface_techs[tech]['capacity_from'][from_region]['summer'] += summer_capacity
+    interface_techs[tech]['capacity_from'][from_region]['winter'] += winter_capacity
 
-    
+
 
 for tech in interface_techs.keys():
 
     interface = interface_techs[tech]
-    capacity = interface['max_capacity']
-    if capacity <= 0: continue # this comes up with retired interfaces
+    
+    # Max capacity is largest of both directions and summer/winter (TEMOA demands a single capacity per intertie)
+    max_capacity = max(sum([list(v.values()) for v in list(interface['capacity_from'].values())],[])) # it works dont question it
+    if max_capacity <= 0: continue # zero capacity comes up with retired interfaces
 
     description = interface['description']
 
     # technologies
-    curs.execute(f"""INSERT OR IGNORE INTO
-                technologies(tech, tech_desc)
-                VALUES("{tech}", "{description}")""")
+    curs.execute(f"""REPLACE INTO
+                technologies(tech, flag, sector, tech_desc)
+                VALUES("{tech}", "p", "electric", "{description}")""")
     
     # tech_exchange
-    curs.execute(f"""INSERT OR IGNORE INTO
+    curs.execute(f"""REPLACE INTO
                 tech_exchange(tech, notes)
+                VALUES("{tech}", "{description}")""")
+    
+    # tech_curtailment set as flows are fixed
+    curs.execute(f"""REPLACE INTO
+                tech_curtailment(tech, notes)
                 VALUES("{tech}", "{description}")""")
     
 
@@ -455,10 +473,13 @@ for tech in interface_techs.keys():
 
         if from_region == 'EX' and to_region == 'EX': continue # if not representing all provinces
 
+        # FIXME The QC-ON interlink seems to significantly exceed capacity (4408/2750) so do this for now
+        if (from_region == 'EX') != (to_region == 'EX'): max_capacity = 5
+
         # ExistingCapacity
         curs.execute(f"""REPLACE INTO
                     ExistingCapacity(regions, tech, vintage, exist_cap, exist_cap_units, exist_cap_notes)
-                    VALUES("{region}", "{tech}", 2020, "{capacity}", "{translator['units']['capacity']['CANOE_unit']}", "{description}")""")
+                    VALUES("{region}", "{tech}", 2020, "{max_capacity}", "{translator['units']['capacity']['CANOE_unit']}", "{description}")""")
 
         # LifetimeTech
         curs.execute(f"""REPLACE INTO
@@ -470,28 +491,45 @@ for tech in interface_techs.keys():
                     CapacityToActivity(regions, tech, c2a, c2a_notes)
                     VALUES("{region}", "{tech}", "{c2a}", "{c2a_unit}")""")
         
-        for season in ['SUM', 'WIN']:
-            for time_of_day in times_of_day:
+        # CapacityFactorTech
+        # Endogenous intertie, set summer/winter to/from capacities
+        if from_region != 'EX' and to_region != 'EX':
+
+            for hour in range(8760):
+
+                season = seas_8760[hour]
+                time_of_day = tofd_8760[hour]
+
+                summer_winter = translator['time'][hour]['summer_winter']
+                capacity = interface['capacity_from'][from_region][summer_winter]
+
                 curs.execute(f"""REPLACE INTO
                             CapacityFactorTech(regions, season_name, time_of_day_name, tech, cf_tech, cf_tech_notes)
-                            VALUES("{region}", "{season}", "{time_of_day}", "{tech}", "{interface['capacities'][region+season]/capacity}", "{description}")""")
+                            VALUES("{region}", "{season}", "{time_of_day}", "{tech}", "{capacity/max_capacity}", "{description}")""")
+        
+        # Intertie crosses model boundary, fix hourly flow
+        elif (from_region == 'EX') != (to_region == 'EX'):
+
+            for hour in range(8760):
+
+                season = seas_8760[hour]
+                time_of_day = tofd_8760[hour]
+
+                cf = interface['transfers_from'][from_region][hour]/max_capacity/1000
+
+                curs.execute(f"""REPLACE INTO
+                            CapacityFactorTech(regions, season_name, time_of_day_name, tech, cf_tech, cf_tech_notes)
+                            VALUES("{region}", "{season}", "{time_of_day}", "{tech}", "{cf}", "{description}")""")
         
         for period in model_periods:
 
             # Efficiency
             # No efficiencies in CODERS right now so don't override manual data
-            input_comm = "E_ethos" if from_region == "EX" else elc_comm
-            output_comm = "E_ethos" if to_region == "EX" else elc_comm
+            input_comm = ex_comm if from_region == "EX" else elc_comm
+            output_comm = ex_comm if to_region == "EX" else elc_comm
             curs.execute(f"""INSERT OR IGNORE INTO
                         Efficiency(regions, input_comm, tech, vintage, output_comm, efficiency)
-                        VALUES("{region}", "{elc_comm}", "{tech}", 2020, "{elc_comm}", 1)""")
-            
-            # CostVariable
-            cost_variable = interface['cost_variable']
-            if cost_variable != 0:
-                curs.execute(f"""REPLACE INTO
-                            CostVariable(regions, periods, tech, vintage, cost_variable, cost_variable_units, cost_variable_notes)
-                            VALUES("{region}", "{period}", "{tech}", 2020, "{cost_variable}", "{translator['units']['cost_variable']['CANOE_unit']}", "{description}")""")
+                        VALUES("{region}", "{input_comm}", "{tech}", 2020, "{output_comm}", 1)""")
 
 
 
@@ -510,7 +548,7 @@ for tx_tech in tx_techs + dummy_techs:
                 VALUES("{translator['generator_types'][tx_tech]['output_comm']}")""")
 
 # Regional parameters
-ca_sys_params = requests.get('http://206.12.95.90/CA_system_parameters').json()
+ca_sys_params = coders_data.get_json(end_point='CA_system_parameters',from_cache=from_cache)
 for province in ca_sys_params:
 
     region = translator['regions'][province['province'].upper()]['CANOE_region']
@@ -537,22 +575,6 @@ for province in ca_sys_params:
             curs.execute(f"""REPLACE INTO
                         Efficiency(regions, input_comm, tech, vintage, output_comm, efficiency)
                         VALUES("{region}", "{input}", "{tech}", {model_periods[0]}, "{output}", "{eff}")""")
-
-
-
-# Solar and wind capacity factors estimated from CWEC data where none exists
-for region in all_regions:
-    if region in ('EX', 'ON'): continue
-
-    solar_exs_cf = solar_capacity_factor.get_exs_cf(existing_gen, region, translator)
-    # wind_exs_cf = 
-
-    for hour in range(8760):
-        if solar_exs_cf is not None:
-            curs.execute(f"""REPLACE INTO
-                        CapacityFactorTech(regions, season_name, time_of_day_name, tech, cf_tech)
-                        VALUES("{region}", "{seas_8760[hour]}", "{tofd_8760[hour]}", "{translator['generator_types']['SOLAR']['CANOE_tech']}", {solar_exs_cf[hour]})""")
-        # if wind_exs_cf is not None:
                  
 
 
