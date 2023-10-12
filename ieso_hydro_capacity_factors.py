@@ -13,23 +13,26 @@ from matplotlib import pyplot as plot
 import json
 import sqlite3
 import os
+import tools
+from pull_config import params
 
 
+
+data_year = params['default_data_year']
 
 this_dir = os.path.realpath(os.path.dirname(__file__)) + "/"
 ieso_data = this_dir + "ieso_data/"
-data_year = 2020
 
 
-# I think it's a warcrime to use lambda functions like this
+# A bunch of lambda functions to handle data nonsense
+get_ieso_data = lambda month: tools.get_file(url(month), skiprows=3, index_col=False)
 url = lambda month: f"""http://reports.ieso.ca/public/GenOutputCapabilityMonth/PUB_GenOutputCapabilityMonth_{str(data_year) + NN(month + 1)}.csv"""
-get_ieso_data = lambda month: pd.read_csv(url(month), skiprows=3, index_col=False)
 NN = lambda dm: str(dm) if dm>9 else '0' + str(dm)
 to_date = lambda month, day: f"{data_year}-{NN(month+1)}-{NN(day+1)}"
 get_ieso_value = lambda ieso_data, generator, measurement, month, day, hour: ieso_data.loc[(ieso_data['Generator'] == generator) & (ieso_data['Measurement'] == measurement) & (ieso_data['Delivery Date'] == to_date(month, day))]['Hour ' + str(hour+1)].values[0]
 
 
-ieso_hydro_gens = pd.read_excel(ieso_data + 'ieso_hydro_generators.csv', index_col=False, header=None)
+ieso_hydro_gens = pd.read_csv(ieso_data + 'hydro_generators.csv', index_col=False, header=None)
 ror_gens = []
 dly_gens = []
 

@@ -11,197 +11,140 @@ import matplotlib.pyplot as pp
 import sqlite3
 import os
 import tools
+from pull_config import params, translator
 
 
 
-data_year = 2020
+data_year = params['default_data_year']
+
 this_dir = os.path.realpath(os.path.dirname(__file__)) + "/"
+coders_db = this_dir + "coders_db.sqlite"
 ieso_data = this_dir + "ieso_data/"
+batch_file = this_dir + "input_files/batched_new_capacity.xlsx"
+cc_file = ieso_data + 'capacity_credits.csv'
+# TODO ref
+reference = "1. Frew, B., Cole, W., Sun, Y., Richards, J. & Mai, T. 8760-Based Method for Representing Variable Generation Capacity Value in Capacity Expansion Models: Preprint."
 
 
-vres = ['WIND','SOLAR']
+
+batched_cap = pd.read_excel(batch_file, sheet_name="ON", index_col=0, skiprows=2)
+
+vres = ['WIND_ONSHORE','SOLAR_PV']
 cfs = ieso_cf.get_capacity_factors() # gets hydro daily as 365 days
 cfs.update({'HYDRO_DLY':pd.read_csv(ieso_data + 'hydro_dly_cf_8760.csv',index_col=0,header=0)['0']})
 
-production = dict()
+intertie_flow = tools.get_file(f"http://reports.ieso.ca/public/IntertieScheduleFlowYear/PUB_IntertieScheduleFlowYear_{data_year}.csv", index_col=False, skiprows=4, nrows=8760)
+demand = tools.get_file(f"http://reports.ieso.ca/public/Demand/PUB_Demand_{data_year}.csv", index_col=False, skiprows=3, nrows=8760).rename(columns={'Ontario Demand': 'load'})
+demand['load'] += intertie_flow['Exp.14'] - intertie_flow['Imp.14']
+demand['net_load'] = demand['load'].copy()
+
+capacity_mw = dict()
+production_mwh = dict()
 for vre in vres:
-    production.update({vre:cfs[vre]*ieso_cf.get_total_capacity(vre)*1000})
-
-intertie_flow = tools.get_csv(f"http://reports.ieso.ca/public/IntertieScheduleFlowYear/PUB_IntertieScheduleFlowYear_{data_year}.csv", index_col=False, skiprows=4)
-
-
-
-def get_capacity_values(new_mw=0, mw_step=1000):
-
-    demand = pd.read_csv(ieso_data + 'ieso_elc_demand_2020.csv',index_col=0,skiprows=3).rename(columns={'Ontario Demand': 'load'})
-
-    demand['load'] += intertie_flow['net_flow']
-
-    demand['net_load'] = demand['load'].copy()
-    for vre in vres:
-        demand['net_load'] -= production[vre]
+    capacity_mw.update({vre: ieso_cf.get_total_capacity(vre)*1000})
+    production_mwh.update({vre: cfs[vre] * capacity_mw[vre]})
+    demand['net_load'] -= production_mwh[vre]
 
 
 
-    # Total CC
+def get_capacity_credit(vre, new_mw=0, mw_step=1000):
+
+    # Net load without this VRE generation
+    if new_mw == 0: load = demand['net_load'].copy() + cfs[vre]*capacity_mw[vre]
+    else: load = demand['net_load'].copy() - cfs[vre]*(new_mw - mw_step)
+    ldc = load.sort_values(ascending=False)
+
+    # Net load with this VRE generation
+    net_load = demand['net_load'].copy() - cfs[vre]*new_mw
+    nldc = net_load.sort_values(ascending=False)
+
+    if (new_mw == 0):
+        pp.figure(vre)
+        pp.plot(range(8760),ldc,label="LDC")
+        pp.plot(range(8760),nldc,label="NLDC")
+
     # LDC - NLDC top 100 hours
-    ccs_ldc = dict()
-    for vre in vres:
+    cv = np.mean(ldc[0:100] - nldc[0:100])
+    marg_cap = capacity_mw[vre] if new_mw == 0 else mw_step
 
-        # Net load without this VRE
-        load = demand['net_load'].copy() + production[vre]
-        ldc = load.sort_values(ascending=False)
+    # Divided by capacity for cc
+    cc = cv/marg_cap # capacity in GW in database
 
-        # Net load with this VRE
-        net_load = demand['net_load'].copy() - cfs[vre]*new_mw
-        nldc = net_load.sort_values(ascending=False)
-
-        cv = np.mean(ldc[0:100] - nldc[0:100])
-        cap = ieso_cf.get_total_capacity(vre) + new_mw/1000
-
-        cc = cv/cap/1000 # cap in GW in database
-
-        ccs_ldc.update({vre:cc})
-
-
-    # Marginal CC
-    # LDC - NLDC top 100 hours
-    ccs_marg_ldc = dict()
-    for vre in vres:
-
-        # Net load without this VRE marginal capacity
-        load = demand['net_load'].copy() - cfs[vre]*(new_mw - mw_step)
-        ldc = load.sort_values(ascending=False)
-
-        # Net load with this VRE marginal capacity
-        net_load = demand['net_load'].copy() - cfs[vre]*new_mw
-        nldc = net_load.sort_values(ascending=False)
-
-        cv = np.mean(ldc[0:100] - nldc[0:100])
-        marg_cap = mw_step/1000
-
-        cc = cv/marg_cap/1000 # capacity in GW in database
-
-        ccs_marg_ldc.update({vre:cc})
-
-    pp.figure(10)
-    pp.plot(range(8760),ldc)
-    pp.plot(range(8760),nldc)
-
-    # Total / marginal CC
-    # CF top 10 hours
-    ccs_cf = dict()
-    for vre in vres:
-
-        net_load = demand['net_load'].copy() - cfs[vre]*new_mw
-        nldc = net_load.sort_values(ascending=False)
-        nldc_hours = nldc.index.to_numpy()[0:10]
-
-        cc = np.mean(cfs[vre][nldc_hours])
-
-        ccs_cf.update({vre: cc})
-
-
-    return ccs_cf, ccs_ldc, ccs_marg_ldc
+    return cc
 
 
 
-def get_cc_curves(new_mw_step=1000, new_mw_max=11000, return_type='marg_ldc'):
+def get_cc_curve(vre, mw_steps):
 
-    new_mws = range(0,new_mw_max,new_mw_step)
-    mw_indexed = {'new_mw':list(new_mws)}
+    ccs = list()
 
-    ccs_cf = mw_indexed.copy()
-    ccs_ldc = mw_indexed.copy()
-    ccs_marg_ldc = mw_indexed.copy()
+    new_mw = 0
+    new_mws = list()
+    new_mw_max = sum(mw_steps)
 
-    for vre in vres:
-        ccs_cf.update({vre: list()})
-        ccs_ldc.update({vre: list()})
-        ccs_marg_ldc.update({vre: list()})
+    for i in range(len(mw_steps)):
+        new_mw += mw_steps[i]
+        new_mws.append(new_mw)
+        ccs.append(get_capacity_credit(vre=vre, new_mw=new_mw, mw_step=mw_steps[i]))
 
-    for new_mw in new_mws:
+    pp.figure()
+    pp.plot(new_mws, ccs, label='LDC marginal 100H')
+    mean_cf = np.mean(cfs[vre])
+    pp.plot([0,new_mw_max],[mean_cf,mean_cf],'k-', label='Annual CF')
+    pp.legend(loc=1)
+    pp.title(vre)
 
-        cc_cf, cc_ldc, cc_marg_ldc = get_capacity_values(new_mw=new_mw)
-
-        for vre in vres:
-            ccs_cf[vre].append(cc_cf[vre])
-            ccs_ldc[vre].append(cc_ldc[vre])
-
-            ccs_marg_ldc[vre].append(cc_marg_ldc[vre] if new_mw > 0 else cc_ldc[vre])
-
-
-    f = 1 # figure counter
-    for vre in vres:
-
-        pp.figure(f)
-        # pp.ylim([0,0.8])
-        f += 1
-
-        pp.plot(ccs_cf['new_mw'],ccs_cf[vre],label='CF total/marginal 10H')
-        pp.plot(ccs_ldc['new_mw'],ccs_ldc[vre], label='LDC total 100H')
-        pp.plot(ccs_marg_ldc['new_mw'],ccs_marg_ldc[vre], label='LDC marginal 100H')
-
-        mean_cf = np.mean(cfs[vre])
-
-        pp.plot([0,new_mw_max],[mean_cf,mean_cf],'k-', label='Annual CF')
-        pp.legend(loc=1)
-        pp.title(vre)
-
-
-    to_return = {
-        'cf': ccs_cf,
-        'tot_ldc': ccs_ldc,
-        'marg_ldc': ccs_marg_ldc
-    }
-
-    return to_return[return_type]
+    return ccs
 
 
 
-ccs = get_cc_curves(return_type='marg_ldc')
-ccs['new_mw'][0] = 'existing'
-
-df = pd.DataFrame(ccs)
-df.to_csv(ieso_data + 'ieso_capacity_credits.csv')
-
-print(df.head(len(ccs['new_mw'])))
-
-pp.show()
-
-# TODO fill this function
-def write_to_coders_db(download=False, update_cache=False):
-
-    cfs = get_capacity_factors(download=download, update_cache=update_cache)
-
-    hydro_dly_total_cap = get_total_capacity('HYDRO_DLY')
-    hydro_dly_seas_act = cfs['HYDRO_DLY'] * hydro_dly_total_cap
+# Write capacity credits to CODERS database
+def write_to_coders_db(ccs_vres):
 
     conn = sqlite3.connect(coders_db)
     curs = conn.cursor()
+    
+    for vre in vres:
+        base_tech = translator['generator_types'][vre]['CANOE_tech']
+        ccs = ccs_vres[vre]
 
-    # Run these separately to keep the database in order
-    for h in range(8760):
-        curs.execute(f"""REPLACE INTO
-                    CapacityFactorTech(regions, season_name, time_of_day_name, tech, cf_tech)
-                    VALUES('ON', '{DDD(seas_8760[h])}', '{HH(tofd_8760[h])}', 'E_WND_ON', {cfs['WIND'][h]})""")
-    for h in range(8760):
-        curs.execute(f"""REPLACE INTO
-                    CapacityFactorTech(regions, season_name, time_of_day_name, tech, cf_tech)
-                    VALUES('ON', '{DDD(seas_8760[h])}', '{HH(tofd_8760[h])}', 'E_SOL_PV', {cfs['SOLAR'][h]})""")
-    for h in range(8760):
-        curs.execute(f"""REPLACE INTO
-                    CapacityFactorTech(regions, season_name, time_of_day_name, tech, cf_tech)
-                    VALUES('ON', '{DDD(seas_8760[h])}', '{HH(tofd_8760[h])}', 'E_HYD_ROR', {cfs['HYDRO_ROR'][h]})""")
-        
-    for period in range(2020,2055,5):
-        for d in range(365):
-            curs.execute(f"""REPLACE INTO
-                        MinSeasonalActivity(regions, periods, season_name, tech, minact, minact_units)
-                        VALUES('ON', {period}, '{DDD(seas_8760[d])}', 'E_HYD_DLY', {hydro_dly_seas_act[d]}, 'PJ')""")
-            curs.execute(f"""REPLACE INTO
-                        MaxSeasonalActivity(regions, periods, season_name, tech, maxact, maxact_units)
-                        VALUES('ON', {period}, '{DDD(seas_8760[d])}', 'E_HYD_DLY', {hydro_dly_seas_act[d]}, 'PJ')""")
+        for i in range(len(ccs)):
 
+            cc = ccs[i]
+            if cc is None: break
+
+            tech = f"{base_tech}-NEW-{i}" if i > 0 else base_tech
+            print(tech)
+
+            curs.execute(f"""
+                         UPDATE CapacityCredit
+                         SET
+                          cf_tech={cc},
+                          cf_tech_notes='LDC - NLDC top 100 hours from IESO public data [{reference}]'
+                         WHERE
+                          regions=='ON' and tech=='{tech}'
+                        """)
+    
     conn.commit()
     conn.close()
+        
+
+
+ccs_vres = dict()
+max_n = max(batched_cap['batches'])
+for vre in vres:
+
+    n_batches = batched_cap.loc[vre, 'batches']
+    mw_steps = [0, *batched_cap.loc[vre, 1:n_batches].tolist()]
+
+    # Have to pad smaller lists to build the dataframe
+    ccs = [*get_cc_curve(vre, mw_steps), *[None for n in range(max_n - n_batches)]]
+    ccs_vres.update({vre: ccs})
+
+df = pd.DataFrame.from_dict(ccs_vres)
+print(df.head(max_n+1))
+df.to_csv(cc_file)
+
+write_to_coders_db(ccs_vres)
+
+pp.show()

@@ -13,11 +13,12 @@ import xmltodict
 import pandas as pd
 from pathlib import Path
 from matplotlib import pyplot
-from translator import *
+from pull_config import params, seas_8760, tofd_8760
+import tools
 
 
 
-data_year = 2020
+data_year = params['default_data_year']
 
 this_dir = os.path.realpath(os.path.dirname(__file__)) + "/"
 translation_file = this_dir + "CODERS_CANOE_translation.sqlite"
@@ -28,33 +29,9 @@ cache = ieso_data +  f"ieso_gen_hourly_{data_year}.txt"
 
 
 
-def get_ieso_production(download=False):
+def get_ieso_production():
 
-    data = None
-    if (download or not os.path.isfile(cache)):
-
-        url = f"http://reports.ieso.ca/public/GenOutputbyFuelHourly/PUB_GenOutputbyFuelHourly_{data_year}.xml"
-        xml_data = requests.get(url).content
-        data = json.dumps(xmltodict.parse(xml_data))
-
-        # Overwrite local data cache with newly downloaded file
-        file = open(cache, 'w')
-        file.write(data)
-        file.close()
-
-        print(f"Downloaded and cached {data_year} hourly production data from IESO")
-
-    else:
-
-        # Pull data from saved json text file
-        file = open(cache)
-        data = json.loads(file.read())
-
-        print(f"Got {data_year} hourly IESO production data from local cache")
-
-    if data == None: return None
-
-
+    data = tools.get_file(f"http://reports.ieso.ca/public/GenOutputbyFuelHourly/PUB_GenOutputbyFuelHourly_{data_year}.xml")
 
     fuels = ['NUCLEAR', 'GAS', 'HYDRO', 'WIND', 'SOLAR', 'BIOFUEL']
     hourly_production = dict()
@@ -76,12 +53,12 @@ def get_ieso_production(download=False):
 
 
 
-def get_capacity_factors(download=False, update_cache=False):
+def get_capacity_factors():
 
-    hourly_production = get_ieso_production(download=download, update_cache=update_cache)
+    hourly_production = get_ieso_production()
 
-    wind_total_cap = get_total_capacity('WIND')
-    solar_total_cap = get_total_capacity('SOLAR')
+    wind_total_cap = get_total_capacity('WIND_ONSHORE')
+    solar_total_cap = get_total_capacity('SOLAR_PV')
     hydro_total_cap = get_total_capacity('HYDRO')
 
     wind_cf = np.array(hourly_production['WIND']) / wind_total_cap / 1000 # MWh/GW.h to PJ/PJ
@@ -91,8 +68,8 @@ def get_capacity_factors(download=False, update_cache=False):
     hydro_dly_cf = np.array(pd.read_csv(ieso_data + 'hydro_dly_cf_365.csv',index_col=0,header=0)['0']) * 3600 * 24 / 10**6 # GWd to PJ
 
     return dict({
-        'WIND':wind_cf,
-        'SOLAR':solar_cf,
+        'WIND_ONSHORE':wind_cf,
+        'SOLAR_PV':solar_cf,
         'HYDRO_ROR':hydro_ror_cf,
         'HYDRO_DLY':hydro_dly_cf,
         'HYDRO':hydro_cf
@@ -106,8 +83,8 @@ def get_total_capacity(vre_type):
     curs = conn.cursor()
 
     tech_like = dict({
-        'WIND':'%WND%',
-        'SOLAR':'%SOL%',
+        'WIND_ONSHORE':'%WND_ON%',
+        'SOLAR_PV':'%SOL_PV%',
         'HYDRO_ROR':'%HYD_ROR%',
         'HYDRO_DLY':'%HYD_DLY%',
         'HYDRO':'%HYD%'

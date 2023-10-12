@@ -7,8 +7,8 @@ import sqlite3
 import os
 import tools
 
+data_year = 2020
+url = f"http://reports.ieso.ca/public/IntertieScheduleFlowYear/PUB_IntertieScheduleFlowYear_{data_year}.csv"
+data = tools.get_file(url, index_col=False, skiprows=4, nrows=8760)
 
-url = "http://reports.ieso.ca/public/GenOutputbyFuelHourly/PUB_GenOutputbyFuelHourly_2020.xml"
-df = tools.get_file(url)
-
-print(df.head(10))
+print(data.head(10))

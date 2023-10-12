@@ -10,12 +10,13 @@ import intertie_transfers
 from tools import string_cleaner
 import numpy as np
 import coders_api
-from translator import *
+from pull_config import *
 
 
 
 # Get the schema, target, and database translation files
 this_dir = os.path.realpath(os.path.dirname(__file__)) + "/"
+input_files = this_dir + "input_files/"
 schema_file = this_dir + "temoa_schema.sqlite"
 database_file = this_dir + "coders_db.sqlite"
 
@@ -487,16 +488,6 @@ for province in ca_sys_params:
                         Efficiency(regions, input_comm, tech, vintage, output_comm, efficiency)
                         VALUES("{region}", "{input}", "{tech}", {model_periods[0]}, "{output}", "{eff}")""")
             
-
-
-# Capacity credits for new capacity
-for tech in translator['new_capacity'].keys():
-
-
-    # duplicate exs tech to new-N
-    # get ccs from csvs by region
-    # add to db by cap batch
-                 
 
 
 # MUST BE LAST
