@@ -20,7 +20,7 @@ model_periods = config.model_periods
 
 
 
-# Get the schema, target, and database translation files
+# Get various files
 this_dir = os.path.realpath(os.path.dirname(__file__)) + "/"
 input_files = this_dir + "input_files/"
 schema_file = this_dir + "temoa_schema.sqlite"
@@ -90,9 +90,9 @@ for region in config.batched_cap.keys():
         if base_tech not in generic_techs.keys(): continue
         n_batches = int(translator['generator_types'][generic_techs[base_tech]['generation_type'].upper()]['new_cap_steps'])
 
-        if n_batches == 0: variants = [f"{base_tech}-EXS"]
-        elif n_batches > 1: variants = [f"{base_tech}-EXS", *[f"{base_tech}-NEW-{n}" for n in range(1,n_batches+1)]]
-        else: variants = [f"{base_tech}-EXS", f"{base_tech}-NEW"]
+        if n_batches == 0: variants = [f"{base_tech}-EXS"] # No new capacity allowed
+        elif n_batches > 1: variants = [f"{base_tech}-EXS", *[f"{base_tech}-NEW-{n}" for n in range(1,n_batches+1)]] # Specified batches
+        else: variants = [f"{base_tech}-EXS", f"{base_tech}-NEW"] # Not specified or 1 so allow new and existing
 
         tech_variants.update({base_tech: variants})
 
@@ -181,15 +181,16 @@ for generator in existing_gen:
         continue
     
     if 'HYD' in tech and params['no_hydro_retirement'] == 'true':
-        vint = 2020
+        vint = 2020 # If hydro doesn't retire might as well aggregate
     else:
-        vint = generator['previous_renewal_year'] # Hydro doesn't retire so might as well aggregate
+        vint = generator['previous_renewal_year']
         if vint is None: vint = generator['start_year']
 
     # Aggregate all other existing vintages by specified num years
     exs_y = int(params['exs_aggregation_years'])
-    vint = min(2023,int(exs_y * round(float(vint)/exs_y)))
+    vint = min(min(model_periods)-1,int(exs_y * round(float(vint)/exs_y))) # Round to the nearest exs_y years but before first model period
 
+    # Add all existing vintages as existing time periods
     curs.execute(f"""INSERT OR IGNORE INTO
                 time_periods(t_periods, flag)
                 VALUES({vint}, "e")""")
@@ -200,7 +201,8 @@ for generator in existing_gen:
     if vint + life <= model_periods[0]:
         print(f"Existing {region} generator {generator['project_name']} would retire before first model period and so was excluded. Vintage: {vint}, life: {life}")
         continue
-
+    
+    # Keeping a record of valid region-tech-vintage sets (existing here but future added later)
     if region not in rtv_data.keys(): rtv_data.update({region: dict()})
     if tech not in rtv_data[region].keys(): rtv_data[region].update({tech: dict()})
     if vint not in rtv_data[region][tech].keys(): rtv_data[region][tech].update({vint: dict({'capacity': capacity, 'description': generator_name})})
