@@ -13,9 +13,11 @@ import xmltodict
 import pandas as pd
 from pathlib import Path
 from matplotlib import pyplot
-from pull_config import params, seas_8760, tofd_8760
+from setup import config
 import tools
 
+params = config.params
+translator = config.translator
 
 
 data_year = params['default_data_year']
@@ -112,24 +114,24 @@ def write_to_coders_db(download=False, update_cache=False):
     for h in range(8760):
         curs.execute(f"""REPLACE INTO
                     CapacityFactorTech(regions, season_name, time_of_day_name, tech, cf_tech)
-                    VALUES('ON', '{seas_8760[h]}', '{tofd_8760[h]}', 'E_WND_ON', {cfs['WIND'][h]})""")
+                    VALUES('ON', '{config.seas_8760[h]}', '{config.tofd_8760[h]}', 'E_WND_ON', {cfs['WIND'][h]})""")
     for h in range(8760):
         curs.execute(f"""REPLACE INTO
                     CapacityFactorTech(regions, season_name, time_of_day_name, tech, cf_tech)
-                    VALUES('ON', '{seas_8760[h]}', '{tofd_8760[h]}', 'E_SOL_PV', {cfs['SOLAR'][h]})""")
+                    VALUES('ON', '{config.seas_8760[h]}', '{config.tofd_8760[h]}', 'E_SOL_PV', {cfs['SOLAR'][h]})""")
     for h in range(8760):
         curs.execute(f"""REPLACE INTO
                     CapacityFactorTech(regions, season_name, time_of_day_name, tech, cf_tech)
-                    VALUES('ON', '{seas_8760[h]}', '{tofd_8760[h]}', 'E_HYD_ROR', {cfs['HYDRO_ROR'][h]})""")
+                    VALUES('ON', '{config.seas_8760[h]}', '{config.tofd_8760[h]}', 'E_HYD_ROR', {cfs['HYDRO_ROR'][h]})""")
         
     for period in range(2020,2055,5):
         for d in range(365):
             curs.execute(f"""REPLACE INTO
                         MinSeasonalActivity(regions, periods, season_name, tech, minact, minact_units)
-                        VALUES('ON', {period}, '{seas_8760[d]}', 'E_HYD_DLY', {hydro_dly_seas_act[d]}, 'PJ')""")
+                        VALUES('ON', {period}, '{config.seas_8760[d]}', 'E_HYD_DLY', {hydro_dly_seas_act[d]}, 'PJ')""")
             curs.execute(f"""REPLACE INTO
                         MaxSeasonalActivity(regions, periods, season_name, tech, maxact, maxact_units)
-                        VALUES('ON', {period}, '{seas_8760[d]}', 'E_HYD_DLY', {hydro_dly_seas_act[d]}, 'PJ')""")
+                        VALUES('ON', {period}, '{config.seas_8760[d]}', 'E_HYD_DLY', {hydro_dly_seas_act[d]}, 'PJ')""")
 
     conn.commit()
     conn.close()

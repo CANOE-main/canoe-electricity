@@ -11,7 +11,11 @@ import matplotlib.pyplot as pp
 import sqlite3
 import os
 import tools
-from pull_config import params, translator
+from setup import config
+
+params = config.params
+batched_cap = config.batched_cap["ON"]
+translator = config.translator
 
 
 
@@ -20,14 +24,10 @@ data_year = params['default_data_year']
 this_dir = os.path.realpath(os.path.dirname(__file__)) + "/"
 coders_db = this_dir + "coders_db.sqlite"
 ieso_data = this_dir + "ieso_data/"
-batch_file = this_dir + "input_files/batched_new_capacity.xlsx"
 cc_file = ieso_data + 'capacity_credits.csv'
-# TODO ref
-reference = "1. Frew, B., Cole, W., Sun, Y., Richards, J. & Mai, T. 8760-Based Method for Representing Variable Generation Capacity Value in Capacity Expansion Models: Preprint."
+reference = f"{params['capacity_credit_reference']} [{params['ieso_reference'].replace('<year>',data_year)}]"
 
 
-
-batched_cap = pd.read_excel(batch_file, sheet_name="ON", index_col=0, skiprows=2)
 
 vres = ['WIND_ONSHORE','SOLAR_PV']
 cfs = ieso_cf.get_capacity_factors() # gets hydro daily as 365 days
@@ -116,28 +116,30 @@ def write_to_coders_db(ccs_vres):
             tech = f"{base_tech}-NEW-{i}" if i > 0 else base_tech
             print(tech)
 
+            # New cap batch techs need to be in place already (CODERS_pull.py)
             curs.execute(f"""
                          UPDATE CapacityCredit
                          SET
                           cf_tech={cc},
-                          cf_tech_notes='LDC - NLDC top 100 hours from IESO public data [{reference}]'
+                          cf_tech_notes='{reference}'
                          WHERE
                           regions=='ON' and tech=='{tech}'
                         """)
     
     conn.commit()
     conn.close()
-        
+
 
 
 ccs_vres = dict()
-max_n = max(batched_cap['batches'])
+max_n = max([int(translator['generator_types'][vre]['new_cap_steps']) for vre in vres])
 for vre in vres:
 
-    n_batches = batched_cap.loc[vre, 'batches']
+    n_batches = int(translator['generator_types'][vre]['new_cap_steps'])
+    print(n_batches)
     mw_steps = [0, *batched_cap.loc[vre, 1:n_batches].tolist()]
 
-    # Have to pad smaller lists to build the dataframe
+    # Have to pad smaller lists to match lengths to build the dataframe
     ccs = [*get_cc_curve(vre, mw_steps), *[None for n in range(max_n - n_batches)]]
     ccs_vres.update({vre: ccs})
 

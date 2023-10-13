@@ -3,9 +3,6 @@ This script gets 8760 transfer flows per regional boundary
 Written by Ian David Elder for the TEMOA Canada / CANOE model
 """
 
-import requests
-import statistics
-import sqlite3
 import numpy as np
 from matplotlib import pyplot
 import coders_api

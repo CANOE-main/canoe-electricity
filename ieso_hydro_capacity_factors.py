@@ -14,7 +14,7 @@ import json
 import sqlite3
 import os
 import tools
-from pull_config import params
+from setup import params
 
 
 

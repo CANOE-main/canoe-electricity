@@ -10,7 +10,13 @@ import intertie_transfers
 from tools import string_cleaner
 import numpy as np
 import coders_api
-from pull_config import *
+from setup import config
+
+# Frequently used config variables
+translator = config.translator
+params = config.params
+all_regions = config.all_regions
+model_periods = config.model_periods
 
 
 
@@ -30,15 +36,18 @@ if not os.path.exists(database_file):
 conn = sqlite3.connect(database_file)
 curs = conn.cursor() # Cursor object interacts with the sqlite db
 
+# Whether to use CODERS data from local cache instead of downloading new
+from_cache = params['pull_from_cache']
+
 # Collect generic tech data. Need this now to get lifetimes for viable existing vintages
-generic_json = coders_api.get_json(end_point='generation_generic',from_cache=pull_from_cache)
+generic_json = coders_api.get_json(end_point='generation_generic',from_cache=from_cache)
 generic_techs = dict({translator['generator_types'][tech['generation_type'].upper()]['CANOE_tech']: tech for tech in generic_json})
 
 # Collect existing generator data
-existing_gen = coders_api.get_json(end_point='generators',from_cache=pull_from_cache)
+existing_gen = coders_api.get_json(end_point='generators',from_cache=from_cache)
 
 # Collect evolving cost data
-cost_json = coders_api.get_json(end_point='generation_cost_evolution',from_cache=pull_from_cache)
+cost_json = coders_api.get_json(end_point='generation_cost_evolution',from_cache=from_cache)
 evolving_cost = dict({translator['generator_types'][tech['gen_type'].upper()]['CANOE_tech']: tech for tech in cost_json})
 
 # Add future model periods
@@ -52,13 +61,52 @@ for region in all_regions:
     curs.execute(f"""INSERT OR IGNORE INTO
                     regions(regions)
                     VALUES("{region}")""")
+    
+# commodities
+for comm in config.all_comms:
+    curs.execute(f"""INSERT OR IGNORE INTO
+                commodities(comm_name, flag)
+                VALUES("{comm}", "p")""")
+    
+
+
+# To determine whether a tech is existing or new
+is_exs = lambda tech: '-EXS' in tech
+is_new = lambda tech: '-NEW' in tech
+
+
+
+# Handle batches of new techs
+tech_variants = dict() # tech_variants[region][tech][tech-EXS, tech-NEW-1, ...]
+old_techs = set()
+for region in config.batched_cap.keys():
+    if region == 'EX': continue
+
+    tech_variants.update({region: dict()})
+
+    # For techs with specified batch sizes get from csv
+    for base_tech in config.all_techs:
+        
+        if base_tech not in generic_techs.keys(): continue
+        n_batches = int(translator['generator_types'][generic_techs[base_tech]['generation_type'].upper()]['new_cap_steps'])
+
+        if n_batches == 0: variants = [f"{base_tech}-EXS"]
+        elif n_batches > 1: variants = [f"{base_tech}-EXS", *[f"{base_tech}-NEW-{n}" for n in range(1,n_batches+1)]]
+        else: variants = [f"{base_tech}-EXS", f"{base_tech}-NEW"]
+
+        tech_variants.update({base_tech: variants})
+
+        # Add these additional techs to the generic techs dict
+        old_techs.add(base_tech)
+        for variant in variants:
+            generic_techs.update({variant: generic_techs[base_tech]})
+            if is_new(variant): evolving_cost.update({variant: evolving_cost[base_tech]})
 
 
 
 # Add storage technology data
-storage_exs = coders_api.get_json(end_point='storage',from_cache=pull_from_cache)
+storage_exs = coders_api.get_json(end_point='storage',from_cache=from_cache)
 
-old_storage_techs = set() # Storage techs without duration disaggregation to be removed
 for storage in storage_exs:
 
     if storage['closure_year'] <= model_periods[0]:
@@ -68,7 +116,15 @@ for storage in storage_exs:
     CODERS_gen_type = storage['generation_type'].upper()
     duration = int(round(storage['duration']))
     CANOE_tech = translator['generator_types'][CODERS_gen_type]['CANOE_tech']
-    tech = f"{CANOE_tech}_{duration}H"
+
+    if CANOE_tech not in generic_techs.keys():
+        print(f"""Existing storage technology {CODERS_gen_type} has no generic data and was ignored!
+              Site: {storage['project_name']} ({storage['owner']})
+              Region: {translator['regions'][storage['operating_region'].upper()]['CANOE_region']}
+              Capacity: {storage['storage_capacity_in_mw']} MW""")
+        continue
+
+    tech = f"{CANOE_tech}-{duration}H"
 
     # Some nomenclature differences between merged tables
     storage.update({'install_capacity_in_mw': storage['storage_capacity_in_mw']})
@@ -78,15 +134,15 @@ for storage in storage_exs:
     translator['generator_types'].update({tech: dict()})
     translator['generator_types'][tech].update({'CANOE_tech': tech})
 
-    try:
-        generic_techs.update({tech: generic_techs[CANOE_tech]})
-        evolving_cost.update({tech: evolving_cost[CANOE_tech]})
-        existing_gen.append(storage)
-    except:
-        print(f"""Existing storage technology {CODERS_gen_type} has no generic data and was excluded. Capacity: {storage['storage_capacity_in_mw']} MW""")
-        continue
+    # Update dicts with new storage tech name, new and existing
+    generic_techs.update({f"{tech}-NEW": generic_techs[CANOE_tech]})
+    generic_techs.update({f"{tech}-EXS": generic_techs[CANOE_tech]})
+    existing_gen.append(storage.copy())
+    evolving_cost.update({f"{tech}-NEW": evolving_cost[CANOE_tech]})
+    evolving_cost.update({f"{tech}-EXS": evolving_cost[CANOE_tech]})
 
-    old_storage_techs.add(CANOE_tech)
+    # Slate old tech name for removal
+    old_techs.add(CANOE_tech)
 
     for region in all_regions:
         if region == 'EX': continue
@@ -96,9 +152,14 @@ for storage in storage_exs:
         # Can use insert or ignore here as the tech name is now tied to the duration
         curs.execute(f"""REPLACE INTO
                     StorageDuration(regions, tech, duration, duration_notes)
-                    VALUES("{region}", "{tech}", "{duration}", "{notes}")""")
+                    VALUES("{region}", "{tech}-NEW", "{duration}", "{notes}")""")
+        curs.execute(f"""REPLACE INTO
+                    StorageDuration(regions, tech, duration, duration_notes)
+                    VALUES("{region}", "{tech}-EXS", "{duration}", "{notes}")""")
 
-for old_tech in old_storage_techs: generic_techs.pop(old_tech, None)
+for old_tech in old_techs:
+    generic_techs.pop(old_tech)
+    evolving_cost.pop(old_tech)
 
 
 
@@ -108,20 +169,26 @@ rtv_data = dict()
 # ExistingCapacity
 for generator in existing_gen:
 
-    capacity = generator['install_capacity_in_mw']
-    if capacity <= 0:
-        print(f"Existing {region} generator {generator['project_name']} has {capacity} MW capacity and so was excluded")
-        continue
-    
-    tech = translator['generator_types'][generator['gen_type'].upper()]['CANOE_tech']
+    tech = translator['generator_types'][generator['gen_type'].upper()]['CANOE_tech'] + '-EXS'
     generator_name = f"{generator['project_name']} ({generator['owner']})"
     region = translator['regions'][generator['copper_balancing_area'].upper()]['CANOE_region']
 
     if region == 'EX': continue # If not representing all provinces
 
-    vint = 2020 if 'HYD' in tech else generator['previous_renewal_year'] # Hydro doesn't retire so might as well aggregate
-    if vint is None: vint = generator['start_year']
-    vint = min(2023,int(5 * round(float(vint)/5))) # Remove this line to have yearly vintages
+    capacity = generator['install_capacity_in_mw']
+    if capacity <= 0:
+        print(f"Existing {region} generator {generator['project_name']} has {capacity} MW capacity and so was excluded")
+        continue
+    
+    if 'HYD' in tech and params['no_hydro_retirement'] == 'true':
+        vint = 2020
+    else:
+        vint = generator['previous_renewal_year'] # Hydro doesn't retire so might as well aggregate
+        if vint is None: vint = generator['start_year']
+
+    # Aggregate all other existing vintages by specified num years
+    exs_y = int(params['exs_aggregation_years'])
+    vint = min(2023,int(exs_y * round(float(vint)/exs_y)))
 
     curs.execute(f"""INSERT OR IGNORE INTO
                 time_periods(t_periods, flag)
@@ -151,16 +218,22 @@ for generator in existing_gen:
 
 
 # Add generic technology data
-for tech in list(generic_techs.keys()):
+for tech in generic_techs.keys():
 
+    # Generic data on this tech
     generic_tech = generic_techs[tech]
 
     # Collect some generic data for the tech
     eff = generic_tech['efficiency']
+    flag = translator['generator_types'][generic_tech['generation_type'].upper()]['flag']
 
+    # Generate a tech description
     description = generic_tech['description']
     if 'project_name' in generic_tech.keys(): description += " - " + generic_tech['project_name']
     description = string_cleaner(description)
+    if is_exs(tech): description = 'Existing ' + description
+    elif is_new(tech): description = 'New ' + description
+
 
     input_comm = translator['generator_types'][generic_tech['generation_type'].upper()]['input_comm']
     output_comm = translator['generator_types'][generic_tech['generation_type'].upper()]['output_comm']
@@ -169,18 +242,13 @@ for tech in list(generic_techs.keys()):
     cost_fixed = translator['units']['cost_fixed']['conversion_factor'] * generic_tech['fixed_om_cost_CAD_per_MWyear']
     cost_variable = translator['units']['cost_variable']['conversion_factor'] * generic_tech['variable_om_cost_CAD_per_MWh']
     emis_act = translator['units']['emission_activity']['conversion_factor'] * generic_tech['carbon_emissions_tCO2eq_per_MWh']
-
-    # technologies
-    curs.execute(f"""INSERT OR IGNORE INTO
-                technologies(tech, tech_desc)
-                VALUES("{tech}", "{description}")""")
     
-    # commodities
-    for comm in (input_comm, output_comm):
-        curs.execute(f"""INSERT OR IGNORE INTO
-                    commodities(comm_name, flag)
-                    VALUES("{comm}", "p")""")
-        
+    
+    # technologies
+    curs.execute(f"""REPLACE INTO
+                technologies(tech, flag, sector, tech_desc)
+                VALUES("{tech}", "{flag}", "electric", "{description}")""")
+
 
 
     for region in all_regions:
@@ -188,7 +256,8 @@ for tech in list(generic_techs.keys()):
 
 
         # LifetimeTech
-        life = 200 if 'HYD' in tech else generic_tech['service_life_years']
+        if 'HYD' in tech and params['no_hydro_retirement'] == 'true': life = 200
+        else: life = generic_tech['service_life_years']
         curs.execute(f"""REPLACE INTO
                     LifetimeTech(regions, tech, life, life_notes)
                     VALUES("{region}", "{tech}", "{life}", "{description}")""")
@@ -197,7 +266,7 @@ for tech in list(generic_techs.keys()):
         # CapacityToActivity
         curs.execute(f"""REPLACE INTO
                     CapacityToActivity(regions, tech, c2a, c2a_notes)
-                    VALUES("{region}", "{tech}", "{c2a}", "{c2a_unit}")""")
+                    VALUES("{region}", "{tech}", "{config.c2a}", "{config.c2a_unit}")""")
         
 
         # RampUp and RampDown
@@ -214,7 +283,7 @@ for tech in list(generic_techs.keys()):
 
 
         # CostInvest
-        if cost_invest != 0:
+        if cost_invest != 0 and is_new(tech):
             for period in model_periods:
                 cost_invest = translator['units']['cost_invest']['conversion_factor'] * evolving_cost[tech][str(period) + '_CAD_per_kW']
                 curs.execute(f"""REPLACE INTO
@@ -222,12 +291,16 @@ for tech in list(generic_techs.keys()):
                             VALUES("{region}", "{tech}", "{period}", "{cost_invest}", "{translator['units']['cost_invest']['CANOE_unit']}", "{description}")""")
     
 
-        # All techs should have future vintages
+        # Give all techs future vintages
         if tech not in rtv_data[region].keys():
             rtv_data[region].update({tech: dict()})
         [rtv_data[region][tech].update({period: {'capacity': 0, 'description': description}}) for period in model_periods]
 
         for vint in rtv_data[region][tech]:
+            
+            # Only existing techs for past vintages and new techs for future vintages
+            if vint in model_periods and is_exs(tech): continue
+            elif vint not in model_periods and is_new(tech): continue
 
             description = string_cleaner(rtv_data[region][tech][vint]['description'])
 
@@ -269,18 +342,11 @@ for tech in list(generic_techs.keys()):
                     curs.execute(f"""REPLACE INTO
                                 CostVariable(regions, periods, tech, vintage, cost_variable, cost_variable_units, cost_variable_notes)
                                 VALUES("{region}", "{period}", "{tech}", "{vint}", "{cost_variable}", "{translator['units']['cost_variable']['CANOE_unit']}", "{description}")""")
-        
-            
-        # CapacityFactorTech
-        # regions season_name time_of_day_name tech cf_tech
-        # Min/Max annual CF table?
-
-        # CapacityCredit?
 
 
 
 # Regional interfaces
-# Get variable prices for each set of interties as defined in interface_capacities
+# Get flows and fix for each boundary
 # Do this up here so it doesn't slam the CODERS database twice for no reason
 intertie_flows = dict()
 for interties in translator['transfer_regions'].keys():
@@ -300,12 +366,12 @@ for interties in translator['transfer_regions'].keys():
     # Do not represent interties outside the model
     if region_1_CANOE == 'EX' and region_2_CANOE == 'EX': continue
 
-    from_region_1, from_region_2 = intertie_transfers.get_transfers(region_1, region_2, translator['transfer_regions'][interties]['type'], from_cache=pull_from_cache)
+    from_region_1, from_region_2 = intertie_transfers.get_transfers(region_1, region_2, translator['transfer_regions'][interties]['type'], from_cache=from_cache)
 
     intertie_flows.update({tech: {region_1_CANOE: from_region_1, region_2_CANOE: from_region_2}})
 
 
-interfaces = coders_api.get_json(end_point='interface_capacities',from_cache=pull_from_cache)
+interfaces = coders_api.get_json(end_point='interface_capacities',from_cache=from_cache)
 
 interface_techs = dict() # keys are CANOE techs
 
@@ -355,8 +421,13 @@ for tech in interface_techs.keys():
     interface = interface_techs[tech]
     
     # Max capacity is largest of both directions and summer/winter (TEMOA demands a single capacity per intertie)
-    max_capacity = max(sum([list(v.values()) for v in list(interface['capacity_from'].values())],[])) # it works dont question it
+    max_capacity = max(sum([list(v.values()) for v in list(interface['capacity_from'].values())],[])) # it works dont mess with it
     if max_capacity <= 0: continue # zero capacity comes up with retired interfaces
+
+    # Some interface flows exceed rated capacity so take max hourly flow as max cap
+    # This is for fixed-flow model boundary interfaces
+    if (interface['regions'][0] == 'EX') != (interface['regions'][1] == 'EX'):
+        max_capacity = max( max(interface['transfers_from'][interface['regions'][0]]), max(interface['transfers_from'][interface['regions'][1]]) )
 
     description = interface['description']
 
@@ -385,9 +456,6 @@ for tech in interface_techs.keys():
 
         if from_region == 'EX' and to_region == 'EX': continue # if not representing all provinces
 
-        # FIXME The QC-ON interlink seems to significantly exceed capacity (4408/2750) so do this for now
-        if (from_region == 'EX') != (to_region == 'EX'): max_capacity = 5
-
         # ExistingCapacity
         curs.execute(f"""REPLACE INTO
                     ExistingCapacity(regions, tech, vintage, exist_cap, exist_cap_units, exist_cap_notes)
@@ -401,7 +469,7 @@ for tech in interface_techs.keys():
         # CapacityToActivity
         curs.execute(f"""REPLACE INTO
                     CapacityToActivity(regions, tech, c2a, c2a_notes)
-                    VALUES("{region}", "{tech}", "{c2a}", "{c2a_unit}")""")
+                    VALUES("{region}", "{tech}", "{config.c2a}", "{config.c2a_unit}")""")
         
         # CapacityFactorTech
         # Endogenous intertie, set summer/winter to/from capacities
@@ -409,8 +477,8 @@ for tech in interface_techs.keys():
 
             for hour in range(8760):
 
-                season = seas_8760[hour]
-                time_of_day = tofd_8760[hour]
+                season = config.seas_8760[hour]
+                time_of_day = config.tofd_8760[hour]
 
                 summer_winter = translator['time'][hour]['summer_winter']
                 capacity = interface['capacity_from'][from_region][summer_winter]
@@ -424,8 +492,8 @@ for tech in interface_techs.keys():
 
             for hour in range(8760):
 
-                season = seas_8760[hour]
-                time_of_day = tofd_8760[hour]
+                season = config.seas_8760[hour]
+                time_of_day = config.tofd_8760[hour]
 
                 cf = interface['transfers_from'][from_region][hour]/max_capacity/1000
 
@@ -450,17 +518,11 @@ tx_techs = ["TX_TO_DX", "DX_TO_TX"]
 dummy_techs = ["DX_TO_DEM", "G_TO_TX", "GRPS_TO_TX"]
 for tx_tech in tx_techs + dummy_techs:
     curs.execute(f"""INSERT OR IGNORE INTO
-                technologies(tech)
-                VALUES("{translator['generator_types'][tx_tech]['CANOE_tech']}")""")
-    curs.execute(f"""INSERT OR IGNORE INTO
-                commodities(comm_name)
-                VALUES("{translator['generator_types'][tx_tech]['input_comm']}")""")
-    curs.execute(f"""INSERT OR IGNORE INTO
-                commodities(comm_name)
-                VALUES("{translator['generator_types'][tx_tech]['output_comm']}")""")
+                technologies(tech, flag, sector, tech_desc)
+                VALUES("{translator['generator_types'][tx_tech]['CANOE_tech']}", "p", "electric", "Transmission dummy tech")""")
 
 # Regional parameters
-ca_sys_params = coders_api.get_json(end_point='CA_system_parameters',from_cache=pull_from_cache)
+ca_sys_params = coders_api.get_json(end_point='CA_system_parameters',from_cache=from_cache)
 for province in ca_sys_params:
 
     region = translator['regions'][province['province'].upper()]['CANOE_region']
@@ -490,16 +552,33 @@ for province in ca_sys_params:
             
 
 
-# MUST BE LAST
-# Overwrite with global values from translator database
+# TODO could probably generalise this process
+# Not just for this script but for all scripts
+# MaxCapacity
 for region in all_regions:
-    for global_value in global_values:
+    if region == 'EX': continue
+    
+    for tech in config.cap_limits[region].index:
+        for period in model_periods:
+
+            max_cap = float(config.cap_limits[region].loc[tech, period]) * translator['units']['capacity']['conversion_factor']
+
+            curs.execute(f"""REPLACE INTO
+                         MaxCapacity(regions, periods, tech, maxcap, maxcap_units)
+                         VALUES('{region}', {period}, '{tech}', {max_cap}, '{translator['units']['capacity']['CANOE_unit']}')""")
+            
+
+
+# MUST COME LAST
+# Overwrite all regions with global values from translator database
+for region in all_regions:
+    for global_override in config.global_overrides:
 
         if region == 'EX': continue
         
         curs.execute(f"""REPLACE INTO
-                     {global_value['table']}(regions, tech, {global_value['columns']})
-                     VALUES('{region}', '{global_value['CANOE_tech']}', {global_value['global_values']})""")
+                     {global_override['table']}(regions, tech, {global_override['columns']})
+                     VALUES('{region}', '{global_override['CANOE_tech']}', {global_override['global_values']})""")
         
 
 
