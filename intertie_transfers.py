@@ -8,9 +8,9 @@ from matplotlib import pyplot
 import coders_api
 from setup import config
 
-def get_transfers(region_1, region_2, intertie_type, from_cache=False):
+data_year = config.params['default_data_year']
 
-    data_year = config.params['default_data_year']
+def get_transfered_mwh(region_1, region_2, intertie_type, from_cache=False):
 
     transfers = list()
     if intertie_type == 'international': transfers = coders_api.get_json(end_point=f"international_transfers?year={data_year}&province={region_1}&us_region={region_2}", from_cache=from_cache)

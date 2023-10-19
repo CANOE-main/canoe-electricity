@@ -444,9 +444,10 @@ for interties in translator['transfer_regions'].keys():
     # Do not represent interties outside the model
     if region_1_CANOE == 'EX' and region_2_CANOE == 'EX': continue
 
-    from_region_1, from_region_2 = intertie_transfers.get_transfers(region_1, region_2, translator['transfer_regions'][interties]['type'], from_cache=from_cache)
-
-    intertie_flows[tech] = {region_1_CANOE: from_region_1, region_2_CANOE: from_region_2}
+    # Get 8760 transfers from the data year for this boundary and convert MWh to PJ
+    conv_factor = translator['units']['activity']['conversion_factor']
+    from_region_1, from_region_2 = intertie_transfers.get_transfered_mwh(region_1, region_2, translator['transfer_regions'][interties]['type'], from_cache=from_cache)
+    intertie_flows[tech] = {region_1_CANOE: conv_factor*from_region_1, region_2_CANOE: conv_factor*from_region_2}
 
 
 interfaces = coders_api.get_json(end_point='interface_capacities',from_cache=from_cache)
@@ -500,10 +501,11 @@ for tech in interface_techs.keys():
     max_capacity = max(sum([list(v.values()) for v in list(interface['capacity_from'].values())],[])) # it works dont mess with it
     if max_capacity <= 0: continue # zero capacity comes up with retired interfaces
 
-    # Some interface flows exceed rated capacity so take max hourly flow as max cap
+    # Some interface flows exceed rated capacity so take max hourly flow as max cap and convert from PJ/h to GW
     # This is for fixed-flow model boundary interfaces
     if (interface['regions'][0] == 'EX') != (interface['regions'][1] == 'EX'):
         max_capacity = max( max(interface['transfers_from'][interface['regions'][0]]), max(interface['transfers_from'][interface['regions'][1]]) )
+        max_capacity *= translator['units']['capacity']['conversion_factor'] / translator['units']['activity']['conversion_factor']
 
     description = interface['description']
 
