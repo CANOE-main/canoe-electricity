@@ -95,22 +95,6 @@ for period in config.model_periods:
     curs.execute(f"""REPLACE INTO
                 EmissionLimit(regions, periods, emis_comm, emis_limit, emis_limit_units)
                 VALUES("ON", {period}, "CO2eq", {emis[period]*base_emis}, "ktCO2eq")""")
-    
-import_prices_pj = {
-    'IMP_NGS':2.24,
-    'IMP_URN_NAT':0.039487,
-    'IMP_BIO_M':10
-}
-
-for tech in import_prices_pj.keys():
-    curs.execute(f"""INSERT INTO technologies(tech, flag, sector)
-                 VALUES('{tech}', 'p', 'electric')""")
-    curs.execute(f"""REPLACE INTO Efficiency(regions, input_comm, tech, vintage, output_comm, efficiency)
-                 VALUES('ON', 'E_ethos', '{tech}', 2025, '{'E_' + tech}', 1.0)""")
-    for period in config.model_periods:
-        curs.execute(f"""REPLACE INTO CostVariable(regions, periods, tech, vintage, cost_variable)
-                    VALUES('ON', {period}, '{tech}', 2025, {import_prices_pj[tech]})""")
-
 
 conn.commit()
 conn.close()

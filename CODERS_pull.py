@@ -97,43 +97,12 @@ is_new = lambda tech: '-NEW' in tech
 
 """
 ##############################################################
-    Setup existing/new capacity batches
-##############################################################
-"""
-
-# Handle batches of new techs
-tech_variants = dict() # tech_variants[region][tech][tech-EXS, tech-NEW-1, ...]
-old_techs = set()
-for region in config.batched_cap.keys():
-    if region == 'EX': continue
-
-    tech_variants[region] = dict()
-
-    # For techs with specified batch sizes get from csv
-    for base_tech in config.all_techs:
-        
-        if base_tech not in generic_techs.keys(): continue
-        n_batches = int(translator['generator_types'][generic_techs[base_tech]['generation_type'].upper()]['new_cap_steps'])
-
-        if n_batches == 0: variants = [f"{base_tech}-EXS"] # No new capacity allowed
-        elif n_batches > 1: variants = [f"{base_tech}-EXS", *[f"{base_tech}-NEW-{n}" for n in range(1,n_batches+1)]] # Specified batches
-        else: variants = [f"{base_tech}-EXS", f"{base_tech}-NEW"] # Not specified or 1 so allow new and existing
-
-        tech_variants[base_tech] = variants
-
-        # Add these additional techs to the generic techs dict
-        old_techs.add(base_tech)
-        for variant in variants:
-            generic_techs[variant] = generic_techs[base_tech]
-            if is_new(variant): evolving_cost[variant] = evolving_cost[base_tech]
-
-
-
-"""
-##############################################################
     Existing storage capacity
 ##############################################################
 """
+
+# Replacing these base tech names with updated variants
+old_techs = set()
 
 # Add storage technology data
 storage_exs = coders_api.get_json(end_point='storage',from_cache=from_cache)
@@ -149,34 +118,34 @@ for storage in storage_exs:
     # Get the storage tech name e.g. E_BAT_4H
     CODERS_gen_type = storage['generation_type'].upper()
     duration = int(round(storage['duration']))
-    CANOE_tech = translator['generator_types'][CODERS_gen_type]['CANOE_tech']
+    base_tech = translator['generator_types'][CODERS_gen_type]['CANOE_tech']
 
-    if CANOE_tech not in generic_techs.keys():
+    if base_tech not in generic_techs.keys():
         print(f"""Existing storage technology {CODERS_gen_type} has no generic data and was ignored!
               Site: {storage['project_name']} ({storage['owner']})
               Region: {region}
               Capacity: {storage['storage_capacity_in_mw']} MW""")
         continue
 
-    tech = f"{CANOE_tech}-{duration}H"
+    tech = f"{base_tech}-{duration}H"
 
     # Some nomenclature differences between merged tables
     storage['install_capacity_in_mw'] = storage['storage_capacity_in_mw']
-    storage['gen_type'] = tech # Updated duration-tagged tech
+
+    # Updated duration-tagged tech
+    storage['gen_type'] = tech
 
     # Have to add updated duration-tagged tech to translator
     translator['generator_types'][tech] = dict()
     translator['generator_types'][tech]['CANOE_tech'] = tech
 
     # Update dicts with new storage tech name, new and existing
-    generic_techs[f"{tech}-NEW"] = generic_techs[CANOE_tech]
-    generic_techs[f"{tech}-EXS"] = generic_techs[CANOE_tech]
+    generic_techs[tech] = generic_techs[base_tech]
+    evolving_cost[tech] = evolving_cost[base_tech]
     existing_gen.append(storage.copy())
-    evolving_cost[f"{tech}-NEW"] = evolving_cost[CANOE_tech]
-    evolving_cost[f"{tech}-EXS"] = evolving_cost[CANOE_tech]
 
     # Slate old tech name for removal
-    old_techs.add(CANOE_tech)
+    old_techs.add(base_tech)
 
     notes = "1 hour storage" if duration == 1 else str(duration) + " hours storage"
 
@@ -187,7 +156,51 @@ for storage in storage_exs:
     curs.execute(f"""REPLACE INTO
                 StorageDuration(regions, tech, duration, duration_notes)
                 VALUES("{region}", "{tech}-EXS", "{duration}", "{notes}")""")
+    
 
+# Remove outdated base storage techs
+for old_tech in old_techs:
+    generic_techs.pop(old_tech)
+    evolving_cost.pop(old_tech)
+old_techs.clear()
+
+
+
+"""
+##############################################################
+    Setup existing/new capacity batches (tech variants)
+##############################################################
+"""
+
+# Handle batches of new techs
+tech_variants = dict() # tech_variants[region][tech][tech-EXS, tech-NEW-1, ...]
+for region in config.batched_cap.keys():
+    if region == 'EX': continue
+
+    tech_variants[region] = list()
+
+    # For techs with specified batch sizes get from csv
+    for base_tech in list(generic_techs.keys()):
+        
+        n_batches = int(translator['generator_types'][generic_techs[base_tech]['generation_type'].upper()]['new_cap_steps'])
+
+        if n_batches == 0: variants = [f"{base_tech}-EXS"] # No new capacity allowed
+        elif n_batches > 1: variants = [f"{base_tech}-EXS", *[f"{base_tech}-NEW-{n}" for n in range(1,n_batches+1)]] # Specified batches
+        else: variants = [f"{base_tech}-EXS", f"{base_tech}-NEW"] # Not specified or 1 so allow new and existing
+
+        tech_variants[region].extend(variants)
+
+        # Add these additional techs to the generic techs dict
+        old_techs.add(base_tech)
+        for variant in variants:
+            generic_techs[variant] = generic_techs[base_tech]
+
+            # Evolving costs are only given for capital cost so only for new techs
+            if is_new(variant): evolving_cost[variant] = evolving_cost[base_tech]
+
+
+
+# Remove outdated base techs
 for old_tech in old_techs:
     generic_techs.pop(old_tech)
     evolving_cost.pop(old_tech)
@@ -263,38 +276,39 @@ for generator in existing_gen:
 """
 
 # Add generic technology data
-for tech in generic_techs.keys():
+for region in all_regions:
+    if region == 'EX': continue
 
-    # Generic data on this tech
-    generic_tech = generic_techs[tech]
+    for tech in tech_variants[region]:
 
-    # Collect some generic data for the tech
-    eff = generic_tech['efficiency']
+        # Generic data on this tech
+        generic_tech = generic_techs[tech]
 
-    # Generate a tech description
-    description = generic_tech['description']
-    if is_exs(tech): description = 'existing ' + description
-    elif is_new(tech): description = 'new ' + description
+        # Collect some generic data for the tech
+        eff = generic_tech['efficiency']
 
-    # Some generic data based on gen type
-    gen_type = generic_tech['generation_type'].upper()
-    input_comm = translator['generator_types'][gen_type]['input_comm']
-    output_comm = translator['generator_types'][gen_type]['output_comm']
-    flag = translator['generator_types'][gen_type]['flag']
-    tech_sets = translator['generator_types'][gen_type]['tech_sets']
+        # Generate a tech description
+        description = generic_tech['description']
+        if is_exs(tech): description = 'existing ' + description
+        elif is_new(tech): description = 'new ' + description
 
-    # Some generic data based on units
-    cost_invest = translator['units']['cost_invest']['conversion_factor'] * generic_tech['overnight_capital_cost_CAD_per_kW']
-    cost_fixed = translator['units']['cost_fixed']['conversion_factor'] * generic_tech['fixed_om_cost_CAD_per_MWyear']
-    cost_variable = translator['units']['cost_variable']['conversion_factor'] * generic_tech['variable_om_cost_CAD_per_MWh']
-    emis_act = translator['units']['emission_activity']['conversion_factor'] * generic_tech['carbon_emissions_tCO2eq_per_MWh']
+        # Some generic data based on gen type
+        gen_type = generic_tech['generation_type'].upper()
+        input_comm = translator['generator_types'][gen_type]['input_comm']
+        output_comm = translator['generator_types'][gen_type]['output_comm']
+        flag = translator['generator_types'][gen_type]['flag']
+        tech_sets = translator['generator_types'][gen_type]['tech_sets']
+        include_fuel_cost = translator['generator_types'][gen_type]['include_fuel_cost'] == 'true'
+
+        # Some generic data based on units
+        cost_invest = translator['units']['cost_invest']['conversion_factor'] * generic_tech['total_project_cost_2020_CAD_per_kW']
+        cost_fixed = translator['units']['cost_fixed']['conversion_factor'] * generic_tech['fixed_om_cost_CAD_per_MWyear']
+        cost_variable = translator['units']['cost_variable']['conversion_factor'] * generic_tech['variable_om_cost_CAD_per_MWh']
+        if include_fuel_cost: cost_variable += translator['units']['cost_fuel']['conversion_factor'] * generic_tech['average_fuel_price_CAD_per_GJ']
+        emis_act = translator['units']['emission_activity']['conversion_factor'] * generic_tech['carbon_emissions_tCO2eq_per_MWh']
 
 
-
-    for region in all_regions:
-        if region == 'EX': continue
-
-        # Skip existing techs with no existing capacity (unused)
+        # Skip existing variants with no existing capacity (unused)
         if is_exs(tech) and tech not in rtv_data[region].keys(): continue
 
         
