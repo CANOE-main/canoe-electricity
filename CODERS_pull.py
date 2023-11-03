@@ -670,7 +670,7 @@ for province in ca_sys_params:
         curs.execute(f"""REPLACE INTO
                     Efficiency(regions, input_comm, tech, vintage, output_comm, efficiency)
                     VALUES("{region}", "{input_comm}", "{tech}", {model_periods[0]}, "{output_comm}", {eff})""")
-            
+
 
 
 """

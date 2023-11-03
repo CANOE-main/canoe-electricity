@@ -1,5 +1,5 @@
 """
-This builds and handles the CODERS translator
+Sets up configuration for electricity sector aggregation
 Written by Ian David Elder for the CANOE model
 """
 
