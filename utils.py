@@ -96,6 +96,9 @@ class DatabaseConverter:
         if overwrite.upper() != "Y":
             print("Did not overwrite workbook.")
             return
+        
+        print(f"\nCloning {os.path.basename(from_sqlite_file)} into target {os.path.basename(to_excel_file)}."\
+              "\nThis may take a minute...")
 
         if not os.path.isfile(to_excel_file):
 

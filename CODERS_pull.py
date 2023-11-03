@@ -22,18 +22,18 @@ generic_techs = config.generic_techs
 # Get various files
 this_dir = os.path.realpath(os.path.dirname(__file__)) + "/"
 input_files = this_dir + "input_files/"
-schema_file = this_dir + "coders_schema.sqlite"
+schema_file = this_dir + "canoe_schema.sql"
 database_file = this_dir + "coders_db.sqlite"
 
-# If db does not exist make a copy of the schema
-if not os.path.exists(database_file):
-    shutil.copy(schema_file, database_file)
-
-
+# Check if database exists or needs to be built
+build_db = not os.path.exists(database_file)
 
 # Connect to the new database file
 conn = sqlite3.connect(database_file)
 curs = conn.cursor() # Cursor object interacts with the sqlite db
+
+# Build the database if it doesn't exist
+if build_db: curs.executescript(open(schema_file, 'r').read())
 
 # Whether to use CODERS data from local cache instead of downloading new
 from_cache = params['pull_from_cache'] == 'true'
