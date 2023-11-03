@@ -7,7 +7,7 @@ import sqlite3
 import shutil
 import os
 import intertie_transfers
-from tools import string_cleaner
+from utils import string_cleaner
 import coders_api
 from setup import config
 
@@ -22,7 +22,7 @@ generic_techs = config.generic_techs
 # Get various files
 this_dir = os.path.realpath(os.path.dirname(__file__)) + "/"
 input_files = this_dir + "input_files/"
-schema_file = this_dir + "temoa_schema.sqlite"
+schema_file = this_dir + "coders_schema.sqlite"
 database_file = this_dir + "coders_db.sqlite"
 
 # If db does not exist make a copy of the schema
@@ -163,7 +163,7 @@ for storage in storage_exs:
 for old_tech in old_techs:
     generic_techs.pop(old_tech)
     evolving_cost.pop(old_tech)
-old_techs.clear()
+old_techs.clear() # Otherwise it'll throw an error popping again below
 
 
 
@@ -412,7 +412,8 @@ for region in all_regions:
             if emis_act != 0:
                 curs.execute(f"""REPLACE INTO
                             EmissionActivity(regions, emis_comm, input_comm, tech, vintage, output_comm, emis_act, emis_act_units, emis_act_notes)
-                            VALUES("{region}", "{translator['units']['emission_commodity']['CANOE_unit']}", "{input_comm}", "{tech}", "{vint}", "{output_comm}", "{emis_act}", "{translator['units']['emission_activity']['CANOE_unit']}", "{description}")""")
+                            VALUES("{region}", "{translator['units']['emission_commodity']['CANOE_unit']}", "{input_comm}", "{tech}", "{vint}", "{output_comm}",
+                            "{emis_act}", "{translator['units']['emission_activity']['CANOE_unit']}", "{description}")""")
 
             for period in model_periods:
                 

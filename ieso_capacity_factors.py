@@ -10,7 +10,7 @@ import numpy as np
 import pandas as pd
 from setup import config
 from matplotlib import pyplot as pp
-import tools
+import utils
 import coders_api
 
 params = config.params
@@ -39,8 +39,8 @@ tech_like = {
 
 def get_ieso_production():
 
-    monthly = tools.get_data(f"http://reports.ieso.ca/public/GenOutputbyFuelMonthly/PUB_GenOutputbyFuelMonthly_{data_year}.xml")
-    hourly = tools.get_data(f"http://reports.ieso.ca/public/GenOutputbyFuelHourly/PUB_GenOutputbyFuelHourly_{data_year}.xml")
+    monthly = utils.get_data(f"http://reports.ieso.ca/public/GenOutputbyFuelMonthly/PUB_GenOutputbyFuelMonthly_{data_year}.xml")
+    hourly = utils.get_data(f"http://reports.ieso.ca/public/GenOutputbyFuelHourly/PUB_GenOutputbyFuelHourly_{data_year}.xml")
 
     fuels = ['NUCLEAR', 'GAS', 'HYDRO', 'WIND', 'SOLAR', 'BIOFUEL']
     hourly_production = dict()

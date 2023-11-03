@@ -6,7 +6,7 @@ Written by Ian David Elder for the TEMOA Canada / CANOE model
 import requests
 import json
 import os
-from tools import string_cleaner
+from utils import string_cleaner
 
 this_dir = os.path.realpath(os.path.dirname(__file__)) + "/"
 coders_cache = this_dir + "coders_cache/"

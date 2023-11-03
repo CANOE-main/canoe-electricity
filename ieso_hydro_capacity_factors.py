@@ -13,7 +13,7 @@ from matplotlib import pyplot as plot
 import json
 import sqlite3
 import os
-import tools
+import utils
 from setup import params
 
 
@@ -25,7 +25,7 @@ ieso_data = this_dir + "ieso_data/"
 
 
 # A bunch of lambda functions to handle data nonsense
-get_ieso_data = lambda month: tools.get_data(url(month), skiprows=3, index_col=False)
+get_ieso_data = lambda month: utils.get_data(url(month), skiprows=3, index_col=False)
 url = lambda month: f"""http://reports.ieso.ca/public/GenOutputCapabilityMonth/PUB_GenOutputCapabilityMonth_{str(data_year) + NN(month + 1)}.csv"""
 NN = lambda dm: str(dm) if dm>9 else '0' + str(dm)
 to_date = lambda month, day: f"{data_year}-{NN(month+1)}-{NN(day+1)}"

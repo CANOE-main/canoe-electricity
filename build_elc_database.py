@@ -8,16 +8,18 @@ import ieso_vre_capacity_credits as ieso_vre_cc
 import ieso_rel_capacity_credits as ieso_rel_cc
 import ieso_capacity_factors as ieso_cf
 import sqlite3
-import tools
+import utils
 from setup import config
 
 ieso_cf.write_to_coders_db()
 ieso_vre_cc.write_to_coders_db(show_plots=False)
 ieso_rel_cc.write_to_coders_db()
 
+utils.DatabaseConverter().clone_sqlite_to_excel('coders_db.sqlite', 'electricity_generation.xlsx', excel_template_file='Template spreadsheet (make a copy).xlsx')
+
 """
 ##############################################################
-    The following is setup for elc sector testing
+    The following is setup for electricity sector testing
 ##############################################################
 """
 
@@ -26,7 +28,7 @@ curs = conn.cursor()
 
 data_year = 2020
 
-demand = tools.get_data(f"http://reports.ieso.ca/public/Demand/PUB_Demand_{data_year}.csv", index_col=False, skiprows=3, nrows=8760).rename(columns={"Ontario Demand": "demand"})
+demand = utils.get_data(f"http://reports.ieso.ca/public/Demand/PUB_Demand_{data_year}.csv", index_col=False, skiprows=3, nrows=8760).rename(columns={"Ontario Demand": "demand"})
 mwh_to_pj = 3600/1E9
 demand['demand'] = demand["demand"] * mwh_to_pj
 total_demand = sum(demand['demand'])

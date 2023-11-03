@@ -18,13 +18,13 @@ class config:
     batch_file = this_dir + "input_files/batched_new_capacity.xlsx"
     cap_limit_file = this_dir + "input_files/capacity_limits.xlsx"
 
-    instance = None
-    
-
+    _instance = None # singleton pattern
 
     def __new__(cls, *args, **kwargs):
 
-        if isinstance(cls.instance, cls): return cls.instance
+        if isinstance(cls._instance, cls): return cls._instance
+
+        cls._instance = super(config, cls).__new__(cls, *args, **kwargs)
             
         # Connect to the translator file
         conn = sqlite3.connect(cls.translation_file)
@@ -38,9 +38,7 @@ class config:
 
         print('Instantiated setup config.')
 
-        cls.instantiated = True
-
-        return super(config, cls).__new__(cls, *args, **kwargs)
+        return cls._instance
 
         
 

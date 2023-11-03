@@ -10,7 +10,7 @@ import ieso_capacity_factors as ieso_cf
 import matplotlib.pyplot as pp
 import sqlite3
 import os
-import tools
+import utils
 from setup import config
 
 params = config.params
@@ -37,7 +37,7 @@ cfs['HYDRO_DLY'] = pd.read_csv(ieso_data + 'hydro_dly_cf_8760.csv',index_col=0,h
 
 
 # Get Ontario demand and initialise net load
-demand = tools.get_data(f"http://reports.ieso.ca/public/Demand/PUB_Demand_{data_year}.csv", index_col=False, skiprows=3, nrows=8760).rename(columns={'Market Demand': 'load'})
+demand = utils.get_data(f"http://reports.ieso.ca/public/Demand/PUB_Demand_{data_year}.csv", index_col=False, skiprows=3, nrows=8760).rename(columns={'Market Demand': 'load'})
 demand['net_load'] = demand['load'].copy()
 
 capacity_mw = dict()

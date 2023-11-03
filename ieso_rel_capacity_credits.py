@@ -4,7 +4,7 @@ Written by Ian David Elder for the CANOE model
 """
 
 import sqlite3
-import tools
+import utils
 from setup import config
 import pandas as pd
 
@@ -15,7 +15,7 @@ rel_outlook_url = f"https://www.ieso.ca/-/media/Files/IESO/Document-Library/plan
 reference = f"Forecasted capability at normal summer peak divided by total installed capacity [IESO. ({yyyy}, {mmm}). Reliability Outlook. https://www.ieso.ca/en/Sector-Participants/Planning-and-Forecasting/Reliability-Outlook]"
 
 # Get the reliability outlook forecast peak table and calculate capacity credits
-ieso_rel = tools.get_data(rel_outlook_url, file_type='xlsx', sheet_name='Table 4.1', skiprows=4, header=0, nrows=6, index_col=0)
+ieso_rel = utils.get_data(rel_outlook_url, file_type='xlsx', sheet_name='Table 4.1', skiprows=4, header=0, nrows=6, index_col=0)
 ieso_rel['capacity_credit'] = ieso_rel[f"Forecast Capability at 2024 Summer Peak [{config.params['ieso_rel_peak_type']}] (MW)"] / pd.to_numeric(ieso_rel['Total Installed Capacity\n(MW)'])
 print('IESO reliability outlook capacity credits:')
 print(ieso_rel.iloc[:,-1:])
