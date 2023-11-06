@@ -112,7 +112,7 @@ def get_capacity_credits():
     ccs_vres = dict()
 
     # Largest row count (to match column lengths)
-    max_n = max([int(translator['generator_types'][vre]['new_cap_steps']) for vre in vres])
+    max_n = max([int(translator['technologies'][translator['generator_types'][vre]['CANOE_tech']]['new_cap_steps']) for vre in vres])
 
     for vre in vres:
 
@@ -120,7 +120,7 @@ def get_capacity_credits():
             print(f"Tried to get capacity credits for {vre} but no batches specified in input files.")
             continue
 
-        n_batches = int(translator['generator_types'][vre]['new_cap_steps'])
+        n_batches = int(translator['technologies'][translator['generator_types'][vre]['CANOE_tech']]['new_cap_steps'])
         mw_steps = [0, *batched_cap.loc[vre, 1:n_batches].tolist()]
 
         # Have to pad smaller lists to match column lengths to build the dataframe
@@ -148,10 +148,15 @@ def write_to_coders_db(show_plots=False):
 
     ccs_vres = get_capacity_credits()
 
-    reference = f"{params['capacity_credit_reference']} [{params['ieso_reference'].replace('<year>',data_year)}]"
-
     conn = sqlite3.connect(coders_db)
     curs = conn.cursor()
+
+    note = params['capacity_credit_note']
+    reference = params['ieso_reference'].replace('<year>',data_year)
+
+    curs.execute(f"""REPLACE INTO
+                 'references'('reference')
+                 VALUES('{reference}')""")
     
     for vre in vres:
 
@@ -181,8 +186,8 @@ def write_to_coders_db(show_plots=False):
                     cc = ccs[int(ending)]
 
                     curs.execute(f"""REPLACE INTO
-                                    CapacityCredit(regions, periods, tech, vintage, cf_tech, cf_tech_notes)
-                                    VALUES("ON", {period}, '{tech}', {vint}, {cc}, '{reference}')""")
+                                    CapacityCredit(regions, periods, tech, vintage, cf_tech, cf_tech_notes, reference)
+                                    VALUES("ON", {period}, '{tech}', {vint}, {cc}, '{note}', '{reference}')""")
                     
 
                     if tech in config.generic_techs.keys():

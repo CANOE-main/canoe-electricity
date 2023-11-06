@@ -13,12 +13,18 @@ data_year = config.params['default_data_year']
 def get_transfered_mwh(region_1, region_2, intertie_type, from_cache=False):
 
     transfers = list()
-    if intertie_type == 'international': transfers = coders_api.get_json(end_point=f"international_transfers?year={data_year}&province={region_1}&us_region={region_2}", from_cache=from_cache)
-    elif intertie_type == 'interprovincial': transfers = coders_api.get_json(end_point=f"interprovincial_transfers?year={data_year}&province1={region_1}&province2={region_2}", from_cache=from_cache)
+    date_accessed = None
+    if intertie_type == 'international': transfers, date_accessed = coders_api.get_json(end_point=f"international_transfers?year={data_year}&province={region_1}&us_region={region_2}", from_cache=from_cache)
+    elif intertie_type == 'interprovincial': transfers, date_accessed = coders_api.get_json(end_point=f"interprovincial_transfers?year={data_year}&province1={region_1}&province2={region_2}", from_cache=from_cache)
 
     if (len(transfers) < 8760):
         print(f"Insufficient transfer data on {region_1}-{region_2}. Try switching the intertie regions.")
         return None, None
+    
+    # Add reference in either direction to make things easier
+    ref = config.params['coders_reference']
+    config.references[f"{config.translator['regions'][region_1]['CANOE_region']}-{config.translator['regions'][region_2]['CANOE_region']}"] = ref + date_accessed
+    config.references[f"{config.translator['regions'][region_2]['CANOE_region']}-{config.translator['regions'][region_1]['CANOE_region']}"] = ref + date_accessed
   
     hourly_MWh = np.zeros(8760)
 

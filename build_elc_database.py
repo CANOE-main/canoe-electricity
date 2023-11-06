@@ -100,3 +100,5 @@ for period in config.model_periods:
 
 conn.commit()
 conn.close()
+
+print("Finished.")

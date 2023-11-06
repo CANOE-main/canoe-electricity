@@ -17,7 +17,8 @@ params = config.params
 all_regions = config.all_regions
 model_periods = config.model_periods
 generic_techs = config.generic_techs
-
+ref = params['coders_reference']
+refs = config.references
 
 # Get various files
 this_dir = os.path.realpath(os.path.dirname(__file__)) + "/"
@@ -39,10 +40,12 @@ if build_db: curs.executescript(open(schema_file, 'r').read())
 from_cache = params['pull_from_cache'] == 'true'
 
 # Collect existing generator data
-existing_gen = coders_api.get_json(end_point='generators',from_cache=from_cache)
+existing_gen, date_accessed = coders_api.get_json(end_point='generators',from_cache=from_cache)
+refs['generators'] = ref + date_accessed
 
 # Collect evolving cost data
-cost_json = coders_api.get_json(end_point='generation_cost_evolution',from_cache=from_cache)
+cost_json, date_accessed = coders_api.get_json(end_point='generation_cost_evolution',from_cache=from_cache)
+refs['generation_cost_evolution'] = ref + date_accessed
 evolving_cost = dict({translator['generator_types'][tech['gen_type'].upper()]['CANOE_tech']: tech for tech in cost_json})
 
 
@@ -53,7 +56,7 @@ evolving_cost = dict({translator['generator_types'][tech['gen_type'].upper()]['C
 ##############################################################
 """
 
-# Add default global discount rate
+# Add default global discount rate. No index on this table so clear it first.
 curs.execute("DELETE FROM GlobalDiscountRate")
 curs.execute(f"INSERT INTO GlobalDiscountRate(rate) VALUES({params['global_discount_rate']})")
 
@@ -84,9 +87,10 @@ for h in range(24):
                 VALUES("{tofd}")""")
 
 # Add emission commodity
-curs.execute(f"""INSERT OR IGNORE INTO
-             commodities(comm_name, flag)
-             VALUES('{translator['units']['emission_commodity']['CANOE_unit']}', 'e')""")
+emis_comm = translator['units']['emission_commodity']['CANOE_unit']
+curs.execute(f"""REPLACE INTO
+             commodities(comm_name, flag, comm_desc)
+             VALUES('{emis_comm}', 'e', '{translator['commodities'][emis_comm]['description']}')""")
     
 
 
@@ -106,7 +110,8 @@ is_new = lambda tech: '-NEW' in tech
 old_techs = set()
 
 # Add storage technology data
-storage_exs = coders_api.get_json(end_point='storage',from_cache=from_cache)
+storage_exs, date_accessed = coders_api.get_json(end_point='storage',from_cache=from_cache)
+refs['storage'] = ref + date_accessed
 
 for storage in storage_exs:
 
@@ -136,11 +141,8 @@ for storage in storage_exs:
     # Updated duration-tagged tech
     storage['gen_type'] = tech
 
-    # Have to add updated duration-tagged tech to translator
-    translator['generator_types'][tech] = dict()
-    translator['generator_types'][tech]['CANOE_tech'] = tech
-
-    # Update dicts with new storage tech name, new and existing
+    # Update translator, dicts with new storage tech name
+    translator['technologies'][tech] = translator['technologies'][base_tech]
     generic_techs[tech] = generic_techs[base_tech]
     evolving_cost[tech] = evolving_cost[base_tech]
     existing_gen.append(storage.copy())
@@ -152,11 +154,11 @@ for storage in storage_exs:
 
     # Can use insert or ignore here as the tech name is now tied to the duration
     curs.execute(f"""REPLACE INTO
-                StorageDuration(regions, tech, duration, duration_notes)
-                VALUES("{region}", "{tech}-NEW", "{duration}", "{notes}")""")
+                StorageDuration(regions, tech, duration, duration_notes, reference)
+                VALUES("{region}", "{tech}-NEW", "{duration}", "{notes}", "{refs['storage']}")""")
     curs.execute(f"""REPLACE INTO
-                StorageDuration(regions, tech, duration, duration_notes)
-                VALUES("{region}", "{tech}-EXS", "{duration}", "{notes}")""")
+                StorageDuration(regions, tech, duration, duration_notes, reference)
+                VALUES("{region}", "{tech}-EXS", "{duration}", "{notes}", "{refs['storage']}")""")
     
 
 # Remove outdated base storage techs
@@ -183,7 +185,7 @@ for region in config.batched_cap.keys():
     # For techs with specified batch sizes get from csv
     for base_tech in list(generic_techs.keys()):
         
-        n_batches = int(translator['generator_types'][generic_techs[base_tech]['generation_type'].upper()]['new_cap_steps'])
+        n_batches = int(translator['technologies'][base_tech]['new_cap_steps'])
 
         if n_batches == 0: variants = [f"{base_tech}-EXS"] # No new capacity allowed
         elif n_batches > 1: variants = [f"{base_tech}-EXS", *[f"{base_tech}-NEW-{n}" for n in range(1,n_batches+1)]] # Specified batches
@@ -191,10 +193,11 @@ for region in config.batched_cap.keys():
 
         tech_variants[region].extend(variants)
 
-        # Add these additional techs to the generic techs dict
+        # Add these additional techs to the generic techs dict and translator
         old_techs.add(base_tech)
         for variant in variants:
             generic_techs[variant] = generic_techs[base_tech]
+            translator['technologies'][variant] = translator['technologies'][base_tech]
 
             # Evolving costs are only given for capital cost so only for new techs
             if is_new(variant): evolving_cost[variant] = evolving_cost[base_tech]
@@ -220,7 +223,10 @@ rtv_data = dict()
 # ExistingCapacity
 for generator in existing_gen:
 
-    tech = translator['generator_types'][generator['gen_type'].upper()]['CANOE_tech'] + '-EXS'
+    # Existing storage generators already have variant names
+    if generator['gen_type'].upper() in translator['generator_types'].keys(): tech = translator['generator_types'][generator['gen_type'].upper()]['CANOE_tech'] + '-EXS'
+    else: tech = generator['gen_type'].upper() + '-EXS'
+
     generator_name = f"{generator['project_name']} ({generator['owner']})"
     region = translator['regions'][generator['copper_balancing_area'].upper()]['CANOE_region']
 
@@ -265,8 +271,9 @@ for generator in existing_gen:
     exist_cap_notes = rtv_data[region][tech][vint]['description']
 
     curs.execute(f"""REPLACE INTO
-                ExistingCapacity(regions, tech, vintage, exist_cap, exist_cap_units, exist_cap_notes)
-                VALUES("{region}", "{tech}", "{vint}", "{exist_cap}", "{translator['units']['capacity']['CANOE_unit']}", "{string_cleaner(exist_cap_notes)}")""")
+                ExistingCapacity(regions, tech, vintage, exist_cap, exist_cap_units, exist_cap_notes, reference)
+                VALUES("{region}", "{tech}", "{vint}", "{exist_cap}", "{translator['units']['capacity']['CANOE_unit']}",
+                "{string_cleaner(exist_cap_notes)}", "{refs['generators']}")""")
 
 
 
@@ -295,11 +302,11 @@ for region in all_regions:
 
         # Some generic data based on gen type
         gen_type = generic_tech['generation_type'].upper()
-        input_comm = translator['generator_types'][gen_type]['input_comm']
-        output_comm = translator['generator_types'][gen_type]['output_comm']
-        flag = translator['generator_types'][gen_type]['flag']
-        tech_sets = translator['generator_types'][gen_type]['tech_sets']
-        include_fuel_cost = translator['generator_types'][gen_type]['include_fuel_cost'] == 'true'
+        input_comm = translator['technologies'][tech]['input_comm']
+        output_comm = translator['technologies'][tech]['output_comm']
+        flag = translator['technologies'][tech]['flag']
+        tech_sets = translator['technologies'][tech]['tech_sets']
+        include_fuel_cost = translator['technologies'][tech]['include_fuel_cost'] == 'true'
 
         # Some generic data based on units
         cost_invest = translator['units']['cost_invest']['conversion_factor'] * generic_tech['total_project_cost_2020_CAD_per_kW']
@@ -323,7 +330,7 @@ for region in all_regions:
         
 
         # Add to specified sets
-        if tech_sets is not None:
+        if tech_sets is not None and tech_sets != '':
             for tech_set in tech_sets.split(','):
                 # Doing insert or ignore as a better descriptor might be present
                 curs.execute(f"""INSERT OR IGNORE INTO
@@ -335,8 +342,8 @@ for region in all_regions:
         if 'HYD' in tech and params['no_hydro_retirement'] == 'true': life = 200
         else: life = generic_tech['service_life_years']
         curs.execute(f"""REPLACE INTO
-                    LifetimeTech(regions, tech, life, life_notes)
-                    VALUES("{region}", "{tech}", "{life}", "{description}")""")
+                    LifetimeTech(regions, tech, life, life_notes, reference)
+                    VALUES("{region}", "{tech}", "{life}", "{description}", "{refs['generation_generic']}")""")
 
 
         # CapacityToActivity
@@ -351,14 +358,14 @@ for region in all_regions:
             ramp_rate = translator['units']['ramp_rate']['conversion_factor'] * float(ramp_rate)
             if 0.0 < ramp_rate < 1.0:
                 curs.execute(f"""REPLACE INTO
-                            RampUp(regions, tech, ramp_up)
-                            VALUES("{region}", "{tech}", "{ramp_rate}")""")
+                            RampUp(regions, tech, ramp_up, reference)
+                            VALUES("{region}", "{tech}", "{ramp_rate}", "{refs['generation_generic']}")""")
                 curs.execute(f"""REPLACE INTO
-                            RampDown(regions, tech, ramp_down)
-                            VALUES("{region}", "{tech}", "{ramp_rate}")""")
+                            RampDown(regions, tech, ramp_down, reference)
+                            VALUES("{region}", "{tech}", "{ramp_rate}", "{refs['generation_generic']}")""")
                 curs.execute(f"""REPLACE INTO
-                            tech_ramping(tech, notes)
-                            VALUES("{tech}", "{description}")""")
+                            tech_ramping(tech, notes, reference)
+                            VALUES("{tech}", "{description}", "{refs['generation_generic']}")""")
 
 
         # CostInvest
@@ -366,8 +373,9 @@ for region in all_regions:
             for period in model_periods:
                 cost_invest = translator['units']['cost_invest']['conversion_factor'] * evolving_cost[tech][str(period) + '_CAD_per_kW']
                 curs.execute(f"""REPLACE INTO
-                            CostInvest(regions, tech, vintage, cost_invest, cost_invest_units, cost_invest_notes)
-                            VALUES("{region}", "{tech}", "{period}", "{cost_invest}", "{translator['units']['cost_invest']['CANOE_unit']}", "{description}")""")
+                            CostInvest(regions, tech, vintage, cost_invest, cost_invest_units, cost_invest_notes, reference)
+                            VALUES("{region}", "{tech}", "{period}", "{cost_invest}", "{translator['units']['cost_invest']['CANOE_unit']}",
+                            "{description}", "{refs['generation_cost_evolution']}")""")
     
 
         # Give all techs future vintages
@@ -395,25 +403,25 @@ for region in all_regions:
             if "ethos" in input_comm:
                 # Efficiency is arbitrary for ethos
                 curs.execute(f"""REPLACE INTO
-                            Efficiency(regions, input_comm, tech, vintage, output_comm, efficiency, eff_notes)
-                            VALUES("{region}", "{input_comm}", "{tech}", "{vint}", "{output_comm}", 1, "{description}")""")
+                            Efficiency(regions, input_comm, tech, vintage, output_comm, efficiency, eff_notes, reference)
+                            VALUES("{region}", "{input_comm}", "{tech}", "{vint}", "{output_comm}", 1, "{description}", "{refs['generation_generic']}")""")
             elif eff is None:
                 # CODERS database does not provide an efficiency so don't override an existing manual entry
                 curs.execute(f"""INSERT OR IGNORE INTO
-                            Efficiency(regions, input_comm, tech, vintage, output_comm, eff_notes)
-                            VALUES("{region}", "{input_comm}", "{tech}", "{vint}", "{output_comm}", "{description}")""")
+                            Efficiency(regions, input_comm, tech, vintage, output_comm, eff_notes, reference)
+                            VALUES("{region}", "{input_comm}", "{tech}", "{vint}", "{output_comm}", "{description}", "{refs['generation_generic']}")""")
             else:
                 # CODERS database provides an efficiency
                 curs.execute(f"""REPLACE INTO
-                            Efficiency(regions, input_comm, tech, vintage, output_comm, efficiency, eff_notes)
-                            VALUES("{region}", "{input_comm}", "{tech}", "{vint}", "{output_comm}", "{eff}", "{description}")""")
+                            Efficiency(regions, input_comm, tech, vintage, output_comm, efficiency, eff_notes, reference)
+                            VALUES("{region}", "{input_comm}", "{tech}", "{vint}", "{output_comm}", "{eff}", "{description}", "{refs['generation_generic']}")""")
             
             # EmissionActivity
             if emis_act != 0:
                 curs.execute(f"""REPLACE INTO
-                            EmissionActivity(regions, emis_comm, input_comm, tech, vintage, output_comm, emis_act, emis_act_units, emis_act_notes)
+                            EmissionActivity(regions, emis_comm, input_comm, tech, vintage, output_comm, emis_act, emis_act_units, emis_act_notes, reference)
                             VALUES("{region}", "{translator['units']['emission_commodity']['CANOE_unit']}", "{input_comm}", "{tech}", "{vint}", "{output_comm}",
-                            "{emis_act}", "{translator['units']['emission_activity']['CANOE_unit']}", "{description}")""")
+                            "{emis_act}", "{translator['units']['emission_activity']['CANOE_unit']}", "{description}", "{refs['generation_generic']}")""")
 
             for period in model_periods:
                 
@@ -422,14 +430,16 @@ for region in all_regions:
                 # CostFixed
                 if cost_fixed != 0:
                     curs.execute(f"""REPLACE INTO
-                                CostFixed(regions, periods, tech, vintage, cost_fixed, cost_fixed_units, cost_fixed_notes)
-                                VALUES("{region}", "{period}", "{tech}", "{vint}", "{cost_fixed}", "{translator['units']['cost_fixed']['CANOE_unit']}", "{description}")""")
+                                CostFixed(regions, periods, tech, vintage, cost_fixed, cost_fixed_units, cost_fixed_notes, reference)
+                                VALUES("{region}", "{period}", "{tech}", "{vint}", "{cost_fixed}", "{translator['units']['cost_fixed']['CANOE_unit']}",
+                                "{description}", "{refs['generation_generic']}")""")
 
                 # CostVariable
                 if cost_variable != 0:
                     curs.execute(f"""REPLACE INTO
-                                CostVariable(regions, periods, tech, vintage, cost_variable, cost_variable_units, cost_variable_notes)
-                                VALUES("{region}", "{period}", "{tech}", "{vint}", "{cost_variable}", "{translator['units']['cost_variable']['CANOE_unit']}", "{description}")""")
+                                CostVariable(regions, periods, tech, vintage, cost_variable, cost_variable_units, cost_variable_notes, reference)
+                                VALUES("{region}", "{period}", "{tech}", "{vint}", "{cost_variable}", "{translator['units']['cost_variable']['CANOE_unit']}",
+                                "{description}", "{refs['generation_generic']}")""")
 
 
 
@@ -466,19 +476,20 @@ for interties in translator['transfer_regions'].keys():
     intertie_flows[tech] = {region_1_CANOE: conv_factor*from_region_1, region_2_CANOE: conv_factor*from_region_2}
 
 
-interfaces = coders_api.get_json(end_point='interface_capacities',from_cache=from_cache)
+interfaces, date_accessed = coders_api.get_json(end_point='interface_capacities',from_cache=from_cache)
+refs['interface_capacities'] = ref + date_accessed
 
 interface_techs = dict() # keys are CANOE techs
 
-elc_comm = translator['generator_types']['INTERTIE']['input_comm']
-ex_comm = translator['generator_types']['INTERTIE']['output_comm']
+int_tech = translator['generator_types']['INTERTIE']['CANOE_tech']
+elc_comm = translator['technologies'][int_tech]['input_comm']
+ex_comm = translator['technologies'][int_tech]['output_comm']
 
 # Remember that everything here runs twice, regions 1-2 then 2-1
 for interface in interfaces:
 
     interties = interface['associated_interties']
 
-    base_tech = translator['generator_types']['INTERTIE']['CANOE_tech']
     tech = base_tech + "-" + translator['transfer_regions'][interties]['tech']
 
     from_region = translator['regions'][interface['export_from'].upper()]['CANOE_region']
@@ -566,8 +577,9 @@ for tech in interface_techs.keys():
 
         # ExistingCapacity
         curs.execute(f"""REPLACE INTO
-                    ExistingCapacity(regions, tech, vintage, exist_cap, exist_cap_units, exist_cap_notes)
-                    VALUES("{region}", "{tech}", 2020, "{max_capacity}", "{translator['units']['capacity']['CANOE_unit']}", "{description}")""")
+                    ExistingCapacity(regions, tech, vintage, exist_cap, exist_cap_units, exist_cap_notes, reference)
+                    VALUES("{region}", "{tech}", 2020, "{max_capacity}", "{translator['units']['capacity']['CANOE_unit']}",
+                    "{description}", "{refs[from_region+"-"+to_region]}")""")
 
         # LifetimeTech
         curs.execute(f"""REPLACE INTO
@@ -592,8 +604,9 @@ for tech in interface_techs.keys():
                 capacity = interface['capacity_from'][from_region][summer_winter]
 
                 curs.execute(f"""REPLACE INTO
-                            CapacityFactorTech(regions, season_name, time_of_day_name, tech, cf_tech, cf_tech_notes)
-                            VALUES("{region}", "{season}", "{time_of_day}", "{tech}", "{capacity/max_capacity}", "{description}")""")
+                            CapacityFactorTech(regions, season_name, time_of_day_name, tech, cf_tech, cf_tech_notes, reference)
+                            VALUES("{region}", "{season}", "{time_of_day}", "{tech}", "{capacity/max_capacity}",
+                            "{description}", "{refs['interface_capacities']}")""")
         
         # Intertie crosses model boundary, fix hourly flow
         elif (from_region == 'EX') != (to_region == 'EX'):
@@ -606,8 +619,8 @@ for tech in interface_techs.keys():
                 cf = interface['transfers_from'][from_region][hour]/max_capacity/1000
 
                 curs.execute(f"""REPLACE INTO
-                            CapacityFactorTech(regions, season_name, time_of_day_name, tech, cf_tech, cf_tech_notes)
-                            VALUES("{region}", "{season}", "{time_of_day}", "{tech}", "{cf}", "{fixed_flow_note}")""")
+                            CapacityFactorTech(regions, season_name, time_of_day_name, tech, cf_tech, cf_tech_notes, reference)
+                            VALUES("{region}", "{season}", "{time_of_day}", "{tech}", "{cf}", "{fixed_flow_note}", "{refs[from_region+"-"+to_region]}")""")
         
         for period in model_periods:
 
@@ -635,7 +648,9 @@ for tx_tech in tx_techs + dummy_techs:
                 VALUES("{translator['generator_types'][tx_tech]['CANOE_tech']}", "p", "electric", "Transmission dummy tech")""")
 
 # Regional parameters
-ca_sys_params = coders_api.get_json(end_point='CA_system_parameters',from_cache=from_cache)
+ca_sys_params, date_accessed = coders_api.get_json(end_point='CA_system_parameters',from_cache=from_cache)
+refs['CA_system_parameters'] = ref + date_accessed
+
 for province in ca_sys_params:
 
     region = translator['regions'][province['province'].upper()]['CANOE_region']
@@ -645,15 +660,15 @@ for province in ca_sys_params:
     # PlanningReserveMargin
     reserve_margin = province['reserve_requirements_percent']
     curs.execute(f"""REPLACE INTO
-                PlanningReserveMargin(regions, reserve_margin)
-                VALUES("{region}", "{reserve_margin}")""")
+                PlanningReserveMargin(regions, reserve_margin, reference)
+                VALUES("{region}", "{reserve_margin}", "{refs['CA_system_parameters']}")""")
     
     # Transmission loss techs
     line_loss = province["system_line_losses_percent"]
     for tx_tech in tx_techs + dummy_techs:
         tech = translator['generator_types'][tx_tech]['CANOE_tech']
-        input_comm = translator['generator_types'][tx_tech]['input_comm']
-        output_comm = translator['generator_types'][tx_tech]['output_comm']
+        input_comm = translator['technologies'][tech]['input_comm']
+        output_comm = translator['technologies'][tech]['output_comm']
 
         # commodities
         curs.execute(f"""INSERT OR IGNORE INTO
@@ -688,11 +703,25 @@ for region in all_regions:
         for period in model_periods:
 
             max_cap = float(config.cap_limits[region].loc[tech, period]) * translator['units']['capacity']['conversion_factor']
+            reference = config.cap_limits[region].loc[tech, 'reference']
 
             curs.execute(f"""REPLACE INTO
-                         MaxCapacity(regions, periods, tech, maxcap, maxcap_units)
-                         VALUES('{region}', {period}, '{tech}', {max_cap}, '{translator['units']['capacity']['CANOE_unit']}')""")
-        
+                         MaxCapacity(regions, periods, tech, maxcap, maxcap_units, reference)
+                         VALUES('{region}', {period}, '{tech}', {max_cap}, '{translator['units']['capacity']['CANOE_unit']}', "{ref}")""")
+
+
+
+"""
+##############################################################
+    References
+##############################################################
+"""
+
+for ref in refs.values():
+    curs.execute(f"""REPLACE INTO
+                 'references'('reference')
+                 VALUES('{ref}')""")
+
 
 
 conn.commit()

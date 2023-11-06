@@ -48,13 +48,13 @@ class config:
         config.model_periods = [period[0] for period in curs.fetchall()]
 
         # Get all techs
-        curs.execute("""SELECT CANOE_tech FROM generator_types""")
+        curs.execute("""SELECT CANOE_tech FROM technologies""")
         config.all_techs = set(tech[0] for tech in curs.fetchall())
 
         # Get all commodities
-        curs.execute("""SELECT input_comm FROM generator_types""")
+        curs.execute("""SELECT input_comm FROM technologies""")
         config.all_comms = set(comm[0] for comm in curs.fetchall())
-        curs.execute("""SELECT output_comm FROM generator_types""")
+        curs.execute("""SELECT output_comm FROM technologies""")
         [config.all_comms.add(comm[0]) for comm in curs.fetchall()]
 
         # Get all regions
@@ -93,8 +93,11 @@ class config:
             config.cap_limits[region] = limits
 
         # Collect generic tech data
-        generic_json = coders_api.get_json(end_point='generation_generic',from_cache=(config.params['pull_from_cache'] == 'true'))
+        generic_json, date_accessed = coders_api.get_json(end_point='generation_generic',from_cache=(config.params['pull_from_cache'] == 'true'))
         config.generic_techs = dict({config.translator['generator_types'][tech['generation_type'].upper()]['CANOE_tech']: tech for tech in generic_json})
+
+        # Dictionary of references
+        config.references = {'generation_generic': config.params['coders_reference'] + date_accessed}
 
 
 

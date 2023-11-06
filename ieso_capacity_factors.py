@@ -29,10 +29,10 @@ cache = ieso_data +  f"ieso_gen_hourly_{data_year}.txt"
 show_plots=False
 
 tech_like = {
-        'WIND_ONSHORE':'%WND%',
-        'SOLAR_PV':'%SOL_PV%',
-        'HYDRO_RUN':'%HYD_ROR%',
-        'HYDRO_DAILY':'%HYD_DLY%',
+        'WIND_ONSHORE':f"%WND%", # to get on and offshore
+        'SOLAR_PV':f"%{translator['generator_types']['SOLAR_PV']['CANOE_tech']}%",
+        'HYDRO_RUN':f"%{translator['generator_types']['HYDRO_RUN']['CANOE_tech']}%",
+        'HYDRO_DAILY':f"%{translator['generator_types']['HYDRO_DAILY']['CANOE_tech']}%",
         'HYDRO':'%HYD%'
         }
 
@@ -106,10 +106,11 @@ def get_capacity_factors():
 # Get data year capacity of a VRE where unit capacities >20MW
 def get_past_capacity_mw(vre_type):
 
-    existing_gens = coders_api.get_json('generators', from_cache=True)
+    existing_gens, date_accessed = coders_api.get_json('generators', from_cache=True)
 
     total_cap = 0
     for gen in existing_gens:
+
         if vre_type not in gen['gen_type'].upper(): continue
         if "ONTARIO" not in gen['operating_region'].upper(): continue
         if gen['install_capacity_in_mw'] < 20: continue # IESO ignores <20MW in hourly data -> must match for CFs
@@ -156,6 +157,13 @@ def write_to_coders_db():
     conn = sqlite3.connect(coders_db)
     curs = conn.cursor()
 
+    reference = params['ieso_reference'].replace('<year>',data_year)
+    cf_note = params['capacity_factor_note'].replace('<year',data_year)
+
+    curs.execute(f"""REPLACE INTO
+                 'references'('reference')
+                 VALUES('{reference}')""")
+
     for vre in ['HYDRO_RUN', 'SOLAR_PV', 'WIND_ONSHORE']:
 
         # Get all variants of this vre tech
@@ -165,9 +173,11 @@ def write_to_coders_db():
             # Do in this order to keep tech rows together in the database
             for h in range(8760):
                 curs.execute(f"""REPLACE INTO
-                            CapacityFactorTech(regions, season_name, time_of_day_name, tech, cf_tech)
-                            VALUES('ON', '{config.seas_8760[h]}', '{config.tofd_8760[h]}', '{tech}', {cfs[vre][h]})""")
+                            CapacityFactorTech(regions, season_name, time_of_day_name, tech, cf_tech, cf_tech_notes, reference)
+                            VALUES('ON', '{config.seas_8760[h]}', '{config.tofd_8760[h]}', '{tech}', {cfs[vre][h]}, '{cf_note}', '{reference}')""")
 
+
+    dly_note = params['hydro_daily_note'].replace('<year>',data_year)
 
     hyd_dly_variants = [tech[0] for tech in curs.execute(f"SELECT tech FROM technologies WHERE tech like '{tech_like['HYDRO_DAILY']}'").fetchall()]
 
@@ -176,11 +186,11 @@ def write_to_coders_db():
             for d in range(365):
                 h = d*24
                 curs.execute(f"""REPLACE INTO
-                            MinSeasonalActivity(regions, periods, season_name, tech, minact, minact_units)
-                            VALUES('ON', {period}, '{config.seas_8760[h]}', '{tech}', {hydro_dly_seas_act[d]}, 'PJ')""")
+                            MinSeasonalActivity(regions, periods, season_name, tech, minact, minact_units, minact_notes, reference)
+                            VALUES('ON', {period}, '{config.seas_8760[h]}', '{tech}', {hydro_dly_seas_act[d]}, 'PJ', '{dly_note}', '{reference}')""")
                 curs.execute(f"""REPLACE INTO
-                            MaxSeasonalActivity(regions, periods, season_name, tech, maxact, maxact_units)
-                            VALUES('ON', {period}, '{config.seas_8760[h]}', '{tech}', {hydro_dly_seas_act[d]}, 'PJ')""")
+                            MaxSeasonalActivity(regions, periods, season_name, tech, maxact, maxact_units, maxact_notes, reference)
+                            VALUES('ON', {period}, '{config.seas_8760[h]}', '{tech}', {hydro_dly_seas_act[d]}, 'PJ', '{dly_note}', '{reference}')""")
 
     conn.commit()
     conn.close()

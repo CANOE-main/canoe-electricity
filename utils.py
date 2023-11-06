@@ -57,7 +57,7 @@ def get_data(url, file_type=None, name=None, use_cache=True, **kwargs):
         elif "xl" in file_type: data = pd.read_excel(url, **kwargs)
         elif file_type == "xml": data = json.dumps(xmltodict.parse(requests.get(url).content))
 
-        # Try to cache
+        # Try to cache downloaded file
         try:
             if file_type == "csv": data.to_csv(cache_file)
             elif "xl" in file_type: data.to_excel(cache_file)

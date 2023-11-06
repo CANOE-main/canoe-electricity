@@ -12,7 +12,8 @@ import pandas as pd
 yyyy, mmm = config.params['ieso_rel_yyyy_mmm'].split("_")
 
 rel_outlook_url = f"https://www.ieso.ca/-/media/Files/IESO/Document-Library/planning-forecasts/reliability-outlook/ReliabilityOutlookTables_{yyyy}{mmm}.ashx"
-reference = f"Forecasted capability at normal summer peak divided by total installed capacity [IESO. ({yyyy}, {mmm}). Reliability Outlook. https://www.ieso.ca/en/Sector-Participants/Planning-and-Forecasting/Reliability-Outlook]"
+note = "Forecasted capability at normal summer peak divided by total installed capacity"
+reference = f"IESO. ({yyyy}, {mmm}). Reliability Outlook. https://www.ieso.ca/en/Sector-Participants/Planning-and-Forecasting/Reliability-Outlook"
 
 # Get the reliability outlook forecast peak table and calculate capacity credits
 ieso_rel = utils.get_data(rel_outlook_url, file_type='xlsx', sheet_name='Table 4.1', skiprows=4, header=0, nrows=6, index_col=0)
@@ -37,6 +38,10 @@ def write_to_coders_db():
     conn = sqlite3.connect('coders_db.sqlite')
     curs = conn.cursor()
 
+    curs.execute(f"""REPLACE INTO
+                 'references'('reference')
+                 VALUES('{reference}')""")
+
     for fuel in fuel_tech_like.keys():
 
         techs = set()
@@ -57,8 +62,8 @@ def write_to_coders_db():
                     if vint > period or vint + life < period: continue
 
                     curs.execute(f"""REPLACE INTO
-                                CapacityCredit(regions, periods, tech, vintage, cf_tech, cf_tech_notes)
-                                VALUES("ON", {period}, '{tech}', {vint}, {cc}, '{reference}')""")
+                                CapacityCredit(regions, periods, tech, vintage, cf_tech, cf_tech_notes, reference)
+                                VALUES("ON", {period}, '{tech}', {vint}, {cc}, '{note}', '{reference}')""")
                 
 
                     if tech in config.generic_techs.keys():

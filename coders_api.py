@@ -6,6 +6,8 @@ Written by Ian David Elder for the TEMOA Canada / CANOE model
 import requests
 import json
 import os
+from datetime import datetime
+from datetime import date
 from utils import string_cleaner
 
 this_dir = os.path.realpath(os.path.dirname(__file__)) + "/"
@@ -19,18 +21,26 @@ def get_json(end_point=None, from_cache=False, update_cache=True):
     json_cache = coders_cache + string_cleaner(end_point) + ".json"
     
     data_json = None
-    downloaded = False
+    date_accessed = str(date.today())
+
+
     if from_cache and os.path.isfile(json_cache):
+
         with open(json_cache, 'r') as in_file:
             data_json = json.load(in_file)
         print(f"Got CODERS data from cache, endpoint={end_point}")
+
+        date_accessed = str(datetime.fromtimestamp(os.path.getmtime(json_cache)).date())
+
     else:
+
         data_json = requests.get(coders_root + end_point).json()
-        downloaded = True
         print(f"Downloaded CODERS data, endpoint={end_point}")
 
-    if (downloaded and update_cache):
-        with open(json_cache, "w") as outfile:
-            json.dump(data_json, outfile)
+        if update_cache:
 
-    return data_json
+            with open(json_cache, "w") as outfile:
+                json.dump(data_json, outfile)
+            print(f"Cached CODERS data locally, endpoint={end_point}")
+
+    return data_json, date_accessed
