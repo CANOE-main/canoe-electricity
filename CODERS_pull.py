@@ -471,9 +471,8 @@ for interties in translator['transfer_regions'].keys():
     if region_1_CANOE == 'EX' and region_2_CANOE == 'EX': continue
 
     # Get 8760 transfers from the data year for this boundary and convert MWh to PJ
-    conv_factor = translator['units']['activity']['conversion_factor']
     from_region_1, from_region_2 = intertie_transfers.get_transfered_mwh(region_1, region_2, translator['transfer_regions'][interties]['type'], from_cache=from_cache)
-    intertie_flows[tech] = {region_1_CANOE: conv_factor*from_region_1, region_2_CANOE: conv_factor*from_region_2}
+    intertie_flows[tech] = {region_1_CANOE: from_region_1, region_2_CANOE: from_region_2}
 
 
 interfaces, date_accessed = coders_api.get_json(end_point='interface_capacities',from_cache=from_cache)
@@ -532,7 +531,7 @@ for tech in interface_techs.keys():
     # This is for fixed-flow model boundary interfaces
     if (interface['regions'][0] == 'EX') != (interface['regions'][1] == 'EX'):
         max_capacity = max( max(interface['transfers_from'][interface['regions'][0]]), max(interface['transfers_from'][interface['regions'][1]]) )
-        max_capacity *= translator['units']['capacity']['conversion_factor'] / translator['units']['activity']['conversion_factor']
+        max_capacity /= 1000
 
     description = interface['description']
 

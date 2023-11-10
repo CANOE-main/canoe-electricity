@@ -7,4 +7,5 @@ import sqlite3
 import os
 import utils
 import shutil
+from setup import config
 import coders_api

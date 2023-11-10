@@ -13,10 +13,10 @@ import coders_api
 class config:
 
     # File locations
-    this_dir = os.path.realpath(os.path.dirname(__file__)) + "/"
-    translation_file = this_dir + "CODERS_CANOE_translation.sqlite"
-    batch_file = this_dir + "input_files/batched_new_capacity.xlsx"
-    cap_limit_file = this_dir + "input_files/capacity_limits.xlsx"
+    _this_dir = os.path.realpath(os.path.dirname(__file__)) + "/"
+    _translation_file = _this_dir + "CODERS_CANOE_translation.sqlite"
+    _batch_file = _this_dir + "input_files/batched_new_capacity.xlsx"
+    _cap_limit_file = _this_dir + "input_files/capacity_limits.xlsx"
 
     _instance = None # singleton pattern
 
@@ -27,7 +27,7 @@ class config:
         cls._instance = super(config, cls).__new__(cls, *args, **kwargs)
             
         # Connect to the translator file
-        conn = sqlite3.connect(cls.translation_file)
+        conn = sqlite3.connect(cls._translation_file)
         curs = conn.cursor()
 
         cls._build_translator(curs)
@@ -81,7 +81,7 @@ class config:
         for region in config.all_regions:
             if region == 'EX': continue
 
-            batches = pd.read_excel(config.batch_file, sheet_name=region, index_col=0, skiprows=2)
+            batches = pd.read_excel(config._batch_file, sheet_name=region, index_col=0, skiprows=2)
             config.batched_cap[region] = batches
 
         # New capacity limits
@@ -89,7 +89,7 @@ class config:
         for region in config.all_regions:
             if region == 'EX': continue
 
-            limits = pd.read_excel(config.cap_limit_file, sheet_name=region, index_col=0, skiprows=2)
+            limits = pd.read_excel(config._cap_limit_file, sheet_name=region, index_col=0, skiprows=2)
             config.cap_limits[region] = limits
 
         # Collect generic tech data
