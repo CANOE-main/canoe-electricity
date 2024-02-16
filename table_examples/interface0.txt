@@ -1,8 +1,0 @@
-"country_from": "Canada"
-"country_to": "Canada"
-"export_from": "Alberta"
-"export_to": "British Columbia"
-"current": "ac"
-"summer_capacity_mw": 1000
-"winter_capacity_mw": 1000
-"associated_interties": "IPT Natal Coleman; IPT Cranbrook Chapel Rock; IPT Natal Pocaterra"

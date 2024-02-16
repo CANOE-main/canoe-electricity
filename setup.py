@@ -4,36 +4,31 @@ Written by Ian David Elder for the CANOE model
 """
 
 import os
-import sqlite3
 import pandas as pd
-import coders_api
+import yaml
+import requests
+import urllib.request
+import zipfile
 
-# I'll be honest I mostly just wanted to practice python objects
-# but maybe this will save memory
 class config:
 
     # File locations
     _this_dir = os.path.realpath(os.path.dirname(__file__)) + "/"
-    _translation_file = _this_dir + "CODERS_CANOE_translation.sqlite"
-    _batch_file = _this_dir + "input_files/batched_new_capacity.xlsx"
-    _cap_limit_file = _this_dir + "input_files/capacity_limits.xlsx"
+    input_files = _this_dir + 'input_files/'
+    cache_dir = _this_dir + "data_cache/"
+    references = dict()
 
     _instance = None # singleton pattern
+
+
 
     def __new__(cls, *args, **kwargs):
 
         if isinstance(cls._instance, cls): return cls._instance
-
         cls._instance = super(config, cls).__new__(cls, *args, **kwargs)
-            
-        # Connect to the translator file
-        conn = sqlite3.connect(cls._translation_file)
-        curs = conn.cursor()
 
-        cls._build_translator(curs)
-        cls._get_params(curs)
-
-        conn.close()
+        cls._get_params(cls._instance)
+        cls._get_files(cls._instance)
 
         print('Instantiated setup config.')
 
@@ -41,88 +36,50 @@ class config:
 
         
 
-    def _get_params(curs):
+    def _get_params(cls):
 
-        # Get future model periods
-        curs.execute("""SELECT periods FROM model_periods""")
-        config.model_periods = [period[0] for period in curs.fetchall()]
+        stream = open(config.input_files + "params.yaml", 'r')
+        config.params = dict(yaml.load(stream, Loader=yaml.Loader))
 
-        # Get all techs
-        curs.execute("""SELECT CANOE_tech FROM technologies""")
-        config.all_techs = set(tech[0] for tech in curs.fetchall())
+        config.commodities = pd.read_csv(config.input_files + 'commodities.csv', index_col=0)
+        config.regions = pd.read_csv(config.input_files + 'regions.csv', index_col=0)
+        config.trans_regions = pd.read_csv(config.input_files + 'transfer_regions.csv', index_col=0)
+        config.trans_techs = pd.read_csv(config.input_files + 'transmission_technologies.csv', index_col=0)
+        config.technologies = pd.read_csv(config.input_files + 'technologies.csv', index_col=0)
+        config.time = pd.read_csv(config.input_files + 'time.csv', index_col=0)
+        config.units = pd.read_csv(config.input_files + 'units.csv', index_col=0)
 
-        # Get all commodities
-        curs.execute("""SELECT input_comm FROM technologies""")
-        config.all_comms = set(comm[0] for comm in curs.fetchall())
-        curs.execute("""SELECT output_comm FROM technologies""")
-        [config.all_comms.add(comm[0]) for comm in curs.fetchall()]
+        config.model_periods = list(config.params['model_periods'])
+        config.model_regions = set(config.regions.loc[(config.regions['include']) & (config.regions.index != 'EX')].index)
 
-        # Get all regions
-        curs.execute("""SELECT CANOE_region FROM regions""")
-        config.all_regions = set(region[0] for region in curs.fetchall())
+        # Maps all coders gen types to canoe techs
+        config.tech_map = dict()
+        for tech, row in config.technologies.iterrows():
+            for coders_equiv in row['coders_equivs'].split("+"):
+                config.tech_map[coders_equiv] = tech
 
-        # Get capacity to activity
-        fetch = curs.execute("""SELECT CANOE_unit, conversion_factor FROM units WHERE metric = 'capacity_to_activity'""").fetchone()
-        config.c2a_unit, config.c2a = fetch[0], fetch[1]
+        # Maps all types of coders regions to canoe regions
+        config.region_map = dict()
+        for region, row in config.regions.iterrows():
+            for coders_equiv in row['coders_equivs'].split("+"):
+                config.region_map[coders_equiv] = region
 
-        # hour out of 8760 -> time of day or season name
-        curs.execute("""SELECT time_of_day FROM time""")
-        config.tofd_8760 = [tofd[0] for tofd in curs.fetchall()]
-        curs.execute("""SELECT season FROM time""")
-        config.seas_8760 = [seas[0] for seas in curs.fetchall()]
-
-        # General pull parameters
-        config.params = dict()
-        for param in config.translator['pull_parameters']:
-            config.params[param] = config.translator['pull_parameters'][param]['value']
-
-        # Batched new capacities
+        # Batched new capacities and new capacity limits
         config.batched_cap = dict()
-        for region in config.all_regions:
-            if region == 'EX': continue
-
-            batches = pd.read_excel(config._batch_file, sheet_name=region, index_col=0, skiprows=2)
-            config.batched_cap[region] = batches
-
-        # New capacity limits
         config.cap_limits = dict()
-        for region in config.all_regions:
-            if region == 'EX': continue
-
-            limits = pd.read_excel(config._cap_limit_file, sheet_name=region, index_col=0, skiprows=2)
-            config.cap_limits[region] = limits
-
-        # Collect generic tech data
-        generic_json, date_accessed = coders_api.get_json(end_point='generation_generic',from_cache=(config.params['pull_from_cache'] == 'true'))
-        config.generic_techs = dict({config.translator['generator_types'][tech['generation_type'].upper()]['CANOE_tech']: tech for tech in generic_json})
-
-        # Dictionary of references
-        config.references = {'generation_generic': config.params['coders_reference'] + date_accessed}
-
-
-
-    def _build_translator(curs):
-
-        # Convert translator database into a dictionary to speed things up
-        # usage: translator['table name']['value of first column']['column value needed']
-        config.translator = dict()
-
-        curs.execute("SELECT name FROM sqlite_master WHERE type='table'")
-        all_tables = [table[0] for table in curs.fetchall()]
-
-        for table in all_tables:
-            config.translator[table] = dict()
-
-            rows = curs.execute("SELECT * FROM " + table)
-            column_names = [column[0] for column in rows.description]
+        for region in config.model_regions:
+            config.batched_cap[region] = pd.read_excel(config.input_files + 'batched_new_capacity.xlsx', sheet_name=region, index_col=0, skiprows=2)
+            config.cap_limits[region] = pd.read_excel(config.input_files + 'capacity_limits.xlsx', sheet_name=region, index_col=0, skiprows=2)
             
-            rows = rows.fetchall()
 
-            for r in range(len(rows)):
-                config.translator[table][rows[r][0]] = dict()
 
-                for c in range(len(column_names)):
-                    config.translator[table][rows[r][0]][column_names[c]] = rows[r][c]
+
+    def _get_files(cls):
+
+        config.schema_file = config.input_files + config.params['sqlite_schema']
+        config.database_file = config._this_dir + config.params['sqlite_database']
+        config.excel_template_file = config.input_files + config.params['excel_template']
+        config.excel_target_file = config._this_dir + config.params['excel_output']
 
 
 

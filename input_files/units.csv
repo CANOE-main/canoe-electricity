@@ -1,0 +1,11 @@
+metric,coders_unit,units,conversion_factor
+currency,CAD2020,CAD2020,1
+cost_invest,CAD/kW,MCAD/GW,1
+cost_fixed,CAD/MWy,MCAD/GWy,0.001
+cost_variable,CAD/MWh,MCAD/PJ,0.277778
+capacity,MW,GW,0.001
+emission_activity,tCO2eq/MWh,ktCO2eq/PJ,277.7778
+capacity_to_activity,,PJ/GWy,31.536
+ramp_rate,%cap/min,cap/hour,0.6
+activity,MWh,PJ,3.60E-06
+cost_fuel,CAD/GJ,MCAD/PJ,1

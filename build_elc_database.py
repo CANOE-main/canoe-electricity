@@ -3,19 +3,33 @@ Builds the electricity sector database to be merged into the larger model
 Written by Ian David Elder for the CANOE model
 """
 
-import CODERS_pull # Runs on import... for now...
-import ieso_vre_capacity_credits as ieso_vre_cc
-import ieso_rel_capacity_credits as ieso_rel_cc
-import ieso_capacity_factors as ieso_cf
+import coders_pull # Runs on import... for now...
+#import ieso_vre_capacity_credits as ieso_vre_cc
+#import ieso_rel_capacity_credits as ieso_rel_cc
+#import ieso_capacity_factors as ieso_cf
 import sqlite3
 import utils
+import os
+import pandas as pd
 from setup import config
 
-ieso_cf.write_to_coders_db()
-ieso_vre_cc.write_to_coders_db(show_plots=False)
-ieso_rel_cc.write_to_coders_db()
+# Check if database exists or needs to be built
+build_db = not os.path.exists(config.database_file)
 
-utils.DatabaseConverter().clone_sqlite_to_excel('coders_db.sqlite', 'electricity_generation.xlsx', excel_template_file='Template spreadsheet (make a copy).xlsx')
+# Connect to the new database file
+conn = sqlite3.connect(config.database_file)
+curs = conn.cursor() # Cursor object interacts with the sqlite db
+
+# Build the database if it doesn't exist
+if build_db: curs.executescript(open(config.schema_file, 'r').read())
+
+coders_pull.aggregate()
+
+#ieso_cf.write_to_coders_db()
+#ieso_vre_cc.write_to_coders_db(show_plots=False)
+#ieso_rel_cc.write_to_coders_db()
+
+if config.params['clone_to_excel']: utils.DatabaseConverter().clone_sqlite_to_excel(config.database_file, config.excel_target_file, config.excel_template_file)
 
 """
 ##############################################################
@@ -23,7 +37,7 @@ utils.DatabaseConverter().clone_sqlite_to_excel('coders_db.sqlite', 'electricity
 ##############################################################
 """
 
-conn = sqlite3.connect('coders_db.sqlite')
+conn = sqlite3.connect(config.database_file)
 curs = conn.cursor()
 
 data_year = 2020
@@ -33,22 +47,32 @@ mwh_to_pj = 3600/1E9
 demand['demand'] = demand["demand"] * mwh_to_pj
 total_demand = sum(demand['demand'])
 
-pop_index = {
-    2025: 1.0755,
-    2030: 1.1465,
-    2035: 1.2092,
-    2040: 1.2641,
-    2045: 1.3130,
-    2050: 1.3579
+gdp_index = {
+    2025: 1.088,
+    2030: 1.184,
+    2035: 1.300,
+    2040: 1.429,
+    2045: 1.562,
+    2050: 1.708
 }
 
 for period in config.model_periods:
     curs.execute(f"""REPLACE INTO Demand(regions, periods, demand_comm, demand, demand_units)
-                 VALUES("ON", {period}, 'D_ELC', {total_demand*pop_index[period]}, "PJ")""")
+                 VALUES("ON", {period}, 'D_ELC', {total_demand*gdp_index[period]}, "PJ")""")
+    
+rep_days = {
+    'D001': 'Jan',
+    'D009': 'Jan',
+    'D045': 'Feb',
+    'D103': 'Apr',
+    'D128': 'May',
+    'D173': 'Jun',
+    'D184': 'Jul'
+    }
 
 for h in range(8760):
-    curs.execute(f"""REPLACE INTO DemandSpecificDistribution(regions, season_name, time_of_day_name, demand_name, dds)
-                 VALUES("ON", '{config.seas_8760[h]}', '{config.tofd_8760[h]}', 'D_ELC', {demand['demand'][h]/total_demand})""")
+    curs.execute(f"""REPLACE INTO DemandSpecificDistribution(regions, season_name, time_of_day_name, demand_name, dsd)
+                 VALUES("ON", '{config.time.loc[h, 'season']}', '{config.time.loc[h, 'time_of_day']}', 'D_ELC', {demand['demand'][h]})""")
     
 curs.execute(f"""REPLACE INTO sector_labels(sector) VALUES('electric')""")
     
@@ -59,9 +83,8 @@ curs.execute(f"""UPDATE Efficiency
                 SET efficiency = 0.90
                 WHERE tech like '%BAT%'""")
 
-days = ['D001','D009','D089','D103','D128','D173','D196']
 curs.execute(f"DELETE FROM time_season")
-[curs.execute(f"INSERT OR IGNORE INTO time_season(t_season) VALUES('{day}')") for day in days]
+[curs.execute(f"INSERT OR IGNORE INTO time_season(t_season) VALUES('{day}')") for day in rep_days.keys()]
 
 seas_tables = [
     'CapacityFactorTech',
@@ -73,14 +96,14 @@ seas_tables = [
 for table in seas_tables:
     curs.execute(f"DELETE FROM {table} WHERE season_name NOT IN (SELECT t_season from time_season)")
 
-total_dsd = sum([dsd[0] for dsd in curs.execute("SELECT dds FROM DemandSpecificDistribution").fetchall()])
+total_dsd = sum([dsd[0] for dsd in curs.execute("SELECT dsd FROM DemandSpecificDistribution").fetchall()])
 curs.execute(f"""UPDATE DemandSpecificDistribution
-             SET dds = dds / {total_dsd}""")
+             SET dsd = dsd / {total_dsd}""")
 
-for day in days:
+for day in rep_days.keys():
     for h in range(24):
         curs.execute(f"""REPLACE INTO SegFrac(season_name, time_of_day_name, segfrac)
-                    VALUES('{day}', '{config.tofd_8760[h]}', {1/(24*7)})""")
+                    VALUES('{day}', '{config.time.loc[h, 'time_of_day']}', {1/(24*7)})""")
 
 base_emis = 3200
 emis = {

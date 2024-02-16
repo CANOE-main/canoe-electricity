@@ -1,0 +1,48 @@
+# Configuration for aggregation of electricity sector data
+
+period_step: 5
+
+# Must be in ascending order along with all data in tables!
+model_periods:
+  - 2025
+  - 2030
+  - 2035
+  - 2040
+  - 2045
+  - 2050
+
+# Year to pull data from by default
+default_data_year: 2020
+
+global_discount_rate: 0.05
+
+sqlite_schema: "canoe_schema.sql"
+sqlite_database: "electricity.sqlite"
+excel_template: "Template spreadsheet (make a copy).xlsx"
+excel_output: "electricity.xlsx"
+
+force_download: false # Forces downloading data again instead of using cached versions
+no_hydro_retirement: true
+clone_to_excel: true
+
+new_cap:
+  steps: 10
+  step_size_mw: 1000
+
+# Some one-off variables
+emissions_commodity: 'CO2eq'
+c2a_unit: "PJ/GWy"
+c2a: 31.536
+
+# Some notes for data in database
+capacity_credit_note: "Marginal LDC - NLDC top 100 hours using IESO public data [Frew, B., Cole, W., Sun, Y., Richards, J., & Mai, T. (2017). 8760-Based Method for Representing Variable Generation Capacity Value in Capacity Expansion Models: Preprint. NREL. https://www.nrel.gov/docs/fy17osti/68869.pdf]"
+intertie_fixed_flow_note: "Exogenous intertie fixed to <year> hourly flows"
+capacity_factor_note: "Hourly production, from IESO public data, divded by existing capacity in <year>"
+hydro_daily_note: "Daily production, from IESO public data, divded by existing capacity in <year>"
+
+coders_reference: "SESIT. CODERS database API [dataset]. Accessed <date>"
+
+# IESO data, to be removed with in-house modelling
+ieso_reference: "IESO. (<year>). IESO public data. http://reports.ieso.ca/public/"
+ieso_rel_yyyy_mmm: "2023_Sep"
+ieso_rel_peak_type: "Normal"

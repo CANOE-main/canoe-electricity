@@ -12,24 +12,103 @@ import pandas as pd
 import requests
 import xmltodict
 import json
+from setup import config
+import urllib.request
+import zipfile
+import itertools
+import time
+import threading
+import sys
 
 
 
-this_dir = os.path.realpath(os.path.dirname(__file__)) + "/"
-cache_dir = this_dir + "download_cache/"
-excel_template = this_dir + 'Template spreadsheet.xlsx'
-
-
-
+# Cleans up strings for filenames, databases, etc.
 def string_cleaner(string):
 
-    clean_string = ''.join(letter for letter in string if letter in '- ()' or letter.isalnum())
-
-    return clean_string
+    return ''.join(letter for letter in string if letter in '- /()–' or letter.isalnum())
 
 
 
-def get_data(url, file_type=None, name=None, use_cache=True, **kwargs):
+def string_letters(string):
+
+    return ''.join(letter for letter in string_cleaner(string) if letter not in '123456789')
+
+
+
+def clean_index(df):
+
+    df.index = [string_letters(idx).lower() for idx in df.index]
+
+
+
+def compr_db_url(region, table_number):
+
+    return str(config.params['nrcan_url']).replace('<y>', str(config.params['base_year'])).replace('<r>', region.lower()).replace('<t>', str(table_number))
+
+
+
+def get_statcan_table(table, save_as=None, **kwargs):
+
+    if save_as == None: save_as = f"statcan_{table}.csv"
+    if os.path.splitext(save_as)[1] != ".csv": save_as += ".csv"
+
+    if not config.params['force_download'] and os.path.isfile(config.cache_dir + save_as):
+
+        try:
+
+            df = pd.read_csv(config.cache_dir + save_as, index_col=0)
+            
+            print(f"Got Statcan table {table} from local cache.")
+            return df
+        
+        except Exception as e:
+
+            print(f"Could not get Statcan table {table} from local cache. Trying to download instead.")
+
+    # Make a request from the API for the table, returns response status and url for download
+    url = f"https://www150.statcan.gc.ca/t1/wds/rest/getFullTableDownloadCSV/{table}/en"
+    response = requests.get(url).json()
+
+    # If successful, download the table
+    if response['status'] == 'SUCCESS':
+
+        print(f"Downloading Statcan table {table}...")
+
+        # Download and open the zip file
+        filehandle,_ = urllib.request.urlretrieve(response['object'])
+        zip_file_object = zipfile.ZipFile(filehandle, 'r')
+
+        # Read the table from inside the zip file
+        from_file = zip_file_object.open(f"{table}.csv", "r")
+        df = pd.read_csv(from_file, **kwargs)
+        from_file.close()
+
+        df.to_csv(config.cache_dir + save_as)
+
+        print(f"Cached Statcan table {table}.")
+        return df
+
+    else:
+
+        print(f"Request for {table} from Statcan failed. Status: {response['status']}")
+        return None
+    
+
+
+def get_compr_db(region, table_number, first_row=0, last_row=None):
+
+    table = get_data(compr_db_url(region, table_number), skiprows=10)
+    table = table.loc[first_row::] if last_row is None else table.loc[first_row:last_row]
+    table = table.drop("Unnamed: 0", axis=1).set_index('Unnamed: 1').dropna()
+    table.index.name = None
+    clean_index(table)
+
+    return table
+
+
+
+# Downloads and handles local caching of data sources
+def get_data(url, file_type=None, cache_file_type=None, name=None, **kwargs) -> pd.DataFrame:
 
     # Get the original file name
     if name == None: name = url.split("/")[-1].split("\\")[-1]
@@ -37,31 +116,49 @@ def get_data(url, file_type=None, name=None, use_cache=True, **kwargs):
 
     file_type = file_type.lower()
 
-    if file_type == "xml": name = os.path.splitext(name)[0] + ".json"
-    if url.split(".")[-1] != file_type: name = os.path.splitext(name)[0] + "."+file_type
-    cache_file = cache_dir + name
+    if cache_file_type == None:
+        if file_type == "xml": cache_file_type = "json"
+        elif file_type == "xls": cache_file_type = "xlsx"
+        else: cache_file_type = file_type
+    
+    # If file type is different from new file type
+    if url.split(".")[-1] != cache_file_type: name = os.path.splitext(name)[0] + "."+cache_file_type
+    cache_file = config.cache_dir + name
 
     data = None
-    if (use_cache and os.path.isfile(cache_file)):
-
+    if (not config.params['force_download'] and os.path.isfile(cache_file)):
+        
         # Get from existing local cache
-        if file_type == "csv": data = pd.read_csv(cache_file, index_col=0)
-        elif "xl" in file_type: data = pd.read_excel(cache_file, index_col=0)
-        elif file_type == "xml": data = json.load(open(cache_file))
+        if cache_file_type == "csv": data = pd.read_csv(cache_file, index_col=0)
+        elif "xl" in cache_file_type: data = pd.read_excel(cache_file, index_col=0)
+        elif cache_file_type == "xml": data = json.load(open(cache_file))
         print(f"Got {name} from local cache.")
         
     else:
 
-        # Download from url
-        if file_type == "csv": data = pd.read_csv(url, **kwargs)
-        elif "xl" in file_type: data = pd.read_excel(url, **kwargs)
-        elif file_type == "xml": data = json.dumps(xmltodict.parse(requests.get(url).content))
+        print(f"Downloading {name} ...")
+
+        is_done = [False]
+        #working_wheel(is_done)
+
+        try:
+            # Download from url
+            if file_type == "csv": data = pd.read_csv(url, **kwargs)
+            elif "xl" in file_type: data = pd.read_excel(url, **kwargs)
+            elif file_type == "xml": data = json.dumps(xmltodict.parse(requests.get(url).content))
+        except Exception as e:
+            print(url)
+            print(e)
+        finally:
+            is_done[0] = True
 
         # Try to cache downloaded file
         try:
-            if file_type == "csv": data.to_csv(cache_file)
-            elif "xl" in file_type: data.to_excel(cache_file)
-            elif file_type == "xml":
+            if not os.path.exists(config.cache_dir): os.mkdir(config.cache_dir)
+
+            if cache_file_type == "csv": data.to_csv(cache_file)
+            elif "xl" in cache_file_type: data.to_excel(cache_file)
+            elif cache_file_type == "xml":
                 with open(cache_file, 'w') as outfile: outfile.write(data)
             print(f"Cached {name}.")
         except Exception as e:
@@ -71,9 +168,39 @@ def get_data(url, file_type=None, name=None, use_cache=True, **kwargs):
 
 
 
+# Gives data quality time-related indicator based on time gap from data
+def dq_time(from_year, to_year):
+    diff = abs(from_year - to_year)
+
+    data_quality = {
+        3: 1,
+        6: 2,
+        10: 3,
+        15: 4
+    }
+
+    for key in data_quality.keys():
+        if diff <= key: return data_quality[key]
+    
+    return 5 # greater than 15 years time difference
+
+
+
+def stock_vintages(stock_year, lifetime, vint_interval=config.params['period_step']) -> list:
+
+    vint_0 = stock_year - stock_year % vint_interval # first stepped back vint
+
+    # Return any stepped back vintages that are feasible
+    vints = list(range(int(vint_0), int(stock_year-lifetime), -int(vint_interval)))
+    vints.sort()
+
+    return vints
+    
+
+
 class DatabaseConverter:
     
-    # singleton pattern
+    # Singleton pattern
     _instance = None
 
     def __new__(cls, *args, **kwargs):
@@ -86,37 +213,33 @@ class DatabaseConverter:
 
         return cls._instance
 
-    def clone_sqlite_to_excel(self, from_sqlite_file, to_excel_file, excel_template_file=None):
-        
-        # Make sure behaviour is understood
-        overwrite = input(f"\nAbout to clone {os.path.basename(from_sqlite_file)} "\
-                        f"into target {os.path.basename(to_excel_file)}. "\
-                        "This may take some time.\n"
-                        "Any data in the workbook that is not in the sqlite database will be lost. Proceed? (Y/N):")
-        if overwrite.upper() != "Y":
-            print("Did not overwrite workbook.")
-            return
+    def clone_sqlite_to_excel(self, from_sqlite_file: str, to_excel_file: str, excel_template_file: str = None):
         
         print(f"\nCloning {os.path.basename(from_sqlite_file)} into target {os.path.basename(to_excel_file)}."\
               "\nThis may take a minute...")
 
-        if not os.path.isfile(to_excel_file):
+        # Check that the target file or template file exists
+        if (excel_template_file is None):
+            print("Aborted. Must provide a template excel file in input files. Check name is correct in res_config.yaml.")
+            return
+        
+        # Handle numbering if existing excel file
+        if os.path.isfile(to_excel_file):
+            name, ext = os.path.splitext(to_excel_file)
+            n = 1
+            while os.path.isfile(f"{name} ({n}){ext}"): n+=1
+            to_excel_file = f"{name} ({n}){ext}"
 
-            # Check that the target file or template file exists
-            if (excel_template_file is None):
-                print("Target excel file does not yet exist. Must provide a template to copy.")
-                return
-            
-            # Copy template to make target file if target doesn't yet exist
-            shutil.copy(excel_template_file, to_excel_file)
-
+        # Copy template to make target file if target doesn't yet exist
+        shutil.copy(excel_template_file, to_excel_file)
+        
         # Load the target workbook
         wb = load_workbook(to_excel_file)
 
         # Connect to the sqlite from file and get data table names
         conn = sqlite3.connect(from_sqlite_file)
         curs = conn.cursor()
-        fetched = curs.execute("""SELECT name FROM sqlite_master WHERE type='table';""").fetchall()
+        fetched = curs.execute("""SELECT name FROM sqlite_master WHERE type='table'""").fetchall()
 
         # Skipping output tables, since this was written for input data
         all_tables = [table[0] for table in fetched if (not table[0].startswith('Output'))]
@@ -165,3 +288,22 @@ class DatabaseConverter:
                 ws.append(row.values.tolist())
 
         wb.save(to_excel_file)
+
+
+
+def animate_wheel(is_done):
+    for c in itertools.cycle(['|', '/', '-', '\\']):
+        time.sleep(0.1)
+        if is_done[0]:
+            break
+        sys.stdout.write('\r' + c)
+        sys.stdout.flush()
+        time.sleep(0.1)
+    sys.stdout.write('\r')
+    sys.stdout.flush()
+
+
+
+def working_wheel(is_done):
+    t = threading.Thread(target=animate_wheel, args=(is_done,))
+    t.start()
