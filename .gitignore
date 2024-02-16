@@ -3,4 +3,4 @@ coders_cache/
 download_cache/
 deprecated/
 electricity.sqlite
-electricity.xlsx
+electricity*.xlsx
