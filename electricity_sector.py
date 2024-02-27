@@ -9,41 +9,44 @@ import generators # Runs on import... for now...
 #import ieso_capacity_factors as ieso_cf
 import sqlite3
 import utils
+import pre_processing
 import post_processing
 import os
-import transmission
+import model_reduction
+import interties
 import pandas as pd
+import setup
+import generators
+import provincial_grids
 from setup import config
 
 
 
 def build_database():
 
-    # Check if database exists or needs to be built
-    build_db = not os.path.exists(config.database_file)
+    setup.instantiate_database()
 
-    # Connect to the new database file
-    conn = sqlite3.connect(config.database_file)
-    curs = conn.cursor() # Cursor object interacts with the sqlite db
-
-    # Build the database if it doesn't exist
-    if build_db: curs.executescript(open(config.schema_file, 'r').read())
+    pre_processing.process()
 
     generators.aggregate()
-    transmission.aggregate_interties()
-    transmission.aggregate_provincial_grids()
-    post_processing.aggregate_post()
+    provincial_grids.aggregate_reserve_margin()
+    provincial_grids.aggregate_transmission()
+
+    if config.params['include_interties']: interties.aggregate_interties()
+    
+    #post_processing.process()
 
     #ieso_cf.write_to_coders_db()
     #ieso_vre_cc.write_to_coders_db(show_plots=False)
     #ieso_rel_cc.write_to_coders_db()
 
+    if config.params['simplify_model']: model_reduction.simplify_model()
     if config.params['clone_to_excel']: utils.DatabaseConverter().clone_sqlite_to_excel(config.database_file, config.excel_target_file, config.excel_template_file)
 
 
 
 if __name__ == "__main__":
-    
+
     build_database()
 
 
@@ -54,90 +57,92 @@ if __name__ == "__main__":
 ##############################################################
 """
 
-conn = sqlite3.connect(config.database_file)
-curs = conn.cursor()
+def prepare_test_model():
 
-data_year = 2020
+    conn = sqlite3.connect(config.database_file)
+    curs = conn.cursor()
 
-demand = utils.get_data(f"http://reports.ieso.ca/public/Demand/PUB_Demand_{data_year}.csv", index_col=False, skiprows=3, nrows=8760).rename(columns={"Ontario Demand": "demand"})
-mwh_to_pj = 3600/1E9
-demand['demand'] = demand["demand"] * mwh_to_pj
-total_demand = sum(demand['demand'])
+    data_year = 2020
 
-gdp_index = {
-    2025: 1.088,
-    2030: 1.184,
-    2035: 1.300,
-    2040: 1.429,
-    2045: 1.562,
-    2050: 1.708
-}
+    demand = utils.get_data(f"http://reports.ieso.ca/public/Demand/PUB_Demand_{data_year}.csv", index_col=False, skiprows=3, nrows=8760).rename(columns={"Ontario Demand": "demand"})
+    mwh_to_pj = 3600/1E9
+    demand['demand'] = demand["demand"] * mwh_to_pj
+    total_demand = sum(demand['demand'])
 
-for period in config.model_periods:
-    curs.execute(f"""REPLACE INTO Demand(regions, periods, demand_comm, demand, demand_units)
-                 VALUES("ON", {period}, 'D_ELC', {total_demand*gdp_index[period]}, "PJ")""")
-    
-rep_days = {
-    'D001': 'Jan',
-    'D009': 'Jan',
-    'D045': 'Feb',
-    'D103': 'Apr',
-    'D128': 'May',
-    'D173': 'Jun',
-    'D184': 'Jul'
+    gdp_index = {
+        2025: 1.088,
+        2030: 1.184,
+        2035: 1.300,
+        2040: 1.429,
+        2045: 1.562,
+        2050: 1.708
     }
 
-for h in range(8760):
-    curs.execute(f"""REPLACE INTO DemandSpecificDistribution(regions, season_name, time_of_day_name, demand_name, dsd)
-                 VALUES("ON", '{config.time.loc[h, 'season']}', '{config.time.loc[h, 'time_of_day']}', 'D_ELC', {demand['demand'][h]})""")
-    
-curs.execute(f"""REPLACE INTO sector_labels(sector) VALUES('electric')""")
-    
-curs.execute(f"""UPDATE Efficiency
-                SET efficiency = 0.80
-                WHERE tech like '%PMP%'""")
-curs.execute(f"""UPDATE Efficiency
-                SET efficiency = 0.90
-                WHERE tech like '%BAT%'""")
+    for period in config.model_periods:
+        curs.execute(f"""REPLACE INTO Demand(regions, periods, demand_comm, demand, demand_units)
+                    VALUES("ON", {period}, 'D_ELC', {total_demand*gdp_index[period]}, "PJ")""")
+        
+    rep_days = {
+        'D001': 'Jan',
+        'D009': 'Jan',
+        'D045': 'Feb',
+        'D103': 'Apr',
+        'D128': 'May',
+        'D173': 'Jun',
+        'D184': 'Jul'
+        }
 
-curs.execute(f"DELETE FROM time_season")
-[curs.execute(f"INSERT INTO time_season(t_season) VALUES('{day}')") for day in rep_days.keys()]
+    for h in range(8760):
+        curs.execute(f"""REPLACE INTO DemandSpecificDistribution(regions, season_name, time_of_day_name, demand_name, dsd)
+                    VALUES("ON", '{config.time.loc[h, 'season']}', '{config.time.loc[h, 'time_of_day']}', 'D_ELC', {demand['demand'][h]})""")
+        
+    curs.execute(f"""REPLACE INTO sector_labels(sector) VALUES('electric')""")
+        
+    curs.execute(f"""UPDATE Efficiency
+                    SET efficiency = 0.80
+                    WHERE tech like '%PMP%'""")
+    curs.execute(f"""UPDATE Efficiency
+                    SET efficiency = 0.90
+                    WHERE tech like '%BAT%'""")
 
-seas_tables = [
-    'CapacityFactorTech',
-    'DemandSpecificDistribution',
-    'MinSeasonalActivity',
-    'MaxSeasonalActivity'
-    ]
+    curs.execute(f"DELETE FROM time_season")
+    [curs.execute(f"INSERT INTO time_season(t_season) VALUES('{day}')") for day in rep_days.keys()]
 
-for table in seas_tables:
-    curs.execute(f"DELETE FROM {table} WHERE season_name NOT IN (SELECT t_season from time_season)")
+    seas_tables = [
+        'CapacityFactorTech',
+        'DemandSpecificDistribution',
+        'MinSeasonalActivity',
+        'MaxSeasonalActivity'
+        ]
 
-total_dsd = sum([dsd[0] for dsd in curs.execute("SELECT dsd FROM DemandSpecificDistribution").fetchall()])
-curs.execute(f"""UPDATE DemandSpecificDistribution
-             SET dsd = dsd / {total_dsd}""")
+    for table in seas_tables:
+        curs.execute(f"DELETE FROM {table} WHERE season_name NOT IN (SELECT t_season from time_season)")
 
-for day in rep_days.keys():
-    for h in range(24):
-        curs.execute(f"""REPLACE INTO SegFrac(season_name, time_of_day_name, segfrac)
-                    VALUES('{day}', '{config.time.loc[h, 'time_of_day']}', {1/(24*7)})""")
+    total_dsd = sum([dsd[0] for dsd in curs.execute("SELECT dsd FROM DemandSpecificDistribution").fetchall()])
+    curs.execute(f"""UPDATE DemandSpecificDistribution
+                SET dsd = dsd / {total_dsd}""")
 
-base_emis = 3200
-emis = {
-    2025: 1,
-    2030: 0.8,
-    2035: 0.6,
-    2040: 0.4,
-    2045: 0.2,
-    2050: 0
-}
+    for day in rep_days.keys():
+        for h in range(24):
+            curs.execute(f"""REPLACE INTO SegFrac(season_name, time_of_day_name, segfrac)
+                        VALUES('{day}', '{config.time.loc[h, 'time_of_day']}', {1/(24*7)})""")
 
-for period in config.model_periods:
-    curs.execute(f"""REPLACE INTO
-                EmissionLimit(regions, periods, emis_comm, emis_limit, emis_limit_units)
-                VALUES("ON", {period}, "CO2eq", {emis[period]*base_emis}, "ktCO2eq")""")
+    base_emis = 3200
+    emis = {
+        2025: 1,
+        2030: 0.8,
+        2035: 0.6,
+        2040: 0.4,
+        2045: 0.2,
+        2050: 0
+    }
 
-conn.commit()
-conn.close()
+    for period in config.model_periods:
+        curs.execute(f"""REPLACE INTO
+                    EmissionLimit(regions, periods, emis_comm, emis_limit, emis_limit_units)
+                    VALUES("ON", {period}, "CO2eq", {emis[period]*base_emis}, "ktCO2eq")""")
 
-print("Finished.")
+    conn.commit()
+    conn.close()
+
+    print("Finished.")

@@ -56,12 +56,15 @@ def get_data(end_point=None, **kwargs) -> tuple[list[dict], pd.DataFrame, str] |
         try:
             with open(json_cache, 'r') as in_file:
                 data_json = json.load(in_file)
-            print(f"Got CODERS data from local cache, endpoint={end_point}")
+
+            df = _to_dataframe(data_json)
 
             # Data accessed for a cached file is the last edited time, not great but it'll do
             date_accessed = str(datetime.fromtimestamp(os.path.getmtime(json_cache)).date())
 
-            return data_json, _to_dataframe(data_json), date_accessed
+            print(f"Got CODERS data from local cache, endpoint={end_point}")
+
+            return data_json, df, date_accessed
         
         except:
             print(f"Could not get data from local cache for endpoint={end_point}. Downloading instead.")
@@ -73,10 +76,13 @@ def get_data(end_point=None, **kwargs) -> tuple[list[dict], pd.DataFrame, str] |
     # Otherwise, download the json from the CODERS API
     try:
         data_json = requests.get(coders_root + end_point).json()
-        print(f"Downloaded CODERS data, endpoint={end_point}")
 
         # If update_cache=True, save this downloaded file to the local cache
         if data_json is not None:
+
+            df = _to_dataframe(data_json)
+
+            print(f"Downloaded CODERS data, endpoint={end_point}")
 
             try:
                 with open(json_cache, "w") as outfile:
@@ -85,9 +91,9 @@ def get_data(end_point=None, **kwargs) -> tuple[list[dict], pd.DataFrame, str] |
             except:
                 print(f"Could not cache CODERS data locally, endpoint={end_point}")
 
+            return data_json, df, date_accessed
+
     except:
-        print(f"Could not download data for endpoint={end_point}. No data retrieved.")
+        print(f"Could not get data for endpoint={end_point}. No data retrieved.")
 
-        return None
-
-    return data_json, _to_dataframe(data_json), date_accessed
+        return None, None, date_accessed

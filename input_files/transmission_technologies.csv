@@ -1,7 +1,7 @@
-﻿code,tech,input_comm,output_comm
-TX_TO_DX,E_ELC_TX_to_DX,elc_tx,elc_dx
-DX_TO_TX,E_ELC_DX_to_TX,elc_dx,elc_tx
-INTERTIE,E_INT,elc_tx,ethos_ex
-DX_TO_DEM,E_ELC_DX_to_DEM,elc_dx,demand
-G_TO_TX,E_ELCG_to_TX,elcg,elc_tx
-GRPS_TO_TX,E_ELCG_RPS_to_TX,elcg_rps,elc_tx
+﻿code,tech,description,in_comm,out_comm
+tx_to_dx,E_ELC_TX_to_DX,transmission-side electricity to distribution-side electricity,elc_tx,elc_dx
+dx_to_tx,E_ELC_DX_to_TX,distribution-side electricity to transmission-side electricity,elc_dx,elc_tx
+intertie,E_INT,inter-regional intertie,elc_tx,ethos_ex
+dx_to_dem,E_ELC_DX_to_DEM,distribution-side electricity to demand-side electricity,elc_dx,demand
+g_to_tx,E_ELCG_to_TX,generated electricity (non-renewable) to transmission-side electricity,elcg,elc_tx
+grps_to_tx,E_ELCG_RPS_to_TX,generated electricity (renewable) to transmission-side electricity,elcg_rps,elc_tx

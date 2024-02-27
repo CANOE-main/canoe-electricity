@@ -1,0 +1,5 @@
+﻿code,tech,capture_rate,atb_equiv,generator,min_capacity_mw
+coal_ccs_retrofit_90,E_COAL_CCS_RFIT_90,0.9,coal integrated retrofit 90%-ccs,coal,100
+coal_ccs_retrofit_95,E_COAL_CCS_RFIT_95,0.95,coal integrated retrofit 95%-ccs,coal,100
+ng_ccs_retrofit_90,E_NG_CCS_RFIT_90,0.9,ng combined cycle f-class integrated retrofit 90%-ccs,ng_cc,100
+ng_ccs_retrofit_95,E_NG_CCS_RFIT_95,0.95,ng combined cycle f-class integrated retrofit 95%-ccs,ng_cc,100

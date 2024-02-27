@@ -21,6 +21,30 @@ import threading
 import sys
 
 
+# Identify existing or tech variants
+def is_exs(tech: str) -> bool: return tech.endswith('-EXS')
+
+
+
+def instantiate_database():
+    
+    # Check if database exists or needs to be built
+    build_db = not os.path.exists(config.database_file)
+
+    # Connect to the new database file
+    conn = sqlite3.connect(config.database_file)
+    curs = conn.cursor() # Cursor object interacts with the sqlite db
+
+    # Build the database if it doesn't exist. Otherwise clear all data if forced
+    if build_db: curs.executescript(open(config.schema_file, 'r').read())
+    elif config.params['force_wipe_database']:
+        tables = [t[0] for t in curs.execute("""SELECT name FROM sqlite_master WHERE type='table';""").fetchall()]
+        for table in tables: curs.execute(f"DELETE FROM '{table}'")
+    
+    conn.commit()
+    conn.close()
+
+
 
 # Cleans up strings for filenames, databases, etc.
 def string_cleaner(string):
@@ -129,7 +153,7 @@ def get_data(url, file_type=None, cache_file_type=None, name=None, **kwargs) -> 
     if (not config.params['force_download'] and os.path.isfile(cache_file)):
         
         # Get from existing local cache
-        if cache_file_type == "csv": data = pd.read_csv(cache_file, index_col=0)
+        if cache_file_type == "csv": data = pd.read_csv(cache_file, index_col=0, dtype='unicode')
         elif "xl" in cache_file_type: data = pd.read_excel(cache_file, index_col=0)
         elif cache_file_type == "xml": data = json.load(open(cache_file))
         print(f"Got {name} from local cache.")
@@ -183,18 +207,6 @@ def dq_time(from_year, to_year):
         if diff <= key: return data_quality[key]
     
     return 5 # greater than 15 years time difference
-
-
-
-def stock_vintages(stock_year, lifetime, vint_interval=config.params['period_step']) -> list:
-
-    vint_0 = stock_year - stock_year % vint_interval # first stepped back vint
-
-    # Return any stepped back vintages that are feasible
-    vints = list(range(int(vint_0), int(stock_year-lifetime), -int(vint_interval)))
-    vints.sort()
-
-    return vints
     
 
 

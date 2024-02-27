@@ -22,15 +22,23 @@ excel_template: "Template spreadsheet (make a copy).xlsx"
 excel_output: "electricity.xlsx"
 
 force_download: false # Forces downloading data again instead of using cached versions
-no_hydro_retirement: true
-clone_to_excel: true
+force_wipe_database: true # Wipes all data from the database prior to aggregation
+include_interties: true
+include_transmission: true
+include_imports: true # Include dummy import techs
+include_emissions: true
+clone_to_excel: false
+simplify_model: false
 
-new_cap:
-  steps: 10
-  step_size_mw: 1000
+# If include_emissions is true, which emissions to include?
+included_emissions:
+  'co2e': true
+  'co2': true
+  'so2': true
+  'nox': true
+  'hg': true
 
 # Some one-off variables
-emissions_commodity_code: 'co2e'
 c2a_unit: "PJ/GWy"
 c2a: 31.536
 
@@ -40,7 +48,29 @@ intertie_fixed_flow_note: "Exogenous intertie fixed to <year> hourly flows"
 capacity_factor_note: "Hourly production, from IESO public data, divded by existing capacity in <year>"
 hydro_daily_note: "Daily production, from IESO public data, divded by existing capacity in <year>"
 
-coders_reference: "SESIT. CODERS database API [dataset]. Accessed <date>"
+coders:
+  reference: "SESIT. CODERS database API [dataset]. <table> table. Accessed <date>"
+  currency_year: 2020
+  currency: 'CAD'
+
+atb:
+  url: 'https://oedi-data-lake.s3.amazonaws.com/ATB/electricity/csv/2023/ATBe.csv'
+  reference: "NREL. (2023). Annual Technology Baseline. Retrieved from https://atb.nrel.gov/"
+  master_url: "https://data.openei.org/files/5865/2023-ATB-Data_Master_v9.0.xlsx"
+  master_reference: "NREL. (2023). Annual Technology Baseline. Excel workbook sheet <sheet>. Retrieved from https://atb.nrel.gov/"
+  year: 2023
+  core_metric_case: 'Market'
+  currency_year: 2021
+  currency: 'USD'
+  tsv_headers: # translates technology specific variables headers
+    'OutageRates(%)Forced': 'forced_outage_%'
+    'Planned': 'planned_outage_%'
+    'Emissions(lbs/MMBtu)SO2': 'emissions_so2_lbs_MMBtu'
+    'NOx': 'emissions_nox_lbs_MMBtu'
+    'Hg': 'emissions_hg_lbs_MMBtu'
+    'CO2': 'emissions_co2_lbs_MMBtu'
+    'RampRate(%/min)': 'ramp_rate_%_min'
+  cost_invest_metric: 'OCC' # which ATB metric to use for cost invest
 
 # IESO data, to be removed with in-house modelling
 ieso_reference: "IESO. (<year>). IESO public data. http://reports.ieso.ca/public/"

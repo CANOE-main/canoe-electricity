@@ -1,0 +1,10 @@
+﻿tech,in_comm,out_comm
+E_IMP_BIO_G,ethos,biogas
+E_IMP_BIO_M,ethos,biomass
+E_IMP_NG,ethos,ng
+E_IMP_COAL,ethos,coal
+E_IMP_OIL,ethos,oil
+E_IMP_DIES,ethos,diesel
+E_IMP_U_NAT,ethos,u_nat
+E_IMP_U_ENR,ethos,u_enr
+E_IMP_GSL,ethos,gasoline

@@ -2,12 +2,12 @@ code,commodity,description,flag,units
 biogas,E_BIO_G,biogas for electricity generation,p,PJ
 biomass,E_BIO_M,biomass for electricity generation,p,PJ
 ethos,E_ethos,dummy commodity,p,PJ
-ng,E_NGS,natural gas for electricity generation,p,PJ
+ng,E_NG,natural gas for electricity generation,p,PJ
 coal,E_COAL,coal for electricity generation,p,PJ
 oil,E_OIL,oil for electricity generation,p,PJ
 diesel,E_DIES,diesel for electricity generation,p,PJ
-u_nat,E_URN_NAT,uranium (natural) for electricity generation,p,PJ
-u_enr,E_URN_ENR,uranium (enriched) for electricity generation,p,PJ
+u_nat,E_U_NAT,uranium (natural) for electricity generation,p,PJ
+u_enr,E_U_ENR,uranium (enriched) for electricity generation,p,PJ
 gasoline,E_GSL,gasoline for electricity generation,p,PJ
 elc_tx,E_ELC_TX,transmission-side electricity,p,PJ
 elc_dx,E_ELC_DX,distribution-side electricity,p,PJ
@@ -16,3 +16,7 @@ elcg_rps,E_ELCG_RPS,generated electricity (renewable),p,PJ
 ethos_ex,E_ethos_EX,dummy commodity outside model boundary,p,PJ
 demand,D_ELC,demand for electricity,d,PJ
 co2e,CO2eq,carbon-dioxide-equivalent,e,ktCO2eq
+co2,CO2,carbon dioxide,e,ktCO2
+so2,SO2,carbon dioxide,e,tSO2
+nox,NOx,carbon dioxide,e,tNOx
+hg,Hg,carbon dioxide,e,gHg

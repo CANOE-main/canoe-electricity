@@ -1,33 +1,33 @@
 ﻿region,include,coders_equivs,description
-AB,FALSE,ALBERTA.A+ALBERTA+AB,alberta
-BC,FALSE,BRITISH COLUMBIA.A+BRITISH COLUMBIA+BC,british columbia
-MB,FALSE,MANITOBA.A+MANITOBA+MB,manitoba
-NB,FALSE,NEW BRUNSWICK.A+NEW BRUNSWICK+NB,new brunswick
-NLLAB,FALSE,NEWFOUNDLAND AND LABRADOR.A+NEWFOUNDLAND AND LABRADOR.B+NEWFOUNDLAND AND LABRADOR+NEWFOUNDLAND (ISLAND)+NEWFOUNDLAND (LABRADOR)+NLLAB,newfoundland and labrador
-NS,FALSE,NOVA SCOTIA.A+NOVA SCOTIA+NS,nova scotia
-ON,TRUE,ONTARIO.B+ONTARIO.A+ONTARIO+ONTARIO (NORTH)+ONTARIO (SOUTH)+ON,ontario
-PEI,FALSE,PRINCE EDWARD ISLAND.A+PRINCE EDWARD ISLAND+PEI,prince edward island
-QC,FALSE,QUEBEC.A+QUEBEC.B+QUÉBEC+QUEBEC (SOUTH)+QUEBEC (NORTH)+QC-HVDC+QC,quebec
-SK,FALSE,SASKATCHEWAN.A+SASKATCHEWAN+SASKATCHEWAN (NORTH)+SASKATCHEWAN (SOUTH)+SK,saskatchewan
-EX,,ISONE,
-EX,,ISONE-Maine,
-EX,,MAINE,
-EX,,MICHIGAN,
-EX,,MINNESOTA,
-EX,,MINNESOTA/DAKOTA,
-EX,,MISO-Dakota,
-EX,,MISO-Michigan,
-EX,,MISO-Minnesota,
-EX,,MONTANA,
-EX,,NEW ENGLAND,
-EX,,NEW YORK,
-EX,,NEW YORK (NIAGARA),
-EX,,NEW YORK (ST. LAWRENCE),
-EX,,NMISA-NorthernMaine,
-EX,,NORTH DAKOTA,
-EX,,NORTHERN MAINE,
-EX,,NYISO-HQ,
-EX,,NYISO-West,
-EX,,US-Montana,
-EX,,US-Northwest,
-EX,,WASHINGTON,
+AB,TRUE,alberta.a+alberta+ab,alberta
+BC,TRUE,british columbia.a+british columbia+bc,british columbia
+MB,TRUE,manitoba.a+manitoba+mb,manitoba
+NB,TRUE,new brunswick.a+new brunswick+nb,new brunswick
+NLLAB,TRUE,newfoundland and labrador.a+newfoundland and labrador.b+newfoundland and labrador+newfoundland (island)+newfoundland (labrador)+nllab,newfoundland and labrador
+NS,TRUE,nova scotia.a+nova scotia+ns,nova scotia
+ON,TRUE,ontario.b+ontario.a+ontario+ontario (north)+ontario (south)+on,ontario
+PEI,TRUE,prince edward island.a+prince edward island+pei,prince edward island
+QC,TRUE,quebec.a+quebec.b+québec+quebec (south)+quebec (north)+qc-hvdc+qc,quebec
+SK,TRUE,saskatchewan.a+saskatchewan+saskatchewan (north)+saskatchewan (south)+sk,saskatchewan
+EX,,isone,
+EX,,isone-maine,
+EX,,maine,
+EX,,michigan,
+EX,,minnesota,
+EX,,minnesota/dakota,
+EX,,miso-dakota,
+EX,,miso-michigan,
+EX,,miso-minnesota,
+EX,,montana,
+EX,,new england,
+EX,,new york,
+EX,,new york (niagara),
+EX,,new york (st. lawrence),
+EX,,nmisa-northernmaine,
+EX,,north dakota,
+EX,,northern maine,
+EX,,nyiso-hq,
+EX,,nyiso-west,
+EX,,us-montana,
+EX,,us-northwest,
+EX,,washington,
