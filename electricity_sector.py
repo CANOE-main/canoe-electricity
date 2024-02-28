@@ -19,6 +19,7 @@ import setup
 import generators
 import provincial_grids
 from setup import config
+from matplotlib import pyplot as pp
 
 
 
@@ -28,9 +29,9 @@ def build_database():
 
     pre_processing.process()
 
-    generators.aggregate()
-    provincial_grids.aggregate_reserve_margin()
-    provincial_grids.aggregate_transmission()
+    #generators.aggregate()
+    #provincial_grids.aggregate_reserve_margin()
+    #provincial_grids.aggregate_transmission()
 
     if config.params['include_interties']: interties.aggregate_interties()
     
@@ -39,9 +40,10 @@ def build_database():
     #ieso_cf.write_to_coders_db()
     #ieso_vre_cc.write_to_coders_db(show_plots=False)
     #ieso_rel_cc.write_to_coders_db()
-
+    
     if config.params['simplify_model']: model_reduction.simplify_model()
     if config.params['clone_to_excel']: utils.DatabaseConverter().clone_sqlite_to_excel(config.database_file, config.excel_target_file, config.excel_template_file)
+    if config.params['show_plots']: pp.show()
 
 
 

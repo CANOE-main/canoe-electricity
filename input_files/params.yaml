@@ -29,6 +29,7 @@ include_imports: true # Include dummy import techs
 include_emissions: true
 clone_to_excel: false
 simplify_model: false
+show_plots: true
 
 # If include_emissions is true, which emissions to include?
 included_emissions:

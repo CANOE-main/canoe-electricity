@@ -1,7 +1,9 @@
 ﻿code,tech,description,in_comm,out_comm
 tx_to_dx,E_ELC_TX_to_DX,transmission-side electricity to distribution-side electricity,elc_tx,elc_dx
 dx_to_tx,E_ELC_DX_to_TX,distribution-side electricity to transmission-side electricity,elc_dx,elc_tx
-intertie,E_INT,inter-regional intertie,elc_tx,ethos_ex
+int,E_INT,endogenous inter-regional intertie,elc_tx,elc_tx
 dx_to_dem,E_ELC_DX_to_DEM,distribution-side electricity to demand-side electricity,elc_dx,demand
 g_to_tx,E_ELCG_to_TX,generated electricity (non-renewable) to transmission-side electricity,elcg,elc_tx
 grps_to_tx,E_ELCG_RPS_to_TX,generated electricity (renewable) to transmission-side electricity,elcg_rps,elc_tx
+int_out,E_INT_OUT,boundary intertie leaving the model - treated as a demand technology,elc_tx,demand_int
+int_in,E_INT_IN,boundary intertie entering the model - treated as a variable generator,ethos,elc_tx

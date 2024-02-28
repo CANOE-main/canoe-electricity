@@ -7,6 +7,7 @@ import os
 import pandas as pd
 import yaml
 import sqlite3
+import numpy as np
 import urllib.request 
 
 
@@ -65,7 +66,7 @@ class config:
 
         config.commodities = pd.read_csv(config.input_files + 'commodities.csv', index_col=0)
         config.regions = pd.read_csv(config.input_files + 'regions.csv', index_col=0)
-        config.trans_regions = pd.read_csv(config.input_files + 'transfer_regions.csv', index_col=0)
+        config.interties = pd.read_csv(config.input_files + 'interties.csv')
         config.time = pd.read_csv(config.input_files + 'time.csv', index_col=0)
         config.units = pd.read_csv(config.input_files + 'units.csv', index_col=0)
         config.trans_techs = pd.read_csv(config.input_files + 'transmission_technologies.csv', index_col=0)
@@ -78,8 +79,9 @@ class config:
         config.storage_techs['tech_sets'] = pd.NA # what sets would you add them to?
         config.storage_techs['include_fuel_cost'] = False # no fuel for storage techs
 
+        # Included regions and future periods
         config.model_periods = list(config.params['model_periods'])
-        config.model_regions = set(config.regions.loc[(config.regions['include']) & (config.regions.index != 'EX')].index)
+        config.model_regions = set(config.regions.loc[(config.regions['endogenous'])].index)
 
         # Maps all coders gen types to canoe techs
         config.gen_map = dict()
@@ -98,7 +100,14 @@ class config:
         config.region_map = dict()
         for region, row in config.regions.iterrows():
             for coders_equiv in row['coders_equivs'].split("+"):
-                config.region_map[coders_equiv] = region
+                if row['endogenous']: config.region_map[coders_equiv] = region
+                else: config.region_map[coders_equiv] = 'X'
+
+        # Get CANOE regions for interties, sort regions so they're direction agnostic and remove any interties outside the model
+        config.interties[['region_1','region_2']] = [np.sort([config.region_map[ft[0].lower()], config.region_map[ft[1].lower()]])
+                                                     for ft in config.interties[['coders_from','coders_to']].values]
+        config.interties.loc[(config.interties['region_1'].isin(config.model_regions)) | (config.interties['region_2'].isin(config.model_regions))]
+        config.interties = config.interties.set_index(['region_1','region_2']).sort_index()
 
         # Batched new capacities and new capacity limits
         config.batched_cap = dict()

@@ -1,4 +1,4 @@
-﻿region,include,coders_equivs,description
+﻿region,endogenous,coders_equivs,description
 AB,TRUE,alberta.a+alberta+ab,alberta
 BC,TRUE,british columbia.a+british columbia+bc,british columbia
 MB,TRUE,manitoba.a+manitoba+mb,manitoba
@@ -9,25 +9,25 @@ ON,TRUE,ontario.b+ontario.a+ontario+ontario (north)+ontario (south)+on,ontario
 PEI,TRUE,prince edward island.a+prince edward island+pei,prince edward island
 QC,TRUE,quebec.a+quebec.b+québec+quebec (south)+quebec (north)+qc-hvdc+qc,quebec
 SK,TRUE,saskatchewan.a+saskatchewan+saskatchewan (north)+saskatchewan (south)+sk,saskatchewan
-EX,,isone,
-EX,,isone-maine,
-EX,,maine,
-EX,,michigan,
-EX,,minnesota,
-EX,,minnesota/dakota,
-EX,,miso-dakota,
-EX,,miso-michigan,
-EX,,miso-minnesota,
-EX,,montana,
-EX,,new england,
-EX,,new york,
-EX,,new york (niagara),
-EX,,new york (st. lawrence),
-EX,,nmisa-northernmaine,
-EX,,north dakota,
-EX,,northern maine,
-EX,,nyiso-hq,
-EX,,nyiso-west,
-EX,,us-montana,
-EX,,us-northwest,
-EX,,washington,
+USA,FALSE,isone,
+USA,FALSE,isone-maine,
+USA,FALSE,maine,
+USA,FALSE,michigan,
+USA,FALSE,minnesota,
+USA,FALSE,minnesota/dakota,
+USA,FALSE,miso-dakota,
+USA,FALSE,miso-michigan,
+USA,FALSE,miso-minnesota,
+USA,FALSE,montana,
+USA,FALSE,new england,
+USA,FALSE,new york,
+USA,FALSE,new york (niagara),
+USA,FALSE,new york (st. lawrence),
+USA,FALSE,nmisa-northernmaine,
+USA,FALSE,north dakota,
+USA,FALSE,northern maine,
+USA,FALSE,nyiso-hq,
+USA,FALSE,nyiso-west,
+USA,FALSE,us-montana,
+USA,FALSE,us-northwest,
+USA,FALSE,washington,
