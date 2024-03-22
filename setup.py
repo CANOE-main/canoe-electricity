@@ -50,6 +50,8 @@ class config:
         if isinstance(cls._instance, cls): return cls._instance
         cls._instance = super(config, cls).__new__(cls, *args, **kwargs)
 
+        if not os.path.isdir(config.cache_dir): os.mkdir(config.cache_dir)
+
         cls._get_params(cls._instance)
         cls._get_files(cls._instance)
         cls._download_atb_master(cls._instance)

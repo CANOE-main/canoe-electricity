@@ -1,5 +1,10 @@
 # Configuration for aggregation of electricity sector data
 
+# This specifies where your personal CODERS api key is stored
+# For this script to run, you must request an api key here https://cme-emh.ca/en/coders/
+# and store it as a .txt file in input_files/ with the below name
+coders_api_key_file: 'coders_api_key.txt'
+
 period_step: 5
 
 # Must be in ascending order along with all data in tables!
@@ -12,7 +17,8 @@ model_periods:
   - 2050
 
 # Year to pull data from by default
-default_data_year: 2020
+base_year: 2020
+weather_year: 2018
 
 global_discount_rate: 0.05
 
@@ -30,6 +36,7 @@ sqlite_database: "electricity.sqlite"
 excel_template: "Template spreadsheet (make a copy).xlsx"
 excel_output: "electricity.xlsx"
 
+## Bunch of aggregation options
 force_download: false # Forces downloading data again instead of using cached versions
 force_wipe_database: true # Wipes all data from the database prior to aggregation
 include_boundary_interfaces: true # These are to/from regions outside the model. Structured as a demand out and a VRE in
@@ -40,11 +47,12 @@ include_existing_capacity: true
 include_reserve_margin: true
 include_capacity_limits: false
 include_storage: true
-include_demand: true # When true, can also be configured by-province in regions file
+include_provincial_demand: true # When true, can also be configured by-province in regions file
 include_ccs_retrofits: true # Emissions must also be included. Retrofitted techs must use ATB data for disaggregated emissions
+include_tech_fuel_cost: true # Attaches fuel costs to technologies by their variable costs
 clone_to_excel: false
 simplify_model: false # Builds the skeleton model. Not well implemented yet.
-show_plots: false
+show_plots: true # Useful for inspecting data / debugging
 
 # If include_emissions is true, which emissions to include?
 included_emissions:
@@ -65,7 +73,7 @@ capacity_factor_note: "Hourly production, from IESO public data, divded by exist
 hydro_daily_note: "Daily production, from IESO public data, divded by existing capacity in <year>"
 
 coders:
-  reference: "SESIT. CODERS database API [dataset]. <table> table. Accessed <date>"
+  reference: "Hendriks, R.M., Monroe, J., Cusi, T., Aldana, D., Griffiths, K., Dorman, T., Chhina, A., McPherson, M. (2023). Canadian Open-Source Database for Energy Research and Systems-Modelling (CODERS). Available at www.cme-emh/coders. <table> table. Accessed <date>"
   currency_year: 2020
   currency: 'CAD'
 
@@ -89,7 +97,7 @@ atb:
   cost_invest_metric: 'OCC' # which ATB metric to use for cost invest
   ccs_retrofit_cost_invest_metric: 'Additional OCC'
 
-# IESO data, to be removed with in-house modelling
+# IESO config for existing Ontario data
 ieso_reference: "IESO. (<year>). IESO public data. http://reports.ieso.ca/public/"
-ieso_rel_yyyy_mmm: "2023_Sep"
-ieso_rel_peak_type: "Normal"
+ieso_rel_yyyy_mmm: "2023_Dec" # NOTE this report is updated often. Worth checking what the latest version is.
+ieso_rel_peak_type: "Normal" # 'Normal' or 'Extreme' peak

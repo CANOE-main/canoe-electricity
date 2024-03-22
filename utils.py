@@ -19,6 +19,7 @@ import itertools
 import time
 import threading
 import sys
+import pickle
 
 
 # Identify existing or tech variants
@@ -76,7 +77,7 @@ def _initialise_atb():
 
     global df_atb
 
-    # ATB data. CRP years is arbitrary unless using LCOE
+    # ATB data. CRP years is arbitrary unless using LCOE so use 20
     df_atb = get_data(config.params['atb']['url'], dtype='unicode', index_col=0)
     df_atb = df_atb.loc[(df_atb['core_metric_case']==config.params['atb']['core_metric_case']) & (df_atb['crpyears'].astype(int)==20)]
     config.references['atb'] = config.params['atb']['reference']
@@ -170,7 +171,7 @@ def get_compr_db(region, table_number, first_row=0, last_row=None):
 
 
 # Downloads and handles local caching of data sources
-def get_data(url, file_type=None, cache_file_type=None, name=None, **kwargs) -> pd.DataFrame:
+def get_data(url, file_type=None, cache_file_type=None, name=None, **kwargs):
 
     # Get the original file name
     if name == None: name = url.split("/")[-1].split("\\")[-1]
@@ -179,12 +180,12 @@ def get_data(url, file_type=None, cache_file_type=None, name=None, **kwargs) -> 
     file_type = file_type.lower()
 
     if cache_file_type == None:
-        if file_type == "xml": cache_file_type = "json"
-        elif file_type == "xls": cache_file_type = "xlsx"
+        if file_type == "xml": cache_file_type = "pkl"
+        elif "xl" in file_type: cache_file_type = "csv"
         else: cache_file_type = file_type
     
     # If file type is different from new file type
-    if url.split(".")[-1] != cache_file_type: name = os.path.splitext(name)[0] + "."+cache_file_type
+    if name.split(".")[-1] != cache_file_type: name = os.path.splitext(name)[0] + "."+cache_file_type
     cache_file = config.cache_dir + name
 
     data = None
@@ -192,38 +193,34 @@ def get_data(url, file_type=None, cache_file_type=None, name=None, **kwargs) -> 
         
         # Get from existing local cache
         if cache_file_type == "csv": data = pd.read_csv(cache_file, index_col=0, dtype='unicode')
-        elif "xl" in cache_file_type: data = pd.read_excel(cache_file, index_col=0)
-        elif cache_file_type == "xml": data = json.load(open(cache_file))
+        elif cache_file_type == "pkl":
+            with open(cache_file, 'rb') as file: data = pickle.load(file)
+
         print(f"Got {name} from local cache.")
         
     else:
 
         print(f"Downloading {name} ...")
 
-        is_done = [False]
-        #working_wheel(is_done)
-
         try:
             # Download from url
             if file_type == "csv": data = pd.read_csv(url, **kwargs)
             elif "xl" in file_type: data = pd.read_excel(url, **kwargs)
-            elif file_type == "xml": data = json.dumps(xmltodict.parse(requests.get(url).content))
+            elif file_type == "xml": data = xmltodict.parse(requests.get(url).content)
         except Exception as e:
-            print(url)
+            print(f"Failed to download {url}")
             print(e)
-        finally:
-            is_done[0] = True
 
         # Try to cache downloaded file
         try:
             if not os.path.exists(config.cache_dir): os.mkdir(config.cache_dir)
 
             if cache_file_type == "csv": data.to_csv(cache_file)
-            elif "xl" in cache_file_type: data.to_excel(cache_file)
-            elif cache_file_type == "xml":
-                with open(cache_file, 'w') as outfile: outfile.write(data)
+            elif cache_file_type == "pkl":
+                with open(cache_file, 'wb') as file: pickle.dump(data, file)
             print(f"Cached {name}.")
         except Exception as e:
+            print(f"Failed to cache {cache_file}.")
             print(e)
 
     return data
@@ -231,7 +228,7 @@ def get_data(url, file_type=None, cache_file_type=None, name=None, **kwargs) -> 
 
 
 # Gives data quality time-related indicator based on time gap from data
-def dq_time(from_year, to_year):
+def dq_time(from_year: int, to_year: int):
     diff = abs(from_year - to_year)
 
     data_quality = {
@@ -248,7 +245,7 @@ def dq_time(from_year, to_year):
     
 
 
-class DatabaseConverter:
+class database_converter:
     
     # Singleton pattern
     _instance = None
@@ -257,7 +254,7 @@ class DatabaseConverter:
 
         if isinstance(cls._instance, cls): return cls._instance
 
-        cls._instance = super(DatabaseConverter, cls).__new__(cls, *args, **kwargs)
+        cls._instance = super(database_converter, cls).__new__(cls, *args, **kwargs)
 
         print('Instantiated database converter.')
 
@@ -338,22 +335,3 @@ class DatabaseConverter:
                 ws.append(row.values.tolist())
 
         wb.save(to_excel_file)
-
-
-
-def animate_wheel(is_done):
-    for c in itertools.cycle(['|', '/', '-', '\\']):
-        time.sleep(0.1)
-        if is_done[0]:
-            break
-        sys.stdout.write('\r' + c)
-        sys.stdout.flush()
-        time.sleep(0.1)
-    sys.stdout.write('\r')
-    sys.stdout.flush()
-
-
-
-def working_wheel(is_done):
-    t = threading.Thread(target=animate_wheel, args=(is_done,))
-    t.start()

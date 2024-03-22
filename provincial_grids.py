@@ -13,6 +13,8 @@ import pandas as pd
 # Provincial parameters
 df_sys: pd.DataFrame
 
+weather_year = config.params['weather_year']
+
 
 
 def aggregate():
@@ -27,7 +29,7 @@ def aggregate():
     config.references['ca_system_parameters'] = config.params['coders']['reference'].replace('<table>', 'ca_system_parameters').replace('<date>', date_accessed)
 
     if config.params['include_reserve_margin']: aggregate_reserve_margin()
-    if config.params['include_demand']: aggregate_demand()
+    if config.params['include_provincial_demand']: aggregate_demand()
     aggregate_transmission()
 
 
@@ -97,7 +99,7 @@ def aggregate_transmission():
                 curs.execute(f"""REPLACE INTO
                             Efficiency(regions, input_comm, tech, vintage, output_comm, efficiency, eff_notes, reference, data_flags, dq_est)
                             VALUES("{region}", "{input_comm['commodity']}", "{tech_config['tech']}", {config.model_periods[0]}, "{output_comm['commodity']}",
-                            {1.0 - row["system_line_losses_percent"]}, "{note}", "{config.references['ca_system_parameters']}", "coders", 1)""")
+                            {1.0 - float(row["system_line_losses_percent"])}, "{note}", "{config.references['ca_system_parameters']}", "coders", 1)""")
             elif code in dummy_techs:
                 curs.execute(f"""REPLACE INTO
                             Efficiency(regions, input_comm, tech, vintage, output_comm, efficiency, eff_notes)
@@ -128,9 +130,12 @@ def aggregate_demand():
     # Demand commodity
     dem_comm = config.commodities.loc['demand']
 
+    # Get available data provinces and years from coders
+    _json, df_avail, _date = coders_api.get_data(end_point="provincial_demand")
 
-    for region in config.model_regions:
+    for _idx, prov in df_avail.iterrows():
 
+        region = config.region_map[prov['province'].lower()]
         if not config.regions.loc[region, 'include_demand']: continue
 
         """
@@ -157,7 +162,11 @@ def aggregate_demand():
         ##############################################################
         """
 
-        _hourly, df_hourly, date_accessed = coders_api.get_data(end_point="provincial_demand", year=config.params['default_data_year'], province=region)
+        if str(weather_year) not in prov['year']:
+            print(f"Provincial hourly demand data not available for {region} for year {weather_year} so DemandSpecificDistribution was skipped.")
+            continue
+
+        _hourly, df_hourly, date_accessed = coders_api.get_data(end_point="provincial_demand", year=weather_year, province=prov['province'])
         dsd_reference = config.params['coders']['reference'].replace("<date>", date_accessed).replace("<table>", "provincial_demand")
         config.references[f"provincial_demand_{region.lower()}"] = dsd_reference
 
@@ -171,6 +180,7 @@ def aggregate_demand():
         hourly_dem[hourly_dem < hourly_dem.mean() * config.params['dsd_tolerance']] = 0
         dsd = hourly_dem / hourly_dem.sum()
 
+        # Plot provincial demand
         pp.figure()
         pp.plot(dsd)
         pp.title(f"{region} normalised hourly electricity demand")
@@ -184,7 +194,7 @@ def aggregate_demand():
             curs.execute(f"""REPLACE INTO
                         DemandSpecificDistribution(regions, season_name, time_of_day_name, demand_name, dsd, dsd_notes, reference, data_flags, dq_est)
                         VALUES("{region}", "{row['season']}", "{row['time_of_day']}", "{dem_comm['commodity']}", {dsd[h]},
-                        "{config.params['default_data_year']} hourly demand divided by sum of hourly demand for that year",
+                        "{weather_year} hourly demand divided by sum of hourly demand for that year",
                         "{dsd_reference}", "coders", 1)""")
             
     

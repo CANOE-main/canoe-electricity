@@ -8,19 +8,18 @@ diesel_ct,E_DIES_CT,diesel combustion turbine generation,TRUE,diesel_ct,diesel_c
 diesel_st,E_DIES_ST,diesel steam turbine generation,TRUE,diesel_st,diesel_st,,,,,diesel,elcg,,p,,TRUE,FALSE
 geothermal,E_GEO,geothermal generation,TRUE,geothermal,geothermal,Geothermal - Hydro / Flash,,,Moderate,ethos,elcg_rps,,p,,TRUE,FALSE
 gasoline_ct,E_GSL_CT,gasoline combustion turbine generation,TRUE,gasoline_ct,gasoline_ct,,,,,gasoline,elcg,,p,,TRUE,FALSE
-hydro_annual,E_HYD_ANN,hydroelectric generation with annual reservoir storage,TRUE,hydro_annual,hydro_annual,,,,,ethos,elcg_rps,,p,,TRUE,TRUE
 hydro_daily,E_HYD_DLY,hydroelectric generation with daily reservoir storage,TRUE,hydro_daily,hydro_daily,,,,,ethos,elcg_rps,,p,,TRUE,TRUE
 hydro_monthly,E_HYD_MLY,hydroelectric generation with monthly reservoir storage,TRUE,hydro_monthly,hydro_monthly,,,,,ethos,elcg_rps,,p,,TRUE,TRUE
 hydro_run,E_HYD_ROR,hydroelectric run-of-river generation,TRUE,hydro_run,hydro_run,,,,,ethos,elcg_rps,,p,tech_curtailment,TRUE,TRUE
 ng_cc,E_NG_CC,natural gas combined cycle generation,TRUE,ng_cc,ng_cc,NG Combined Cycle (H-Frame),Natural Gas_FE,NG H-Frame CC,Moderate,ng,elcg,,p,,TRUE,FALSE
 ng_ccs,E_NG_CCS,natural gas combined cycle generation with 95% ccs,TRUE,ng_ccs,ng_ccs,NG Combined Cycle (H-Frame) 95% CCS,Natural Gas_FE,NG H-Frame CC 95% CCS,Moderate,ng,elcg,,p,,TRUE,FALSE
 ng_cg,E_NG_CG,natural gas heat and power cogeneration,TRUE,ng_cg,ng_cg,,,,,ng,elcg,,p,,TRUE,FALSE
-ng_ct,E_NG_CT,natural gas combustion turbine generation,TRUE,ng_ct+gas_ct,ng_ct,NG Combustion Turbine (F-Frame),Natural Gas_FE,NG F-Frame CT,Moderate,ng,elcg,,p,,TRUE,FALSE
+ng_ct,E_NG_CT,natural gas combustion turbine generation,TRUE,ng_sc+ng_ct+gas_ct,ng_sc,NG Combustion Turbine (F-Frame),Natural Gas_FE,NG F-Frame CT,Moderate,ng,elcg,,p,,TRUE,FALSE
 nuclear_candu,E_NUC_CANDU,nuclear candu generation,TRUE,nuclear,nuclear,,,,,u_nat,elcg_rps,,pb,,TRUE,FALSE
 nuclear_pwr,E_NUC_PWR,nuclear pressurised water reactor generation,TRUE,,nuclear,Nuclear - AP1000,Nuclear,Nuclear,Moderate,u_enr,elcg_rps,,pb,,TRUE,FALSE
 nuclear_smr,E_NUC_SMR,nuclear small modular reactor generation,TRUE,nuclear_smr,nuclear_smr,Nuclear - Small Modular Reactor,Nuclear,Nuclear,Moderate,u_enr,elcg_rps,,pb,,TRUE,FALSE
 oil_ct,E_OIL_CT,oil combustion turbine generation,TRUE,oil_ct,oil_ct,,,,,oil,elcg,,p,,TRUE,FALSE
 oil_st,E_OIL_ST,oil steam turbine generation,TRUE,oil_st,oil_st,,,,,oil,elcg,,p,,TRUE,FALSE
 solar,E_SOL_PV,utility-scale solar photovoltaic generation,TRUE,solar_pv+solar,solar_pv,Utility PV - Class 3,,,Moderate,ethos,elcg_rps,,p,tech_curtailment,TRUE,FALSE
-wind_offshore,E_WND_OFF,offshore wind generation,TRUE,wind_offshore,wind_offshore,Offshore Wind - Class 3,,,Moderate,ethos,elcg_rps,,p,tech_curtailment,TRUE,FALSE
-wind_onshore,E_WND_ON,onshore wind generation,TRUE,wind_onshore,wind_onshore,Land-Based Wind - Class 3 - Technology 1,,,Moderate,ethos,elcg_rps,,p,tech_curtailment,TRUE,FALSE
+wind_offshore,E_WND_OFF,offshore wind generation,TRUE,wind_ofs,wind_ofs,Offshore Wind - Class 3,,,Moderate,ethos,elcg_rps,,p,tech_curtailment,TRUE,FALSE
+wind_onshore,E_WND_ON,onshore wind generation,TRUE,wind_ons,wind_ons,Land-Based Wind - Class 3 - Technology 1,,,Moderate,ethos,elcg_rps,,p,tech_curtailment,TRUE,FALSE

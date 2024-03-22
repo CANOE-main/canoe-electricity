@@ -3,9 +3,6 @@ Builds the electricity sector database to be merged into the larger model
 Written by Ian David Elder for the CANOE model
 """
 
-#import ieso_vre_capacity_credits as ieso_vre_cc
-#import ieso_rel_capacity_credits as ieso_rel_cc
-#import ieso_capacity_factors as ieso_cf
 import sqlite3
 import utils
 import pre_processing
@@ -13,7 +10,6 @@ import post_processing
 import os
 import model_reduction
 import interfaces
-import pandas as pd
 import setup
 import currency_conversion
 import generators
@@ -39,12 +35,8 @@ def build_database():
     if config.params['simplify_model']: model_reduction.simplify_model()
     
     post_processing.process()
-
-    #ieso_cf.write_to_coders_db()
-    #ieso_vre_cc.write_to_coders_db(show_plots=False)
-    #ieso_rel_cc.write_to_coders_db()
     
-    if config.params['clone_to_excel']: utils.DatabaseConverter().clone_sqlite_to_excel()
+    if config.params['clone_to_excel']: utils.database_converter().clone_sqlite_to_excel()
 
     print(f"Electricity sector aggregated into {os.path.basename(config.database_file)}\n")
     

@@ -1,33 +1,34 @@
 ﻿region,endogenous,coders_equivs,description,include_demand
 AB,TRUE,alberta.a+alberta+ab,alberta,TRUE
 BC,TRUE,british columbia.a+british columbia+bc,british columbia,TRUE
-MB,FALSE,manitoba.a+manitoba+mb,manitoba,TRUE
+MB,TRUE,manitoba.a+manitoba+mb,manitoba,TRUE
 NB,TRUE,new brunswick.a+new brunswick+nb,new brunswick,TRUE
-NLLAB,TRUE,newfoundland and labrador.a+newfoundland and labrador.b+newfoundland and labrador+newfoundland (island)+newfoundland (labrador)+nllab,newfoundland and labrador,TRUE
+NLLAB,TRUE,newfoundland and labrador.a+newfoundland and labrador.b+newfoundland and labrador+newfoundland island+newfoundland labrador+nllab+nl,newfoundland and labrador,TRUE
 NS,TRUE,nova scotia.a+nova scotia+ns,nova scotia,TRUE
-ON,TRUE,ontario.b+ontario.a+ontario+ontario (north)+ontario (south)+on,ontario,TRUE
-PEI,TRUE,prince edward island.a+prince edward island+pei,prince edward island,TRUE
-QC,TRUE,quebec.a+quebec.b+québec+quebec (south)+quebec (north)+qc-hvdc+qc,quebec,TRUE
-SK,FALSE,saskatchewan.a+saskatchewan+saskatchewan (north)+saskatchewan (south)+sk+saskatachewan,saskatchewan,TRUE
-USA,,isone,,
-USA,,isone-maine,,
+ON,TRUE,ontario.b+ontario.a+ontario+ontario north+ontario south+on,ontario,TRUE
+PEI,TRUE,prince edward island.a+prince edward island+pei+pe,prince edward island,TRUE
+QC,TRUE,quebec.a+quebec.b+québec+quebec south+quebec north+qc-hvdc+qc,quebec,TRUE
+SK,TRUE,saskatchewan.a+saskatchewan+saskatchewan north+saskatchewan south+sk+saskatachewan,saskatchewan,TRUE
+USA,,isone(highgate),,
+USA,,isone(hvdc),,
+USA,,isone(maine),,
 USA,,maine,,
 USA,,michigan,,
 USA,,minnesota,,
 USA,,minnesota/dakota,,
-USA,,miso-dakota,,
-USA,,miso-michigan,,
-USA,,miso-minnesota,,
+USA,,miso(dakota),,
+USA,,miso(michigan),,
+USA,,miso(minnesota),,
 USA,,montana,,
 USA,,new england,,
 USA,,new york,,
-USA,,new york (niagara),,
-USA,,new york (st. lawrence),,
-USA,,nmisa-northernmaine,,
+USA,,new york niagara,,
+USA,,new york st. lawrence,,
+USA,,nmisa(northernmaine),,
 USA,,north dakota,,
 USA,,northern maine,,
-USA,,nyiso-hq,,
-USA,,nyiso-west,,
-USA,,us-montana,,
-USA,,us-northwest,,
+USA,,nyiso(hq),,
+USA,,nyiso(west),,
+USA,,us(montana),,
+USA,,us(northwest),,
 USA,,washington,,

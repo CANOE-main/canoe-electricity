@@ -10,12 +10,13 @@ import utils
 import pandas as pd
 import os
 import traceback
+import capacity_credits
+import capacity_factors
 
 df_rtv: pd.DataFrame
 df_generic: pd.DataFrame
 df_cost: pd.DataFrame
 
-# Make these global so only have to manage one database connection
 conn: sqlite3.Connection
 curs: sqlite3.Cursor
 
@@ -23,12 +24,7 @@ curs: sqlite3.Cursor
 
 def aggregate():
 
-    global conn, curs
-
     print("Aggregating generator data...")
-
-    conn = sqlite3.connect(config.database_file)
-    curs = conn.cursor()
 
     initialise_data()
 
@@ -46,9 +42,6 @@ def aggregate():
 
     print(f"Generator data aggregated into {os.path.basename(config.database_file)}\n")
 
-    conn.commit()
-    conn.close()
-
 
 
 def initialise_data():
@@ -64,12 +57,15 @@ def initialise_data():
     # CODERS generic generator data
     _generic_json, df_generic, date_accessed = coders_api.get_data(end_point='generation_generic')
     config.references['generation_generic'] = config.params['coders']['reference'].replace("<date>", date_accessed).replace("<table>","generation_generic")
-    df_generic['generation_type'] = df_generic['generation_type'].str.lower()
-    df_generic.set_index('generation_type', inplace=True)
+    df_generic['gen_type'] = df_generic['gen_type'].str.lower()
+    df_generic.set_index('gen_type', inplace=True)
 
 
 
 def aggregate_new_generators():
+
+    conn = sqlite3.connect(config.database_file)
+    curs = conn.cursor()
 
     print("Aggregating new generators data...")
 
@@ -104,13 +100,18 @@ def aggregate_new_generators():
                 for period in config.model_periods:
                     rtv.append({'region': region, 'tech_code': tech_code, 'tech': tech, 'vint': period})
 
-            
+    conn.commit()
+    conn.close()
+
     # Aggregate remaining technoeconomic data
     aggregate_generators_generic(pd.DataFrame(data=rtv))
 
 
 
 def aggregate_new_storage():
+
+    conn = sqlite3.connect(config.database_file)
+    curs = conn.cursor()
 
     print("Aggregating new storage data...")
 
@@ -137,7 +138,9 @@ def aggregate_new_storage():
             for period in config.model_periods:
                 rtv.append({'region': region, 'tech_code': tech_code, 'tech': tech, 'vint': period})
 
-            
+    conn.commit()
+    conn.close()
+
     # Aggregate remaining technoeconomic data
     aggregate_storage_generic(pd.DataFrame(data=rtv))
     
@@ -182,11 +185,15 @@ def aggregate_existing_generators():
     df_existing = df_existing.loc[df_existing['region'].isin(config.model_regions)]
 
     # Remove zero-capacity projects
-    df_existing = df_existing.loc[df_existing['install_capacity_in_mw'] > 0]
-    df_existing['capacity'] = df_existing['install_capacity_in_mw'] * float(config.units.loc['capacity', 'coders_conv_fact'])
+    df_existing = df_existing.loc[df_existing['facility_installed_capacity'].astype(float) > 0]
+    df_existing['capacity'] = df_existing['facility_installed_capacity'].astype(float) * float(config.units.loc['capacity', 'coders_conv_fact'])
+
+    if len(df_existing) == 0:
+        print("No valid existing generation capacity found.")
+        return
 
     # Delimiter for concatenating project names together for a description
-    df_existing['description'] = df_existing['project_name'] + ' - '
+    df_existing['description'] = df_existing['generation_facility_name'] + ' - '
 
     # Vintage is last renewal year if available otherwise start year
     df_existing['vint'] = df_existing[['start_year','previous_renewal_year']].max(axis=1)
@@ -196,18 +203,30 @@ def aggregate_existing_generators():
     df_existing['vint'] = [min(config.model_periods[0] - step, step * round(vint/step)) for vint in df_existing['vint']]
 
     # If no retirement then override vintage to last before first model period
-    df_existing['vint'] = df_existing['vint'].mask([config.gen_techs.loc[tech_code, 'no_retirement'] for tech_code in df_existing['tech_code']], config.model_periods[0] - step)
+    df_existing['vint'] = df_existing['vint'].mask([config.gen_techs.loc[tc, 'no_retirement'] for tc in df_existing['tech_code']], config.model_periods[0] - step)
     
     # Aggregate existing capacities and projects by region, tech, vintage
-    df_rtv = df_existing.groupby(['region','tech_code','vint']).sum().reset_index()
+    df_rtv = df_existing.groupby(['region','tech_code','vint']).sum(numeric_only=False).reset_index()
     df_rtv['description'] = df_rtv['description'].str.removesuffix(' - ') # one excess delimiter after concatenating
 
     # Add -EXS tag
-    df_rtv['tech'] = [f"{config.gen_techs.loc[tech_code, 'base_tech']}-EXS" for tech_code in df_rtv['tech_code']]
+    df_rtv['tech'] = [f"{config.gen_techs.loc[tc, 'base_tech']}-EXS" for tc in df_rtv['tech_code']]
 
-    # Iterate over aggregated existing capacity
-    for _idx, row in df_rtv.iterrows():
-        
+    # Add life because capacity credits need it as a check
+    df_rtv['life'] = [df_generic.loc[config.gen_techs.loc[tc, 'coders_equiv'], 'service_life'] for tc in df_rtv['tech_code']]
+
+    ## CapacityFactorTech
+    capacity_factors.aggregate_existing(df_rtv)
+
+    ## CapacityCredit
+    if config.params['include_reserve_margin']: capacity_credits.aggregate_existing(df_rtv)
+
+    conn = sqlite3.connect(config.database_file)
+    curs = conn.cursor()
+
+    # Add technologies
+    for _idx, row in df_rtv[['tech_code','tech','description']].drop_duplicates().iterrows():
+    
         tech_config = config.gen_techs.loc[row['tech_code']]
 
         ## Technologies
@@ -215,6 +234,10 @@ def aggregate_existing_generators():
                     technologies(tech, flag, sector, tech_desc)
                     VALUES("{row['tech']}", "{tech_config['flag']}", "electricity", "existing {tech_config['description']} - {row['description']}")""")
 
+    # Iterate over aggregated existing capacity
+    for _idx, row in df_rtv.iterrows():
+
+        tech_config = config.gen_techs.loc[row['tech_code']]
 
         ## ExistingCapacity
         if tech_config['no_retirement']: note = f"no retirement so aggregated to last existing vintage - {utils.string_cleaner(row['description'])}"
@@ -225,6 +248,8 @@ def aggregate_existing_generators():
                     VALUES("{row['region']}", "{row['tech']}", "{row['vint']}", "{row['capacity']}", "({config.units.loc['capacity', 'units']})",
                     "{note}", "{config.references['generators']}", "coders", 1)""")
         
+    conn.commit()
+    conn.close()
     
     # Aggregate remaining technoeconomic data
     aggregate_generators_generic(df_rtv[['region','tech_code','tech','vint']])
@@ -252,14 +277,14 @@ def aggregate_existing_storage():
             existing_map[(coders_equiv, row['duration'])] = tech_code
 
     # Get CANOE technologies
-    df_existing['generation_type'] = df_existing['generation_type'].str.lower()
-    df_existing['duration'] = round(df_existing['duration'].astype(float)).astype(int)
-    df_existing['tech_code'] = pd.MultiIndex.from_frame(df_existing[['generation_type','duration']]).map(existing_map)
+    df_existing['storage_type'] = df_existing['storage_type'].str.lower()
+    df_existing['storage_duration'] = round(df_existing['storage_duration'].astype(float)).astype(int)
+    df_existing['tech_code'] = pd.MultiIndex.from_frame(df_existing[['storage_type','storage_duration']]).map(existing_map)
 
     # Remove any that have not been set as an equivalent in the config csv
     for idx, row in df_existing.iterrows():
         if pd.isna(row['tech_code']):
-            print(f"Existing storage technology {row['generation_type']} has no equivalent defined in config tables and will be skipped!")
+            print(f"Existing storage technology {row['storage_type']} has no equivalent defined in config tables and will be skipped!")
     df_existing = df_existing.loc[~pd.isna(df_existing['tech_code'])]
 
     # Get CANOE regions and skip capacity in exogenous provinces
@@ -267,10 +292,14 @@ def aggregate_existing_storage():
     df_existing = df_existing.loc[df_existing['region'].isin(config.model_regions)]
 
     # Remove zero-capacity projects
-    df_existing = df_existing.loc[df_existing['storage_capacity_in_mw'] > 0]
+    df_existing = df_existing.loc[df_existing['storage_capacity'] > 0]
+
+    if len(df_existing) == 0:
+        print("No valid existing storage capacity found.")
+        return
 
     # Delimiter for concatenating project names together for a description
-    df_existing['description'] = df_existing['project_name'] + ' - '
+    df_existing['description'] = df_existing['storage_facility_name'] + ' - '
 
     # Vintage is last renewal year if available otherwise start year
     df_existing['vint'] = df_existing[['start_year','previous_renewal_year']].max(axis=1)
@@ -280,15 +309,20 @@ def aggregate_existing_storage():
     df_existing['vint'] = [min(config.model_periods[0] - step, step * round(vint/step)) for vint in df_existing['vint']]
 
     # If no retirement then override vintage to last before first model period
-    df_existing['vint'] = df_existing['vint'].mask([config.storage_techs.loc[tech_code, 'no_retirement'] for tech_code in df_existing['tech_code']], config.model_periods[0] - step)
+    df_existing['vint'] = df_existing['vint'].mask([config.storage_techs.loc[tc, 'no_retirement'] for tc in df_existing['tech_code']], config.model_periods[0] - step)
     
     # Aggregate existing capacities and projects by region, tech, vintage
-    df_rtdv = df_existing.groupby(['region','tech_code','duration','vint']).sum().reset_index()
+    df_rtdv = df_existing.groupby(['region','tech_code','storage_duration','vint']).sum(numeric_only=False).reset_index()
     df_rtdv['description'] = df_rtdv['description'].str.removesuffix(' - ') # one excess delimiter after concatenating
 
     # Add -EXS tag
-    df_rtdv['tech'] = [f"{config.storage_techs.loc[tech_code, 'base_tech']}-EXS" for tech_code in df_rtdv['tech_code']]
+    df_rtdv['tech'] = [f"{config.storage_techs.loc[tc, 'base_tech']}-EXS" for tc in df_rtdv['tech_code']]
 
+    # Add life because capacity credits need it as a check
+    df_rtdv['life'] = [df_generic.loc[config.storage_techs.loc[tc, 'coders_equiv'], 'service_life'] for tc in df_rtdv['tech_code']]
+
+    conn = sqlite3.connect(config.database_file)
+    curs = conn.cursor()
 
     # Iterate over aggregated existing capacity
     for _idx, row in df_rtdv.iterrows():
@@ -323,28 +357,35 @@ def aggregate_existing_storage():
 
         curs.execute(f"""REPLACE INTO
                     ExistingCapacity(regions, tech, vintage, exist_cap, exist_cap_units, exist_cap_notes, reference, data_flags, dq_est)
-                    VALUES("{row['region']}", "{row['tech']}", "{row['vint']}", "{row['storage_capacity_in_mw']}", "({config.units.loc['capacity', 'units']})",
+                    VALUES("{row['region']}", "{row['tech']}", "{row['vint']}", "{row['storage_capacity']}", "({config.units.loc['capacity', 'units']})",
                     "{note}", "{config.references['storage']}", "coders", 1)""")
 
 
         ## StorageDuration
         curs.execute(f"""REPLACE INTO
                     StorageDuration(regions, tech, duration, duration_notes, reference, data_flags, dq_est)
-                    VALUES("{row['region']}", "{row['tech']}", "{row['duration']}", "(hours of storage)", "{config.references['storage']}", "coders", 1)""")
+                    VALUES("{row['region']}", "{row['tech']}", "{row['storage_duration']}", "(hours of storage)", "{config.references['storage']}", "coders", 1)""")
         curs.execute(f"""REPLACE INTO
                     StorageDuration(regions, tech, duration, duration_notes, reference, data_flags, dq_est)
-                    VALUES("{row['region']}", "{row['tech']}", "{row['duration']}", "(hours of storage)", "{config.references['storage']}", "coders", 1)""")
+                    VALUES("{row['region']}", "{row['tech']}", "{row['storage_duration']}", "(hours of storage)", "{config.references['storage']}", "coders", 1)""")
         
-    
+    conn.commit()
+    conn.close()
+
     # Aggregate remaining technoeconomic data
     aggregate_storage_generic(df_rtdv[['region','tech_code','tech','vint']])
 
 
 
-def aggregate_generators_generic(rtv: pd.DataFrame):
+def aggregate_generators_generic(df_rtv: pd.DataFrame):
+
+    global conn, curs
+
+    conn = sqlite3.connect(config.database_file)
+    curs = conn.cursor()
 
     # Just need region and tech indices for this data
-    for _idx, row in rtv[['region','tech_code','tech']].drop_duplicates().iterrows():
+    for _idx, row in df_rtv[['region','tech_code','tech']].drop_duplicates().iterrows():
 
         tech_config = config.gen_techs.loc[row['tech_code']].copy()
 
@@ -355,20 +396,28 @@ def aggregate_generators_generic(rtv: pd.DataFrame):
         else: aggregate_rt_atb(row['region'], row['tech'], tech_config)
     
     # Also need vintage index for this data
-    for _idx, row in rtv.iterrows():
+    for _idx, row in df_rtv.iterrows():
 
         tech_config = config.gen_techs.loc[row['tech_code']].copy()
 
         # Take from ATB if an ATB equivalent is defined, otherwise CODERS
         if pd.isna(tech_config['atb_display_name']): aggregate_rtv_coders(row['region'], row['tech'], row['vint'], tech_config)
         else: aggregate_rtv_atb(row['region'], row['tech'], row['vint'], tech_config)
+
+    conn.commit()
+    conn.close()
     
 
 
-def aggregate_storage_generic(rtv: pd.DataFrame):
+def aggregate_storage_generic(df_rtv: pd.DataFrame):
+
+    global conn, curs
+
+    conn = sqlite3.connect(config.database_file)
+    curs = conn.cursor()
 
     # Just need region and tech indices for this data
-    for _idx, row in rtv[['region','tech_code','tech']].drop_duplicates().iterrows():
+    for _idx, row in df_rtv[['region','tech_code','tech']].drop_duplicates().iterrows():
 
         storage_config = config.storage_techs.loc[row['tech_code']].copy()
 
@@ -379,13 +428,16 @@ def aggregate_storage_generic(rtv: pd.DataFrame):
         else: aggregate_rt_atb(row['region'], row['tech'], storage_config)
     
     # Also need vintage index for this data
-    for _idx, row in rtv.iterrows():
+    for _idx, row in df_rtv.iterrows():
 
         storage_config = config.storage_techs.loc[row['tech_code']].copy()
 
         # Take from ATB if an ATB equivalent is defined, otherwise CODERS
         if pd.isna(storage_config['atb_display_name']): aggregate_rtv_coders(row['region'], row['tech'], row['vint'], storage_config)
         else: aggregate_rtv_atb(row['region'], row['tech'], row['vint'], storage_config)
+
+    conn.commit()
+    conn.close()
 
 
 
@@ -409,7 +461,7 @@ def aggregate_rt_all(region, tech, tech_config):
     else:
         curs.execute(f"""REPLACE INTO
                     LifetimeTech(regions, tech, life, life_notes, reference, data_flags, dq_est)
-                    VALUES("{region}", "{tech}", "{coders_gen['service_life_years']}", "(y) {tech_config['coders_equiv']} service life years",
+                    VALUES("{region}", "{tech}", "{coders_gen['service_life']}", "(y) {tech_config['coders_equiv']} service life years",
                     "{config.references['generation_generic']}", "coders", 1)""")
 
 
@@ -543,7 +595,7 @@ def aggregate_rtv_atb(region, tech, vint, tech_config):
     # Indexed by period and vintage
     for period in config.model_periods:
         
-        if vint > period or vint + coders_gen['service_life_years'] <= period: continue
+        if vint > period or vint + coders_gen['service_life'] <= period: continue
 
         
         ## CostFixed
@@ -562,7 +614,7 @@ def aggregate_rtv_atb(region, tech, vint, tech_config):
         cost_fuel, fuel_note = utils.atb_data(tech_config, core_metric_parameter='Fuel', core_metric_variable=period)
 
         # If asking for fuel costs and ATB doesn't have it, use CODERS for all variable cost (can't mix currencies)
-        if tech_config['include_fuel_cost'] and cost_fuel is None:
+        if config.params['include_tech_fuel_cost'] and tech_config['include_fuel_cost'] and cost_fuel is None:
             aggregate_cost_var_rtvp_coders(region, tech, vint, period, coders_gen, tech_config)
         
         # Otherwise take Variable O&M from the ATB if it has it
@@ -570,7 +622,7 @@ def aggregate_rtv_atb(region, tech, vint, tech_config):
 
             cost_variable = config.units.loc['cost_variable', 'atb_conv_fact'] * float(cost_variable)
             
-            if tech_config['include_fuel_cost']:
+            if config.params['include_tech_fuel_cost'] and tech_config['include_fuel_cost']:
                 cost_variable += config.units.loc['cost_fuel', 'atb_conv_fact'] * float(cost_fuel)
                 note = f"variable o&m plus fuel cost - {var_note} - {fuel_note}"
             else: note = var_note
@@ -685,7 +737,7 @@ def aggregate_rtv_coders(region, tech, vint, tech_config):
     # Indexed by period and vintage
     for period in config.model_periods:
         
-        if vint > period or vint + coders_gen['service_life_years'] <= period: continue
+        if vint > period or vint + coders_gen['service_life'] <= period: continue
 
         
         ## CostFixed
@@ -704,7 +756,7 @@ def aggregate_rtv_coders(region, tech, vint, tech_config):
 
 def aggregate_emissions_rtv_coders(region, tech, vint, input_comm, output_comm, coders_gen, tech_config):
 
-    emis_act = config.units.loc['co2_emissions', 'coders_conv_fact'] * coders_gen['carbon_emissions_tCO2eq_per_MWh']
+    emis_act = config.units.loc['co2_emissions', 'coders_conv_fact'] * float(coders_gen['carbon_emissions'])
     emis_comm = config.commodities.loc['co2e']
     emis_units = f"({emis_comm['units']}/{output_comm['units']})"
 
@@ -712,7 +764,7 @@ def aggregate_emissions_rtv_coders(region, tech, vint, input_comm, output_comm, 
         curs.execute(f"""REPLACE INTO
                     EmissionActivity(regions, emis_comm, input_comm, tech, vintage, output_comm, emis_act, emis_act_units, emis_act_notes, reference, data_flags, dq_est)
                     VALUES("{region}", "{emis_comm['commodity']}", "{input_comm['commodity']}", "{tech}", {vint}, "{output_comm['commodity']}",
-                    {emis_act}, "{emis_units}", "{tech_config['coders_equiv']} carbon_emissions_tCO2eq_per_MWh", "{config.references['generation_generic']}", "coders", 1)""")
+                    {emis_act}, "{emis_units}", "{tech_config['coders_equiv']} carbon_emissions", "{config.references['generation_generic']}", "coders", 1)""")
 
 
 
@@ -721,7 +773,7 @@ def aggregate_cost_var_rtvp_coders(region, tech, vint, period, coders_gen, tech_
     cost_variable = config.units.loc['cost_variable', 'coders_conv_fact'] * float(coders_gen['variable_om_cost_CAD_per_MWh'])
     description = f"{tech_config['coders_equiv']} variable_om_cost_CAD_per_MWh"
 
-    if tech_config['include_fuel_cost']:
+    if config.params['include_tech_fuel_cost'] and tech_config['include_fuel_cost']:
 
         fuel_price = coders_gen['average_fuel_price_CAD_per_GJ']
 
@@ -746,6 +798,9 @@ def aggregate_cost_var_rtvp_coders(region, tech, vint, period, coders_gen, tech_
 ## Generic data for the retrofit tech
 def aggregate_ccs_retrofits():
 
+    conn = sqlite3.connect(config.database_file)
+    curs = conn.cursor()
+
     if not config.params['include_emissions']:
         print("Can't include CCS retrofits without including emissions, too! Retrofits skipped.")
         return
@@ -768,7 +823,7 @@ def aggregate_ccs_retrofits():
             tsv = atb_tsv(gen_config['atb_master_sheet'], gen_config['atb_tsv_row'])
             gen_emis = config.units.loc[f"co2_emissions", 'atb_conv_fact'] * float(tsv[f"emissions_co2_lbs_MMBtu"])
         except Exception as e:
-            gen_emis = config.units.loc['co2_emissions', 'coders_conv_fact'] * coders_gen['carbon_emissions_tCO2eq_per_MWh']
+            gen_emis = config.units.loc['co2_emissions', 'coders_conv_fact'] * float(coders_gen['carbon_emissions'])
             print(traceback.format_exc())
             print(f"\nTrying to aggregate {ccs_code} but could not get CO2 emissions of retrofitted generator {gen_config.name} from ATB workbook."
                   f"\nWill use CODERS emissions data for now but this will be capturing CO2-equivalent emissions!")
@@ -809,7 +864,7 @@ def aggregate_ccs_retrofits():
                 
 
                 ## LifetimeTech
-                life = round(coders_gen['service_life_years'] / 2) # retrofit so average half the life of the existing generator
+                life = round(coders_gen['service_life'] / 2) # retrofit so average half the life of the existing generator
 
                 curs.execute(f"""REPLACE INTO
                             LifetimeTech(regions, tech, life, life_notes, reference, data_flags, dq_est)
@@ -888,8 +943,11 @@ def aggregate_ccs_retrofits():
                                         VALUES("{region}", {period}, "{ccs_config['tech']}", {vint}, "{note}", {cost_variable}, {config.params['atb']['currency_year']},
                                         "{config.params['atb']['currency']}", "{config.references['atb']}", 1)""")
 
+    conn.commit()
+    conn.close()
 
-              
+
+
 """
 ##############################################################
     Technology specific variables data

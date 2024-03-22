@@ -4,3 +4,4 @@ data_cache/
 deprecated/
 electricity.sqlite
 electricity*.xlsx
+*coders_api_key.txt
