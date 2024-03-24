@@ -22,12 +22,15 @@ coders_root = "http://206.12.95.102/"
 
 if not os.path.isdir(cache): os.mkdir(cache)
 
-api_key: str = None
+api_key = None
 
 
 
 def _get_api_key():
     global api_key
+    if not os.path.isfile(config.input_files + config.params['coders_api_key_file']):
+        print(f"\nTo get CODERS data, must save a CODERS API key! Configured location:\n{config.input_files + config.params['coders_api_key_file']}\n")
+        return
     with open(config.input_files + config.params['coders_api_key_file'], 'r') as open_file:
         api_key = open_file.read()
 
@@ -44,9 +47,6 @@ def _to_dataframe(json_data):
 
 
 def get_data(end_point=None, **kwargs) -> tuple[list[dict], pd.DataFrame, str] | None:
-
-    global api_key
-    if api_key is None: _get_api_key()
 
     # Adding additional arguments to the endpoint, e.g. year, province, then finally api key
     end_point += '?'
@@ -88,6 +88,8 @@ def get_data(end_point=None, **kwargs) -> tuple[list[dict], pd.DataFrame, str] |
         print(f"No local cache was found for endpoint={end_point[0:-1]}. Downloading instead.")
 
     # Didn't get from local cache so download from the CODERS API
+    if api_key is None: _get_api_key()
+
     try:
         data_json = requests.get(coders_root + end_point + f"key={api_key}").json()
 
