@@ -136,6 +136,7 @@ def aggregate_demand():
     for _idx, prov in df_avail.iterrows():
 
         region = config.region_map[prov['province'].lower()]
+        if region not in config.model_regions: continue
         if not config.regions.loc[region, 'include_demand']: continue
 
         """

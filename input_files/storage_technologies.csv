@@ -4,5 +4,5 @@ battery_2h,E_BAT_2H,utility-scale lithium-ion battery storage with 2-hour capaci
 battery_3h,E_BAT_3H,utility-scale lithium-ion battery storage with 3-hour capacity,3,FALSE,storage_lithium+storage_ solid+storage,storage_lithium,Utility-Scale Battery Storage - 4Hr,,,Moderate,0.85,elc_tx,elc_tx,FALSE
 battery_4h,E_BAT_4H,utility-scale lithium-ion battery storage with 4-hour capacity,4,TRUE,storage_lithium+storage_ solid+storage,storage_lithium,Utility-Scale Battery Storage - 4Hr,,,Moderate,0.85,elc_tx,elc_tx,FALSE
 battery_5h,E_BAT_5H,utility-scale lithium-ion battery storage with 5-hour capacity,5,FALSE,storage_lithium+storage_ solid+storage,storage_lithium,Utility-Scale Battery Storage - 6Hr,,,Moderate,0.85,elc_tx,elc_tx,FALSE
-pump_6h,E_PUMP_6H,hydroelectric pumped storage with 6-hour capacity,4,FALSE,storage_pump,storage_pump,,,,Moderate,0.8,elc_tx,elc_tx,TRUE
+pump_4h,E_PUMP_4H,hydroelectric pumped storage with 6-hour capacity,4,FALSE,storage_pump,storage_pump,,,,Moderate,0.8,elc_tx,elc_tx,TRUE
 pump_10h,E_PUMP_10H,hydroelectric pumped storage with 10-hour capacity,10,TRUE,storage_pump,storage_pump,Pumped Storage Hydropower - National Class 3,,,Moderate,0.8,elc_tx,elc_tx,TRUE
