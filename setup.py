@@ -29,6 +29,8 @@ def instantiate_database():
         print("Database wiped prior to aggregation. See params.\n")
     
     conn.commit()
+    curs.execute("VACUUM;")
+    conn.commit()
     conn.close()
 
 
