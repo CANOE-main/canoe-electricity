@@ -42,7 +42,7 @@ def build_database():
     print(f"Electricity sector aggregated into {os.path.basename(config.database_file)}\n")
 
     # TODO temp for prototyping
-    # prepare_test_model()
+    #prepare_test_model()
     
     if config.params['show_plots']: pp.show()
 

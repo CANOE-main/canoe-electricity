@@ -973,7 +973,7 @@ def aggregate_ccs_retrofits(df_rtv_all: pd.DataFrame):
                 for vint in config.model_periods:
                     
                     # Make sure that there can be a generator to retrofit for this region and vintage. If so, add remaining data
-                    if len(exs_vints.loc[(exs_vints < vint) & (exs_vints + life > vint)]) == 0: continue
+                    if len(exs_vints.loc[(exs_vints <= vint) & (exs_vints + coders_gen['service_life'] > vint)]) == 0: continue
 
 
                     ## Efficiency
@@ -988,6 +988,11 @@ def aggregate_ccs_retrofits(df_rtv_all: pd.DataFrame):
                                 Efficiency(regions, input_comm, tech, vintage, output_comm, efficiency, eff_notes, reference, dq_est)
                                 VALUES("{region}", "{input_comm['commodity']}", "{ccs_config['tech']}", {vint}, "{output_comm['commodity']}",
                                 "{eff}", "{eff_units} {note}", "{config.references['atb']}", 1)""")
+                    
+                    # Dummy retrofit bypass
+                    curs.execute(f"""REPLACE INTO
+                                Efficiency(regions, input_comm, tech, vintage, output_comm, efficiency, eff_notes)
+                                VALUES("{region}", "{input_comm['commodity']}", "{bypass_tech}", {vint}, "{output_comm['commodity']}", 1, "{eff_units} dummy bypass")""")
                     
 
                     ## EmissionActivity
@@ -1012,17 +1017,23 @@ def aggregate_ccs_retrofits(df_rtv_all: pd.DataFrame):
                                     "{config.params['atb']['currency']}", "{config.references['atb']}", 1)""")
                     
 
-                    # Add  CCS retrofit options for all future model periods
+                    # Add CCS retrofit options for all future model periods
                     for period in config.model_periods:
                         
                         if vint > period or vint + life <= period: continue
 
 
-                        ## Efficiency
-                        # Dummy retrofit bypass
-                        curs.execute(f"""REPLACE INTO
-                                    Efficiency(regions, input_comm, tech, vintage, output_comm, efficiency, eff_notes)
-                                    VALUES("{region}", "{input_comm['commodity']}", "{bypass_tech}", {period}, "{output_comm['commodity']}", 1, "{eff_units} dummy bypass")""")
+                        ## MaxActivity
+                        # This period is beyond end-of-life of all retrofittable generators
+                        if period >= max(exs_vints + coders_gen['service_life']):
+                            curs.execute(f"""REPLACE INTO
+                                        MaxActivity(regions, periods, tech, maxact, maxact_units, maxact_notes)
+                                        VALUES("{region}", {period}, "{ccs_config['tech']}", 0, "({output_comm['units']})",
+                                        "beyond end-of-life of all retrofittable generators")""")
+                            curs.execute(f"""REPLACE INTO
+                                        MaxActivity(regions, periods, tech, maxact, maxact_units, maxact_notes)
+                                        VALUES("{region}", {period}, "{bypass_tech}", 0, "({output_comm['units']})",
+                                        "beyond end-of-life of all retrofittable generators")""")
 
 
                         ## CostFixed

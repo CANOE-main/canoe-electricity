@@ -75,7 +75,7 @@ def aggregate_transmission():
     """
 
     # Transmission techs ELC_TX <--> ELC_DX --> D_ELC
-    tx_techs = ["tx_to_dx", "dx_to_tx"]
+    tx_techs = ["tx_to_dx"]
     dummy_techs = ["dx_to_dem", "g_to_tx", "grps_to_tx"]
 
     for code, tech_config in config.trans_techs.iterrows():
