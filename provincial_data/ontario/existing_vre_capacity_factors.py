@@ -46,7 +46,7 @@ def initialise():
     global df_existing
 
     # Initialise existing generators data
-    if df_existing == None: _json, df_existing, date_accessed = coders_api.get_data('generators')
+    if df_existing is None: _json, df_existing, date_accessed = coders_api.get_data('generators')
     else: return
 
     config.references['generators'] = config.params['coders']['reference'].replace("<date>", date_accessed).replace("<table>","generators")
@@ -90,7 +90,7 @@ def get_capacity_factors() -> tuple[dict[str, np.ndarray], str, str]:
     note = f"{weather_year} hourly generation by fuel for generators >20MW (IESO) divided by preexisting capacities >20MW (CODERS)"
     reference = f"{config.params['ieso_reference'].replace('<year>', str(weather_year))}GenOutputbyFuelHourly/; {config.references['generators']}"
 
-    return {'wind_onshore': cf_wind, 'solar': cf_solar}, note, reference
+    return {'wind_onshore': cf_wind, 'wind_offshore': cf_wind, 'solar': cf_solar}, note, reference
 
 
 

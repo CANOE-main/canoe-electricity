@@ -22,11 +22,6 @@ def aggregate_cfs(df_rtv: pd.DataFrame):
     
     cfs, note, reference = get_capacity_factors(data_year)
 
-    if len(df_rtv) > 2:
-        print("Existing Ontario hydro must be aggregated to a single vintage for each of daily and run-of-river!")
-        print(df_rtv)
-        return
-
     conn = sqlite3.connect(config.database_file)
     curs = conn.cursor()
 

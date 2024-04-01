@@ -11,7 +11,7 @@ import pandas as pd
 
 
 
-def aggregate_ccs(df_rtv: pd.DataFrame):
+def aggregate_capacity_credits(df_rtv: pd.DataFrame):
     
     df_cc, note, reference, year = get_capacity_credits()
 

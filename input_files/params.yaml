@@ -53,7 +53,7 @@ include_ccs_retrofits: true # Emissions must also be included. Retrofitted techs
 include_tech_fuel_cost: true # Attaches fuel costs to technologies by their variable costs
 clone_to_excel: false
 simplify_model: false # Builds the skeleton model. Not well implemented yet.
-show_plots: true # Useful for inspecting data / debugging
+show_plots: false # Useful for inspecting data / debugging
 
 # If include_emissions is true, which emissions to include?
 included_emissions:

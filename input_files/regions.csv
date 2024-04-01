@@ -1,14 +1,14 @@
 ﻿region,coders_equivs,description,endogenous,include_demand
-AB,alberta.a+alberta+ab,alberta,FALSE,TRUE
-BC,british columbia.a+british columbia+bc,british columbia,FALSE,TRUE
-MB,manitoba.a+manitoba+mb,manitoba,FALSE,TRUE
-NB,new brunswick.a+new brunswick+nb,new brunswick,FALSE,TRUE
-NLLAB,newfoundland and labrador.a+newfoundland and labrador.b+newfoundland and labrador+newfoundland island+newfoundland labrador+nllab+nl,newfoundland and labrador,FALSE,TRUE
-NS,nova scotia.a+nova scotia+ns,nova scotia,FALSE,TRUE
+AB,alberta.a+alberta+ab,alberta,TRUE,TRUE
+BC,british columbia.a+british columbia+bc,british columbia,TRUE,TRUE
+MB,manitoba.a+manitoba+mb,manitoba,TRUE,TRUE
+NB,new brunswick.a+new brunswick+nb,new brunswick,TRUE,TRUE
+NLLAB,newfoundland and labrador.a+newfoundland and labrador.b+newfoundland and labrador+newfoundland island+newfoundland labrador+nllab+nl,newfoundland and labrador,TRUE,TRUE
+NS,nova scotia.a+nova scotia+ns,nova scotia,TRUE,TRUE
 ON,ontario.b+ontario.a+ontario+ontario north+ontario south+on,ontario,TRUE,TRUE
-PEI,prince edward island.a+prince edward island+pei+pe,prince edward island,FALSE,TRUE
-QC,quebec.a+quebec.b+québec+quebec south+quebec north+qc-hvdc+qc,quebec,FALSE,TRUE
-SK,saskatchewan.a+saskatchewan+saskatchewan north+saskatchewan south+sk+saskatachewan,saskatchewan,FALSE,TRUE
+PEI,prince edward island.a+prince edward island+pei+pe,prince edward island,TRUE,TRUE
+QC,quebec.a+quebec.b+québec+quebec south+quebec north+qc-hvdc+qc,quebec,TRUE,TRUE
+SK,saskatchewan.a+saskatchewan+saskatchewan north+saskatchewan south+sk+saskatachewan,saskatchewan,TRUE,TRUE
 USA,isone(highgate),,,
 USA,isone(hvdc),,,
 USA,isone(maine),,,

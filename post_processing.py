@@ -52,6 +52,24 @@ def process():
         curs.execute(f"""REPLACE INTO
                     'references'('reference')
                     VALUES('{ref}')""")
+        
+
+
+    """
+    ##############################################################
+        Unused techs
+    ##############################################################
+    """
+
+    used_techs = [t[0] for t in curs.execute("SELECT tech FROM Efficiency")]
+    all_techs = [t[0] for t in curs.execute("SELECT tech FROM technologies")]
+
+    for tech in all_techs:
+        if tech not in used_techs:
+
+            print(f"Not using technology {tech} so it was removed.")
+
+            curs.execute(f"DELETE FROM technologies WHERE tech == '{tech}'")
 
 
     conn.commit()
@@ -59,7 +77,7 @@ def process():
 
 
 
-def aggregate_capacity_limits():
+def aggregate_capacity_limits(): 
 
     conn = sqlite3.connect(config.database_file)
     curs = conn.cursor()

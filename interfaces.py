@@ -173,7 +173,7 @@ def aggregate_boundary_interface(r1_r2: tuple, interface: pd.DataFrame):
 
         curs.execute(f"""REPLACE INTO
                     Efficiency(regions, input_comm, tech, vintage, output_comm, efficiency, eff_notes, reference, data_flags, dq_est)
-                    VALUES("{in_region}", "{input_comm['commodity']}", "{tech_config['tech']}", {vint},"{output_comm['commodity']}",
+                    VALUES("{in_region}", "{input_comm['commodity']}", "{tech_config['tech']}", {config.model_periods[0]},"{output_comm['commodity']}",
                     {eff}, "{note}", "{config.references['ca_system_parameters']}", "coders", 1)""")
         
 
