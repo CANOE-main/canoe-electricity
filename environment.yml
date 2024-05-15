@@ -3,7 +3,7 @@ channels:
     - defaults
     - conda-forge
 dependencies:
-    - python=3.11
+    - python=3.12
     - matplotlib
     - pandas
     - numpy
@@ -11,3 +11,5 @@ dependencies:
     - openpyxl
     - requests
     - pyyaml
+    - xlsxwriter
+    - scipy

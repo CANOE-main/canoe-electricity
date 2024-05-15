@@ -29,7 +29,7 @@ def aggregate():
     config.references['ca_system_parameters'] = config.params['coders']['reference'].replace('<table>', 'ca_system_parameters').replace('<date>', date_accessed)
 
     if config.params['include_reserve_margin']: aggregate_reserve_margin()
-    if config.params['include_provincial_demand']: aggregate_demand()
+    aggregate_demand()
     aggregate_transmission()
 
 
@@ -76,7 +76,7 @@ def aggregate_transmission():
 
     # Transmission techs ELC_TX <--> ELC_DX --> D_ELC
     tx_techs = ["tx_to_dx"]
-    dummy_techs = ["dx_to_dem", "g_to_tx", "grps_to_tx"]
+    dummy_techs = ["g_to_tx", "grps_to_tx"]
 
     for code, tech_config in config.trans_techs.iterrows():
         
@@ -127,8 +127,11 @@ def aggregate_demand():
     df_annual['region'] = [config.region_map[p.lower()] for p in df_annual['province']]
     df_annual.set_index('region', inplace=True)
 
-    # Demand commodity
+    # Demand tech and commodity data
     dem_comm = config.commodities.loc['demand']
+    tech_config = config.trans_techs.loc['dx_to_dem']
+    input_comm = config.commodities.loc[tech_config['in_comm']]
+    output_comm = config.commodities.loc[tech_config['out_comm']]
 
     # Get available data provinces and years from coders
     _json, df_avail, _date = coders_api.get_data(end_point="provincial_demand")
@@ -137,24 +140,6 @@ def aggregate_demand():
 
         region = config.region_map[prov['province'].lower()]
         if region not in config.model_regions: continue
-        if not config.regions.loc[region, 'include_demand']: continue
-
-        """
-        ##############################################################
-            Annual provincial electricity demand
-        ##############################################################
-        """
-
-        ## Demand
-        for period in config.model_periods:
-
-            ann_dem = config.units.loc['demand', 'coders_conv_fact'] * df_annual.loc[region, str(period)]
-
-            curs.execute(f"""REPLACE INTO
-                        Demand(regions, periods, demand_comm, demand, demand_units, demand_notes, reference, data_flags, dq_est)
-                        VALUES("{region}", {period}, "{dem_comm['commodity']}", {ann_dem}, "({dem_comm['units']})",
-                        "provincial electricity demand projection {df_annual.loc[region, 'province']} {period}",
-                        "{config.references["forecasted_annual_demand"]}", "coders", 1)""")
 
 
         """
@@ -176,7 +161,16 @@ def aggregate_demand():
             continue
 
         hourly_dem = df_hourly['demand_MWh'].iloc[0:8760].ffill().to_numpy()
+
+        # Store hourly demand to calculate capacity credits for VREs
+        # Can't turn back before this point or wont be able to calculate CCs
+        config.provincial_demand[region] = hourly_dem
+
+
+        # If not including demand, don't go any further
+        if not config.params['include_provincial_demand'] or not config.regions.loc[region, 'include_demand']: continue
         
+
         # Apply tolerance and normalise
         hourly_dem[hourly_dem < hourly_dem.mean() * config.params['dsd_tolerance']] = 0
         dsd = hourly_dem / hourly_dem.sum()
@@ -189,14 +183,44 @@ def aggregate_demand():
         pp.xlabel("Hour of year")
 
 
+        ## Efficiency
+        curs.execute(f"""REPLACE INTO
+                            Efficiency(regions, input_comm, tech, vintage, output_comm, efficiency, eff_notes)
+                            VALUES("{region}", "{input_comm['commodity']}", "{tech_config['tech']}",
+                            {config.model_periods[0]}, "{output_comm['commodity']}", 1, "dummy tech")""")
+
+
         ## DemandSpecificDistribution
-        for h, row in config.time.iterrows():
+        note = f"{weather_year} hourly demand divided by sum of hourly demand for that year"
+        for h, time in config.time.iterrows():
+
+            if time['time_of_day'] == config.time.iloc[0]['time_of_day']:
+                _note = note
+                _ref = dsd_reference
+            else: _note=_ref=''
 
             curs.execute(f"""REPLACE INTO
                         DemandSpecificDistribution(regions, season_name, time_of_day_name, demand_name, dsd, dsd_notes, reference, data_flags, dq_est)
-                        VALUES("{region}", "{row['season']}", "{row['time_of_day']}", "{dem_comm['commodity']}", {dsd[h]},
-                        "{weather_year} hourly demand divided by sum of hourly demand for that year",
-                        "{dsd_reference}", "coders", 1)""")
+                        VALUES("{region}", "{time['season']}", "{time['time_of_day']}", "{dem_comm['commodity']}", {dsd[h]},
+                        "{_note}", "{_ref}", "coders", 1)""")
+
+
+        """
+        ##############################################################
+            Annual provincial electricity demand
+        ##############################################################
+        """
+
+        ## Demand
+        for period in config.model_periods:
+
+            ann_dem = config.units.loc['demand', 'coders_conv_fact'] * df_annual.loc[region, str(period)]
+
+            curs.execute(f"""REPLACE INTO
+                        Demand(regions, periods, demand_comm, demand, demand_units, demand_notes, reference, data_flags, dq_est)
+                        VALUES("{region}", {period}, "{dem_comm['commodity']}", {ann_dem}, "({dem_comm['units']})",
+                        "provincial electricity demand projection {df_annual.loc[region, 'province']} {period}",
+                        "{config.references["forecasted_annual_demand"]}", "coders", 1)""")
             
     
     conn.commit()

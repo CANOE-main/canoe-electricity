@@ -28,9 +28,9 @@ def build_database():
 
     pre_processing.process()
 
+    provincial_grids.aggregate() # Must go before generators to get provincial demand for capacity credits
     generators.aggregate()
     interfaces.aggregate()
-    provincial_grids.aggregate()
 
     currency_conversion.convert_currencies()
     if config.params['simplify_model']: model_reduction.simplify_model()
@@ -44,7 +44,9 @@ def build_database():
     # TODO temp for prototyping
     #prepare_test_model()
     
-    if config.params['show_plots']: pp.show()
+    if config.params['show_plots']:
+        print("Finished and showing plots.")
+        pp.show()
 
 
 
@@ -61,20 +63,21 @@ def prepare_test_model():
       
     rep_days = [
         'D006', # Coldest day ON 2018
-        'D045', # Coldest day ON 2020
-        'D103',
-        'D128',
-        'D173',
-        'D186' # Hottest day ON 2018
+        'D035',
+        'D070',
+        'D105',
+        'D140',
+        'D185' # Hottest day ON 2018
     ]
 
-    curs.execute(f"""REPLACE INTO sector_labels(sector) VALUES('electric')""")
+    curs.execute(f"""REPLACE INTO sector_labels(sector) VALUES('electricity')""")
 
     curs.execute(f"DELETE FROM time_season")
     [curs.execute(f"INSERT INTO time_season(t_season) VALUES('{day}')") for day in rep_days]
 
     seas_tables = [
         'CapacityFactorTech',
+        'CapacityFactorProcess',
         'DemandSpecificDistribution',
         'MinSeasonalActivity',
         'MaxSeasonalActivity'
@@ -98,7 +101,7 @@ def prepare_test_model():
             curs.execute(f"""REPLACE INTO SegFrac(season_name, time_of_day_name, segfrac)
                         VALUES('{day}', '{config.time.loc[h, 'time_of_day']}', {1/(24*6)})""")
 
-    base_emis = 52000
+    base_emis = 3200
     emis = {
         2021: 1.00,
         2025: 0.80,
@@ -116,6 +119,9 @@ def prepare_test_model():
             curs.execute(f"""REPLACE INTO
                         EmissionLimit(regions, periods, emis_comm, emis_limit, emis_limit_units)
                         VALUES("global", {period}, "{emis_comm}", {emis[period]*base_emis}, "kt")""")
+
+    conn.commit()
+    conn.execute("VACUUM;")
 
     conn.commit()
     conn.close()

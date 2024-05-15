@@ -31,7 +31,7 @@ def instantiate_database():
     conn.commit()
 
     # VACUUM operation to clean up any empty rows
-    curs.execute("VACUUM;")
+    conn.execute("VACUUM;")
     conn.commit()
 
     conn.close()
@@ -44,7 +44,12 @@ class config:
     _this_dir = os.path.realpath(os.path.dirname(__file__)) + "/"
     input_files = _this_dir + 'input_files/'
     cache_dir = _this_dir + "data_cache/"
+
+    if not os.path.exists(cache_dir): os.mkdir(cache_dir)
+    
     references = dict()
+    provincial_demand: dict[str, np.ndarray] = {}
+    exs_vre_gen = dict()
 
     _instance = None # singleton pattern
 
@@ -96,6 +101,9 @@ class config:
         config.regions['endogenous'].fillna(False, inplace=True)
         config.model_regions = config.regions.loc[(config.regions['endogenous'])].index.unique().to_list()
         config.model_regions.sort()
+
+        # Initialise VRE hourly generation, for calculating capacity credits
+        for region in config.model_regions: config.exs_vre_gen[region] = np.zeros(8760)
 
         # Maps all coders gen types to canoe techs
         config.gen_map = dict()

@@ -1,7 +1,0 @@
-﻿ieso_fuels,codes
-nuclear,nuclear_candu+nuclear_pwr+nuclear_smr
-hydroelectric,hydro_annual+hydro_monthly+hydro_daily+hydro_run
-gas/oil,coal+coal_ccs+diesel_ct+diesel_st+gasoline_ct+ng_cc+ng_ccs+ng_cg+ng_ct+oil_ct+oil_st
-wind,wind_offshore+wind_onshore
-biofuel,biogas+biomass+biomass_cg
-solar,solar

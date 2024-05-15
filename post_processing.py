@@ -6,6 +6,7 @@ Written by Ian David Elder for the CANOE model
 import sqlite3
 from setup import config
 import pandas as pd
+import utils
 
 
 
@@ -40,20 +41,7 @@ def process():
             curs.execute(f"""REPLACE INTO
                         commodities(comm_name, flag, comm_desc)
                         VALUES('{comm['commodity']}', '{comm['flag']}', '({comm['units']}) {comm['description']}')""")
-
-
-    """
-    ##############################################################
-        References
-    ##############################################################
-    """
-
-    for ref in config.references.values():
-        curs.execute(f"""REPLACE INTO
-                    'references'('reference')
-                    VALUES('{ref}')""")
         
-
 
     """
     ##############################################################
@@ -74,6 +62,16 @@ def process():
 
     conn.commit()
     conn.close()
+
+
+    """
+    ##############################################################
+        References
+    ##############################################################
+    """
+
+    # Fill references table with unique references from every other table
+    utils.fill_references_table()
 
 
 

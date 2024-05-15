@@ -12,6 +12,7 @@ import os
 import traceback
 import capacity_credits
 import capacity_factors
+import new_wind_solar
 
 df_generic: pd.DataFrame
 df_cost: pd.DataFrame
@@ -27,15 +28,16 @@ def aggregate():
 
     initialise_data()
 
-    # Aggregate new generation
-    aggregate_new_generators()
-    if config.params['include_storage']: aggregate_new_storage()
-
     # Aggregate existing generation
+    # Do this before new so we have existing CFs to calculate capacity credits
     df_rtv = None
     if config.params['include_existing_capacity']:
         df_rtv = aggregate_existing_generators()
         if config.params['include_storage']: aggregate_existing_storage()
+
+    # Aggregate new generation
+    aggregate_new_generators()
+    if config.params['include_storage']: aggregate_new_storage()
 
     # Aggregate CCS retrofits
     if config.params['include_ccs_retrofits']: aggregate_ccs_retrofits(df_rtv)
@@ -89,16 +91,16 @@ def aggregate_new_generators():
         if n_batches > 1: new_techs = [f"{base_tech}-NEW-{n}" for n in range(1,n_batches+1)] # batches are specified
         else: new_techs = [f"{base_tech}-NEW"] # batches not specified
 
-        for tech in new_techs:
+        for n in range(len(new_techs)):
 
             ## Technologies
             curs.execute(f"""REPLACE INTO
                         technologies(tech, flag, sector, tech_desc)
-                        VALUES("{tech}", "{tech_config['flag']}", "electricity", "new {tech_config['description']}")""")
+                        VALUES("{new_techs[n]}", "{tech_config['flag']}", "electricity", "{tech_config['description']} - new")""")
             
             for region in config.model_regions:
                 for period in config.model_periods:
-                    rtv.append({'region': region, 'tech_code': tech_code, 'tech': tech, 'vint': period})
+                    rtv.append({'region': region, 'tech_code': tech_code, 'tech': new_techs[n], 'vint': period, 'bin': n})
 
     conn.commit()
     conn.close()
@@ -107,6 +109,10 @@ def aggregate_new_generators():
 
     # Add life because capacity credits need it as a check
     df_rtv['life'] = [df_generic.loc[config.gen_techs.loc[tc, 'coders_equiv'], 'service_life'] for tc in df_rtv['tech_code']]
+
+    # New wind and solar only need a small subset of generic data, then passed to provincial aggregation
+    aggregate_new_wind_solar(df_rtv.loc[df_rtv['tech_code'].isin(['wind_onshore','solar'])])
+    df_rtv = df_rtv.loc[~df_rtv['tech_code'].isin(['wind_onshore','solar'])] # continue with other generators
 
     ## CapacityCredit
     if config.params['include_reserve_margin']: capacity_credits.aggregate_new(df_rtv)
@@ -148,7 +154,7 @@ def aggregate_new_storage():
         ## Technologies
         curs.execute(f"""REPLACE INTO
                     technologies(tech, flag, sector, tech_desc)
-                    VALUES("{tech}", "ps", "electricity", "new {storage_config['description']}")""")
+                    VALUES("{tech}", "ps", "electricity", "{storage_config['description']} - new")""")
         
         for region in config.model_regions:
 
@@ -269,7 +275,7 @@ def aggregate_existing_generators() -> pd.DataFrame:
         ## Technologies
         curs.execute(f"""REPLACE INTO
                     technologies(tech, flag, sector, tech_desc)
-                    VALUES("{row['tech']}", "{tech_config['flag']}", "electricity", "existing {tech_config['description']} - {row['description']}")""")
+                    VALUES("{row['tech']}", "{tech_config['flag']}", "electricity", "{tech_config['description']} - {row['description']} - existing")""")
 
     # Iterate over aggregated existing capacity
     for _idx, row in df_rtv.iterrows():
@@ -394,7 +400,7 @@ def aggregate_existing_storage():
         ## Technologies
         curs.execute(f"""REPLACE INTO
                     technologies(tech, flag, sector, tech_desc)
-                    VALUES("{row['tech']}", "ps", "electricity", "existing {storage_config['description']} - {row['description']}")""")
+                    VALUES("{row['tech']}", "ps", "electricity", "{storage_config['description']} - {row['description']} - existing")""")
         
 
         ## Efficiency
@@ -499,6 +505,28 @@ def aggregate_storage_generic(df_rtv: pd.DataFrame):
 
     conn.commit()
     conn.close()
+
+
+
+# New wind and solar only need a subset of the generic data, rest is provincial
+def aggregate_new_wind_solar(df_rtv: pd.DataFrame):
+
+    global conn, curs
+
+    conn = sqlite3.connect(config.database_file)
+    curs = conn.cursor()
+
+    # Just need region and tech indices for this data
+    for _idx, row in df_rtv[['region','tech_code','tech']].drop_duplicates().iterrows():
+
+        tech_config = config.gen_techs.loc[row['tech_code']].copy()
+
+        aggregate_rt_all(row['region'], row['tech'], tech_config)
+
+    conn.commit()
+    conn.close()
+
+    new_wind_solar.aggregate(df_rtv)
 
 
 

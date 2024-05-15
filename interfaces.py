@@ -196,15 +196,21 @@ def aggregate_boundary_interface(r1_r2: tuple, interface: pd.DataFrame):
         
 
         ## DemandSpecificDistribution
-        for h, row in config.time.iterrows():
+        note = f"{weather_year} hourly flow divided by total annual flow leaving model boundary from {in_region}"
+        reference = config.references[f"{region_1}-{region_2}"]
+        for h, time in config.time.iterrows():
 
             dsd = out_mwh[h] * config.units.loc['activity', 'coders_conv_fact'] / ann_dem
 
+            if time['time_of_day'] == config.time.iloc[0]['time_of_day']:
+                _note = note
+                _ref = reference
+            else: _note=_ref=''
+
             curs.execute(f"""REPLACE INTO
                         DemandSpecificDistribution(regions, season_name, time_of_day_name, demand_name, dsd, dsd_notes, reference, data_flags, dq_est)
-                        VALUES("{in_region}", "{row['season']}", "{row['time_of_day']}", "{dem_comm['commodity']}", {dsd},
-                        "{weather_year} hourly flow divided by total annual flow leaving model boundary from {in_region}",
-                        "{config.references[f"{region_1}-{region_2}"]}", "coders", 1)""")
+                        VALUES("{in_region}", "{time['season']}", "{time['time_of_day']}", "{dem_comm['commodity']}", {dsd},
+                        "{_note}", "{_ref}", "coders", 1)""")
         
 
     
@@ -219,6 +225,11 @@ def aggregate_boundary_interface(r1_r2: tuple, interface: pd.DataFrame):
         tech_config = config.trans_techs.loc['int_in']
         input_comm = config.commodities.loc[tech_config['in_comm']]
         output_comm = config.commodities.loc[tech_config['out_comm']]
+
+        ## tech_curtailment
+        curs.execute(f"""REPLACE INTO
+                     tech_curtailment(tech)
+                     VALUES("{tech_config['tech']}")""")
 
 
         ## ExistingCapacity
@@ -244,15 +255,21 @@ def aggregate_boundary_interface(r1_r2: tuple, interface: pd.DataFrame):
         
 
         ## CapacityFactorTech
-        for h, row in config.time.iterrows():
+        note = f"{weather_year} hourly flow entering {in_region} divided by max hourly flow"
+        reference = config.references[f"{region_1}-{region_2}"]
+        for h, time in config.time.iterrows():
 
             cf = in_mwh[h] / max(in_mwh)
 
+            if time['time_of_day'] == config.time.iloc[0]['time_of_day']:
+                _note = note
+                _ref = reference
+            else: _note=_ref=''
+
             curs.execute(f"""REPLACE INTO
                         CapacityFactorTech(regions, season_name, time_of_day_name, tech, cf_tech, cf_tech_notes, reference, data_flags, dq_est)
-                        VALUES("{in_region}", "{row['season']}", "{row['time_of_day']}", "{tech_config['tech']}", {cf},
-                        "{weather_year} hourly flow entering {in_region} divided by max hourly flow",
-                        "{config.references[f"{region_1}-{region_2}"]}", "coders", 1)""")
+                        VALUES("{in_region}", "{time['season']}", "{time['time_of_day']}", "{tech_config['tech']}", {cf},
+                        "{_note}", "{_ref}", "coders", 1)""")
 
 
 
