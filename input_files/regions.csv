@@ -7,7 +7,7 @@ NLLAB,newfoundland and labrador.a+newfoundland and labrador.b+newfoundland and l
 NS,nova scotia.a+nova scotia+ns,nova scotia,FALSE,TRUE
 ON,ontario.b+ontario.a+ontario+ontario north+ontario south+on,ontario,TRUE,TRUE
 PEI,prince edward island.a+prince edward island+pei+pe,prince edward island,FALSE,TRUE
-QC,quebec.a+quebec.b+québec+quebec south+quebec north+qc-hvdc+qc,quebec,FALSE,TRUE
+QC,quebec.a+quebec.b+québec+quebec south+quebec north+qc-hvdc+qc+quebec,quebec,FALSE,TRUE
 SK,saskatchewan.a+saskatchewan+saskatchewan north+saskatchewan south+sk+saskatachewan,saskatchewan,FALSE,TRUE
 USA,isone(highgate),,,
 USA,isone(hvdc),,,

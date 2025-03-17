@@ -14,9 +14,9 @@ elc_dx,E_elc_dx,distribution-side electricity,p,PJ
 elcg,E_elcg,generated electricity (non-renewable),p,PJ
 elcg_rps,E_elcg_rps,generated electricity (renewable),p,PJ
 demand,E_D_elc,demand for electricity,d,PJ
-co2e,CO2eq,carbon-dioxide-equivalent,e,ktCO2eq
-co2,CO2eq,carbon-dioxide-equivalent,e,ktCO2eq
-so2,E_so2,carbon dioxide,e,tSO2
-nox,E_nox,carbon dioxide,e,tNOx
-hg,E_hg,carbon dioxide,e,gHg
+co2e,co2e,carbon-dioxide-equivalent,e,ktCO2eq
+co2,co2e,carbon-dioxide-equivalent,e,ktCO2eq
+so2,so2,carbon dioxide,e,tSO2
+nox,nox,carbon dioxide,e,tNOx
+hg,hg,carbon dioxide,e,gHg
 demand_int,E_D_elc_int,demanded for exogenous electricity from boundary interties,d,PJ

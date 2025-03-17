@@ -48,10 +48,10 @@ include_existing_capacity: true
 include_reserve_margin: true
 include_capacity_limits: false
 include_storage: true
-include_provincial_demand: true # When true, can also be configured by-province in regions file
+include_provincial_demand: false # When true, can also be configured by-province in regions file
 include_ccs_retrofits: true # Emissions must also be included. Retrofitted techs must use ATB data for disaggregated emissions
 include_tech_fuel_cost: true # Attaches fuel costs to technologies by their variable costs
-clone_to_excel: true
+clone_to_excel: false
 simplify_model: false # Builds the skeleton model. Not well implemented yet.
 show_plots: true # Useful for inspecting data / debugging
 

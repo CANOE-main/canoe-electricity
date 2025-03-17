@@ -78,8 +78,8 @@ def aggregate_vre(df_rtv: pd.DataFrame, df_cf: pd.DataFrame, region: str, vint: 
         axes['hourly'].set_title(f"marginal hourly net load")
         axes['hourly'].set_xlabel(f"hour of year")
         axes['hourly'].set_ylabel(f"load (MW)")
-        axes['hourly'].plot(load, color=(0, 0, 1, 1))
-        axes['hourly'].plot(net_load, color=(0, 1, 0, 1))
+        axes['hourly'].plot(load, color=(0, 0, 1, 0.5))
+        axes['hourly'].plot(net_load, color=(0, 1, 0, 0.5), zorder=-5)
 
         axes['dc'].set_title(f"marginal net load duration curve")
         axes['dc'].set_xlabel(f"sorted by hourly load (descending)")
@@ -89,6 +89,7 @@ def aggregate_vre(df_rtv: pd.DataFrame, df_cf: pd.DataFrame, region: str, vint: 
 
     ## Calculate each marginal capacity credit and add to plots
     green = 1 # Colour gradient from yellow to red by reducing green
+    zorder = -5 # layering each marginal plot backward
     for cluster, rtv in df_clusters.iterrows():
 
         # Subtract generation from this cluster from previous net load to get next marginal net load and nldc
@@ -105,9 +106,10 @@ def aggregate_vre(df_rtv: pd.DataFrame, df_cf: pd.DataFrame, region: str, vint: 
 
         if plot:
             # Add to duration curve and hourly plots
+            zorder -= 5
             green -= 1 / len(df_clusters.index) # reduce green linearly so yellow turns gradually to red
             axes['dc'].plot(range(len(marginal_nldc)), marginal_nldc, color=(1, green, 0, 1))
-            axes['hourly'].plot(range(len(marginal_net_load)), marginal_net_load, color=(1, green, 0, 1))
+            axes['hourly'].plot(range(len(marginal_net_load)), marginal_net_load, color=(1, green, 0, 0.5), zorder=zorder)
 
     if plot:
         # Plot marginal capacity credits by VRE cluster
