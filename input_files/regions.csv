@@ -1,34 +1,12 @@
 ﻿region,coders_equivs,description,endogenous,include_demand
-AB,alberta.a+alberta+ab,alberta,FALSE,TRUE
-BC,british columbia.a+british columbia+bc,british columbia,FALSE,TRUE
-MB,manitoba.a+manitoba+mb,manitoba,FALSE,TRUE
-NB,new brunswick.a+new brunswick+nb,new brunswick,FALSE,TRUE
-NLLAB,newfoundland and labrador.a+newfoundland and labrador.b+newfoundland and labrador+newfoundland island+newfoundland labrador+nllab+nl,newfoundland and labrador,FALSE,TRUE
-NS,nova scotia.a+nova scotia+ns,nova scotia,FALSE,TRUE
+AB,alberta.a+alberta+ab,alberta,TRUE,TRUE
+BC,british columbia.a+british columbia+bc,british columbia,TRUE,TRUE
+MB,manitoba.a+manitoba+mb,manitoba,TRUE,TRUE
+NB,new brunswick.a+new brunswick+nb,new brunswick,TRUE,TRUE
+NLLAB,newfoundland and labrador.a+newfoundland and labrador.b+newfoundland and labrador+newfoundland island+newfoundland labrador+nllab+nl,newfoundland and labrador,TRUE,TRUE
+NS,nova scotia.a+nova scotia+ns,nova scotia,TRUE,TRUE
 ON,ontario.b+ontario.a+ontario+ontario north+ontario south+on,ontario,TRUE,TRUE
-PEI,prince edward island.a+prince edward island+pei+pe,prince edward island,FALSE,TRUE
-QC,quebec.a+quebec.b+québec+quebec south+quebec north+qc-hvdc+qc+quebec,quebec,FALSE,TRUE
-SK,saskatchewan.a+saskatchewan+saskatchewan north+saskatchewan south+sk+saskatachewan,saskatchewan,FALSE,TRUE
-USA,isone(highgate),,,
-USA,isone(hvdc),,,
-USA,isone(maine),,,
-USA,maine,,,
-USA,michigan,,,
-USA,minnesota,,,
-USA,minnesota/dakota,,,
-USA,miso(dakota),,,
-USA,miso(michigan),,,
-USA,miso(minnesota),,,
-USA,montana,,,
-USA,new england,,,
-USA,new york,,,
-USA,new york niagara,,,
-USA,new york st. lawrence,,,
-USA,nmisa(northernmaine),,,
-USA,north dakota,,,
-USA,northern maine,,,
-USA,nyiso(hq),,,
-USA,nyiso(west),,,
-USA,us(montana),,,
-USA,us(northwest),,,
-USA,washington,,,
+PEI,prince edward island.a+prince edward island+pei+pe,prince edward island,TRUE,TRUE
+QC,quebec.a+quebec.b+québec+quebec south+quebec north+qc(hvdc)+qc+quebec+qc(highgate),quebec,TRUE,TRUE
+SK,saskatchewan.a+saskatchewan+saskatchewan north+saskatchewan south+sk+saskatachewan,saskatchewan,TRUE,TRUE
+USA,isone(highgate)+isone(hvdc)+isone(maine)+isone+maine+michigan+minnesota+minnesota / north dakota+miso(dakota)+miso(michigan)+miso(minnesota)+montana+new england+new york+new york niagara+new york st. lawrence+nmisa(northernmaine)+north dakota+nyiso(hq)dakota+northern +maine+nyiso(hq)+nyiso(west)+us(montana)+us(northwest)+washington,,,

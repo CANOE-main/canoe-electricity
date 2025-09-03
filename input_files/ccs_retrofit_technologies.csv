@@ -1,5 +1,5 @@
-﻿code,tech,generator,include,description,capture_rate,atb_display_name,atb_scenario
-coal_ccs_retrofit_90,E_COAL_CCS_RFIT_90,coal,TRUE,90% ccs retrofit for coal generation,0.9,Coal integrated retrofit 90%-CCS,Moderate
-coal_ccs_retrofit_95,E_COAL_CCS_RFIT_95,coal,TRUE,95% ccs retrofit for coal generation,0.95,Coal integrated retrofit 95%-CCS,Moderate
-ng_ccs_retrofit_90,E_NG_CCS_RFIT_90,ng_cc,TRUE,90% ccs retrofit for natural gas combined cycle generation,0.9,NG Combined Cycle H-Class integrated retrofit 90%-CCS,Moderate
-ng_ccs_retrofit_95,E_NG_CCS_RFIT_95,ng_cc,TRUE,95% ccs retrofit for natural gas combustion turbine generation,0.95,NG Combined Cycle H-Class integrated retrofit 95%-CCS,Moderate
+﻿code,tech,generator,include,description,capture_rate,atb_display_name,atb_scenario,atb_min_year
+coal_ccs_retrofit_90,E_COAL_CCS_RFIT_90,coal,TRUE,90% ccs retrofit for coal generation,0.9,Coal integrated retrofit 90%-CCS,Moderate,2022
+coal_ccs_retrofit_95,E_COAL_CCS_RFIT_95,coal,TRUE,95% ccs retrofit for coal generation,0.95,Coal integrated retrofit 95%-CCS,Moderate,2022
+ng_ccs_retrofit_90,E_NG_CCS_RFIT_90,ng_cc,TRUE,90% ccs retrofit for natural gas combined cycle generation,0.9,NG Combined Cycle H-Class integrated retrofit 90%-CCS,Moderate,2022
+ng_ccs_retrofit_95,E_NG_CCS_RFIT_95,ng_cc,TRUE,95% ccs retrofit for natural gas combustion turbine generation,0.95,NG Combined Cycle H-Class integrated retrofit 95%-CCS,Moderate,2022

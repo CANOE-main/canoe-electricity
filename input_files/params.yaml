@@ -9,7 +9,6 @@ period_step: 5
 
 # Must be in ascending order along with all data in tables!
 model_periods:
-  - 2021 # calibration year
   - 2025
   - 2030
   - 2035
@@ -21,36 +20,42 @@ base_year: 2020 # year to pull data from by default
 weather_year: 2018 # year to pull timeseries data for
 timezone: 'EST' # final model timezone
 
-global_discount_rate: 0.05
+data_id_prefix: 'ELCHR'
+data_version: '001'
 
 # Currency, data costs are exchanged and inflated in post processing
 final_currency: 'CAD' # Not configured to output currencies other than CAD yet
 final_currency_year: 2020
 inflation_index: 'gdp_deflator' # gdp_deflator, general_cpi, energy_and_petroleum, industrial, construction_non_residential
 
+global_discount_rate: 0.03 # A temporary fix to calculate VRE LCOEs # TODO calculate in original sutubra data
+
 # Set DSD to zero if less than this times hourly average (i.e. dsd(h) = 0 if dsd(h) < tol * mean(dsd))
 # For computational reasons
 dsd_tolerance: 0.02
 
-sqlite_schema: "canoe_schema.sql"
+sqlite_schema: "canoe_dataset_schema.sql"
 sqlite_database: "electricity.sqlite"
 excel_template: "Template spreadsheet (make a copy).xlsx"
 excel_output: "electricity.xlsx"
 
 ## Aggregation switches
+debug: false # Just prints out a bunch more info
 force_download: false # Forces downloading data again instead of using cached versions
 force_wipe_database: true # Wipes all data from the database prior to aggregation
+full_dataset: true # Tells us we're producing the full dataset to be filtered later NOT a functioning model
 include_boundary_interfaces: true # These are to/from regions outside the model. Structured as a demand out and a VRE in
 include_endogenous_interfaces: true # These are between modelled regions and are proper exchange technologies
 include_imports: true # Include dummy import techs
-include_emissions: true
+include_emissions: true #TODO no
 include_existing_capacity: true
 include_reserve_margin: true
-include_capacity_limits: false
+include_capacity_limits: false # not currently used
 include_storage: true
-include_provincial_demand: false # When true, can also be configured by-province in regions file
-include_ccs_retrofits: true # Emissions must also be included. Retrofitted techs must use ATB data for disaggregated emissions
-include_tech_fuel_cost: true # Attaches fuel costs to technologies by their variable costs
+include_provincial_demand: true # When true, can also be configured by-province in regions file
+include_ccs_retrofits: true # Emissions must also be included. Retrofitted techs must use ATB data for disaggregated emissions # TODO with and without
+include_tech_fuel_cost: true # Attaches fuel costs to technologies by their variable costs #TODO no
+include_new_wind_solar: true # For debugging, skips this very time consuming section
 clone_to_excel: false
 simplify_model: false # Builds the skeleton model. Not well implemented yet.
 show_plots: true # Useful for inspecting data / debugging
@@ -67,6 +72,14 @@ included_emissions:
 c2a_unit: "PJ/GWy"
 c2a: 31.536
 
+# Existing capacities smaller than this are just ignored, once aggregated to region-tech-vintage
+existing_capacity_threshold: 0.001 # GW
+
+# Solar PV capacity factors decrease by this factor year-on-year until EOL
+solar_degradation:
+  rate: 0.0085
+  reference: "Jordan, D. C., Kurtz, S. R., VanSant, K., & Newmiller, J. (2016). Compendium of photovoltaic degradation rates. Progress in Photovoltaics: Research and Applications, 24(7), 978-989. https://doi.org/10.1002/pip.2744"
+
 # Some notes for data in database
 intertie_fixed_flow_note: "Exogenous intertie fixed to <year> hourly flows"
 capacity_factor_note: "Hourly production, from IESO public data, divded by existing capacity in <year>"
@@ -78,13 +91,13 @@ coders:
   currency: 'CAD'
 
 atb:
-  url: 'https://oedi-data-lake.s3.amazonaws.com/ATB/electricity/csv/2023/ATBe.csv'
-  reference: "NREL. (2023). Annual Technology Baseline. Retrieved from https://atb.nrel.gov/"
-  master_url: "https://data.openei.org/files/5865/2023-ATB-Data_Master_v9.0.xlsx"
-  master_reference: "NREL. (2023). Annual Technology Baseline. Excel workbook sheet <sheet>. Retrieved from https://atb.nrel.gov/"
-  year: 2023
+  url: 'https://oedi-data-lake.s3.amazonaws.com/ATB/electricity/csv/2024/v3.0.0/ATBe.csv'
+  reference: "NREL. (2024). Annual Technology Baseline. <scenario> scenario. Retrieved from https://atb.nrel.gov/"
+  master_url: "https://data.openei.org/files/6006/2024_v3_Workbook.xlsx"
+  master_reference: "NREL. (2024). Annual Technology Baseline. Excel workbook sheet <sheet>. Retrieved from https://atb.nrel.gov/"
+  year: 2024
   core_metric_case: 'Market'
-  currency_year: 2021
+  currency_year: 2021 # TODO check
   currency: 'USD'
   tsv_headers: # translates technology specific variables headers
     'OutageRates(%)Forced': 'forced_outage_%'
@@ -102,15 +115,18 @@ capacity_credits:
   year: 2017
 
 sutubra_vre:
-  reference: "TODO"
+  reference: "Sutubra" # TODO
   year: 2024
   sort_solar_by: 'lcoe' # 'lcoe' or 'cf'
-  sort_wind_by: 'lcoe' # only 'lcoe' for now TODO
+  sort_wind_by: 'lcoe' # only 'lcoe' for now # TODO
+
+renewables_ninja:
+  reference: "Pfenninger, S., & Staffell, I. (2016). Long-term patterns of European PV output using 30 years of validated hourly reanalysis and satellite data. Energy, 114, 1251–1265. https://doi.org/10.1016/j.energy.2016.08.060"
 
 # IESO config for existing Ontario data
 ieso_reference: "IESO. (<year>). IESO public data. http://reports.ieso.ca/public/"
-ieso_rel_yyyy_mmm: "2023_Dec" # NOTE this report is updated often. Worth checking what the latest version is.
-ieso_rel_peak_type: "Normal" # 'Normal' or 'Extreme' peak
+ieso_rel_yyyy_mmm: "2025_Jun" # NOTE this report is updated often. Worth checking what the latest version is.
+ieso_rel_peak_type: "Firm" # 'Planned' or 'Firm' (as of 2025, may change)
 
 new_wind_techs:
   t1: "Land-Based Wind - Class 7 - Technology 1"

@@ -1,5 +1,5 @@
 ﻿atb_master_sheet,table,first_row,last_row,columns
 Biopower,tsv,30,33,J:W
 Coal_FE,tsv,41,48,J:V
-Natural Gas_FE,tsv,42,51,J:U
-Nuclear,tsv,35,38,J:W
+Natural Gas_FE,tsv,48,60,J:U
+Nuclear,tsv,35,39,J:U

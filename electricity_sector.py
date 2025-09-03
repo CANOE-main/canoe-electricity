@@ -32,7 +32,7 @@ def build_database():
     generators.aggregate()
     interfaces.aggregate()
 
-    currency_conversion.convert_currencies()
+    # currency_conversion.convert_currencies() # no longer used
     if config.params['simplify_model']: model_reduction.simplify_model()
     
     post_processing.process()
@@ -98,8 +98,8 @@ def prepare_test_model():
 
     for day in rep_days:
         for h in range(24):
-            curs.execute(f"""REPLACE INTO SegFrac(season_name, time_of_day_name, segfrac)
-                        VALUES('{day}', '{config.time.loc[h, 'time_of_day']}', {1/(24*6)})""")
+            curs.execute(f"""REPLACE INTO SegFrac(season_name, tod, segfrac)
+                        VALUES('{day}', '{config.time.loc[h, 'tod']}', {1/(24*6)})""")
 
     base_emis = 3200
     emis = {

@@ -42,9 +42,9 @@ def aggregate_storage(df_rtv: pd.DataFrame):
             if rtv['vint'] > period or rtv['vint'] + rtv['life'] <= period: continue
 
             curs.execute(f"""REPLACE INTO
-                        CapacityCredit(regions, periods, tech, vintage, cc_tech, cc_tech_notes, dq_est)
-                        VALUES('{rtv['region']}', {period}, '{rtv['tech']}', {rtv['vint']}, 1,
-                        'Assumed for now. Improved method on TODO list', 5)""")
+                        CapacityCredit(region, period, tech, vintage, credit, notes, dq_cred, data_id)
+                        VALUES('{rtv['region']}', {period}, '{rtv['tech']}', {rtv['vint']}, 0.9,
+                        'Assumed for now. Improved method on TODO list', 5, "{utils.data_id(rtv['region'])}")""")
             
     conn.commit()
     conn.close()
@@ -78,8 +78,8 @@ def aggregate_vre(df_rtv: pd.DataFrame, df_cf: pd.DataFrame, region: str, vint: 
         axes['hourly'].set_title(f"marginal hourly net load")
         axes['hourly'].set_xlabel(f"hour of year")
         axes['hourly'].set_ylabel(f"load (MW)")
-        axes['hourly'].plot(load, color=(0, 0, 1, 0.5))
-        axes['hourly'].plot(net_load, color=(0, 1, 0, 0.5), zorder=-5)
+        axes['hourly'].plot(range(len(load)), load, color=(0, 0, 1, 0.5))
+        axes['hourly'].plot(range(len(net_load)), net_load, color=(0, 1, 0, 0.5), zorder=-5)
 
         axes['dc'].set_title(f"marginal net load duration curve")
         axes['dc'].set_xlabel(f"sorted by hourly load (descending)")
@@ -117,7 +117,8 @@ def aggregate_vre(df_rtv: pd.DataFrame, df_cf: pd.DataFrame, region: str, vint: 
         axes['cc'].set_xlabel(f"new capacity bins")
         axes['cc'].set_ylabel(f"capacity credit (% capacity)")
         ccs = df_clusters['cc'].values.tolist()
-        axes['cc'].plot(range(len(ccs)+1), [exs_ccs["ON"].loc[tech_code, 'cc'], *ccs]) # TODO regionalise when better data is found
+        axes['cc'].plot(range(len(ccs)), ccs)
+        # axes['cc'].plot(range(len(ccs)+1), [exs_ccs["ON"].loc[tech_code, 'cc'], *ccs]) # TODO regionalise when better data is found
 
     ## Write capacity credits to database
     conn = sqlite3.connect(config.database_file)
@@ -129,7 +130,7 @@ def aggregate_vre(df_rtv: pd.DataFrame, df_cf: pd.DataFrame, region: str, vint: 
         "Assumed capacity bins are fully built out in order of LCOE, "
         "one type of renewable at a time, for now."
     )
-    reference = config.params['capacity_credits']['reference']
+    ref = config.refs.add('capacity_credits', config.params['capacity_credits']['reference'])
 
     for _idx, rtv in df_rtv.iterrows():
         for period in config.model_periods:
@@ -137,10 +138,10 @@ def aggregate_vre(df_rtv: pd.DataFrame, df_cf: pd.DataFrame, region: str, vint: 
             if rtv['vint'] > period or rtv['vint'] + rtv['life'] <= period: continue
 
             curs.execute(f"""REPLACE INTO
-                        CapacityCredit(regions, periods, tech, vintage, cc_tech, cc_tech_notes,
-                        reference, data_year, dq_est, dq_rel, dq_comp, dq_time, dq_geog, dq_tech)
+                        CapacityCredit(region, period, tech, vintage, credit, notes,
+                        data_source, dq_cred, dq_geog, dq_struc, dq_tech, dq_time, data_id)
                         VALUES('{rtv['region']}', {period}, '{rtv['tech']}', {rtv['vint']}, {rtv['cc']}, '{note}',
-                        '{reference}', {config.params['weather_year']}, 2, 2, 3, 1, 1, 1)""")
+                        '{ref.id}', 3, 1, 3, 1, 3, "{utils.data_id(rtv['region'])}")""")
 
     conn.commit()
     conn.close()

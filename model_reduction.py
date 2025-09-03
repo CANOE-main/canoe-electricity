@@ -24,7 +24,7 @@ def simplify_model():
 
     ## Get annual capacity factors for each type of generator for each region
     # Existing generators indexed by tech
-    _existing_json, df_existing, date_accessed = coders_api.get_data(end_point='generators')
+    df_existing, date_accessed = coders_api.get_data(end_point='generators')
     df_existing['tech'] = df_existing['gen_type'].str.lower().map(existing_map)
     df_existing['region'] = df_existing['operating_region'].str.lower().map(config.region_map)
     df_existing.set_index('tech', inplace=True)
@@ -91,11 +91,11 @@ def simplify_model():
     curs.execute(f"DELETE FROM time_periods WHERE flag == 'e'")
     curs.execute(f"INSERT OR IGNORE INTO time_periods(t_periods, flag) VALUES({config.model_periods[0]-1}, 'e')") # Needs one existing period apparently
     curs.execute(f"DELETE FROM time_season")
-    curs.execute(f"DELETE FROM time_of_day")
+    curs.execute(f"DELETE FROM tod")
     curs.execute(f"DELETE FROM SegFrac")
     curs.execute(f"INSERT OR IGNORE INTO time_season(t_season) VALUES('S01')")
-    curs.execute(f"INSERT OR IGNORE INTO time_of_day(t_day) VALUES('D01')")
-    curs.execute(f"INSERT OR IGNORE INTO SegFrac(season_name, time_of_day_name, segfrac) VALUES('S01', 'D01', 1)")
+    curs.execute(f"INSERT OR IGNORE INTO tod(t_day) VALUES('D01')")
+    curs.execute(f"INSERT OR IGNORE INTO SegFrac(season_name, tod_name, segfrac) VALUES('S01', 'D01', 1)")
             
     # Remove unused commodities
     curs.execute(f"DELETE FROM commodities WHERE comm_name == 'CO2eq'")

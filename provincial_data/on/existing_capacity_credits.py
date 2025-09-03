@@ -13,7 +13,8 @@ import pandas as pd
 
 def aggregate_capacity_credits(df_rtv: pd.DataFrame):
     
-    df_cc, note, reference, year = get_capacity_credits()
+    df_cc, note, year = get_capacity_credits()
+    ref = config.refs.get('cc')
 
     conn = sqlite3.connect(config.database_file)
     curs = conn.cursor()
@@ -23,11 +24,24 @@ def aggregate_capacity_credits(df_rtv: pd.DataFrame):
 
             if rtv['vint'] > period or rtv['vint'] + rtv['life'] <= period: continue
 
-            curs.execute(f"""REPLACE INTO
-                        CapacityCredit(regions, periods, tech, vintage, cc_tech, cc_tech_notes,
-                        reference, data_year, dq_rel, dq_comp, dq_time, dq_geog, dq_tech)
-                        VALUES('{rtv['region']}', {period}, '{rtv['tech']}', {rtv['vint']}, {float(df_cc.loc[rtv['tech_code']].iloc[0])}, '{note}',
-                        '{reference}', {year}, 1, 1, {utils.dq_time(year, period)}, 1, 1)""")
+            # For static reserve margin
+            curs.execute(
+                f"""REPLACE INTO
+                CapacityCredit(region, period, tech, vintage, credit, notes,
+                data_source, dq_cred, dq_geog, dq_struc, dq_tech, dq_time, data_id)
+                VALUES('{rtv['region']}', {period}, '{rtv['tech']}', {rtv['vint']}, {float(df_cc.loc[rtv['tech_code']].iloc[0])}, '{note}',
+                '{ref.id}', 1, 1, 2, 2, 3, "{utils.data_id(rtv['region'])}")"""
+            )
+            
+            # For dynamic reserve margin
+            for season in config.time['season'].unique():
+                curs.execute(
+                    f"""REPLACE INTO
+                    ReserveCapacityDerate(region, period, season, tech, vintage, factor, notes,
+                    data_source, dq_cred, dq_geog, dq_struc, dq_tech, dq_time, data_id)
+                    VALUES('{rtv['region']}', {period}, '{season}', '{rtv['tech']}', {rtv['vint']}, {float(df_cc.loc[rtv['tech_code']].iloc[0])}, '{note}',
+                    '{ref.id}', 1, 1, 2, 2, 3, "{utils.data_id(rtv['region'])}")"""
+                )
             
     conn.commit()
     conn.close()
@@ -44,13 +58,13 @@ def get_capacity_credits() -> tuple[pd.DataFrame, str, str, str]:
     yyyy, mmm = config.params['ieso_rel_yyyy_mmm'].split("_")
     peak_type: str = config.params['ieso_rel_peak_type']
 
-    rel_outlook_url = f"https://www.ieso.ca/-/media/Files/IESO/Document-Library/planning-forecasts/reliability-outlook/ReliabilityOutlookTables_{yyyy}{mmm}.ashx"
+    rel_outlook_url = f"https://www.ieso.ca/-/media/Files/IESO/Document-Library/planning-forecasts/reliability-outlook/ReliabilityOutlookTables_{yyyy}{mmm}.xlsx"
     note = f"Forecasted capability at {peak_type.lower()} summer peak divided by total installed capacity"
-    reference = f"IESO. ({yyyy}, {mmm}). Reliability Outlook. https://www.ieso.ca/en/Sector-Participants/Planning-and-Forecasting/Reliability-Outlook"
+    config.refs.add('cc', f"IESO. ({yyyy}, {mmm}). Reliability Outlook. https://www.ieso.ca/en/Sector-Participants/Planning-and-Forecasting/Reliability-Outlook")
 
     # Get the reliability outlook forecast peak table and calculate capacity credits
     df_rel = utils.get_data(rel_outlook_url, file_type='xlsx', cache_file_type='csv', sheet_name='Table 4.1', skiprows=4, header=0, nrows=6, index_col=0).astype(float)
-    df_rel['cc'] = df_rel[f"Forecast Capability at 2024 Summer Peak [{peak_type}] (MW)"] / df_rel['Total Installed Capacity\n(MW)']
+    df_rel['cc'] = df_rel[f"Forecast Capability at {yyyy} Summer Peak [{peak_type}] (MW)"] / df_rel['Total Installed Capacity\n(MW)']
     df_rel.index = df_rel.index.str.lower()
     df_cc = pd.DataFrame()
 
@@ -64,4 +78,4 @@ def get_capacity_credits() -> tuple[pd.DataFrame, str, str, str]:
     # Output to csv for readability
     df_cc.to_csv(this_dir + f"output_data/capacity_credits_{yyyy}_{mmm}.csv")
 
-    return df_cc, note, reference, int(yyyy)
+    return df_cc, note, int(yyyy)

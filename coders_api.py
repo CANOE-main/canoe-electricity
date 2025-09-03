@@ -18,7 +18,7 @@ import utils
 from setup import config
 
 cache = config.cache_dir
-coders_root = "http://206.12.95.102/"
+coders_root = "https://api.sesit.ca/"
 
 if not os.path.isdir(cache): os.mkdir(cache)
 
@@ -38,15 +38,13 @@ def _get_api_key():
 
 # Converts CODERS listed json data into pandas dataframe
 def _to_dataframe(json_data):
-    data_dict = dict()
-    [data_dict.update({idx: json_data[idx]}) for idx in range(len(json_data))]
-
-    # Convert to pandas dataframe
-    return pd.DataFrame.from_dict(data_dict).transpose()
+    return pd.DataFrame(index=range(len(json_data)), data=json_data)
 
 
 
-def get_data(end_point=None, **kwargs) -> tuple[list[dict], pd.DataFrame, str] | None:
+def get_data(end_point=None, **kwargs) -> tuple[pd.DataFrame, str] | None:
+
+    if config.debug: print("Getting CODERS data: ", end_point, kwargs)
 
     # Adding additional arguments to the endpoint, e.g. year, province, then finally api key
     end_point += '?'
@@ -55,28 +53,42 @@ def get_data(end_point=None, **kwargs) -> tuple[list[dict], pd.DataFrame, str] |
         for key in kwargs.keys():
             end_point += f"{key}={kwargs[key]}&"
 
+    clean_endpoint = utils.string_cleaner(end_point)
+
+    dates_file = cache + 'dates.csv'
+    if os.path.isfile(dates_file):
+        try:
+            df_dates = pd.read_csv(dates_file, index_col=0)
+        except:
+            df_dates = pd.Series(name='date_accessed')
+            df_dates.index = df_dates.index.rename('end_point')
+            df_dates.to_csv(dates_file)
+    else:
+        df_dates = pd.Series(name='date_accessed')
+        df_dates.index = df_dates.index.rename('end_point')
+
     # Filename for local json cache
-    json_cache = cache + utils.string_cleaner(end_point[0:-1]) + ".json"
+    csv_cache = cache + clean_endpoint + ".csv"
     
     # Initialising variables
     data_json = None
     date_accessed = str(date.today()) # date accessed is today if downloaded
 
     # If from_cache=True, try getting the json data from the local cache
-    if not config.params['force_download'] and os.path.isfile(json_cache):
+    if not config.params['force_download'] and os.path.isfile(csv_cache):
         
         try:
-            with open(json_cache, 'r') as in_file:
-                data_json = json.load(in_file)
+            df = pd.read_csv(csv_cache, index_col=0)
 
-            df = _to_dataframe(data_json)
-
-            # Data accessed for a cached file is the last edited time, not great but it'll do
-            date_accessed = str(datetime.fromtimestamp(os.path.getmtime(json_cache)).date())
+            # Data accessed for a cached file
+            try:
+                date_accessed = df_dates.loc[clean_endpoint].iloc[0]
+            except:
+                date_accessed = 'na'
 
             print(f"Got CODERS data from local cache, endpoint={end_point[0:-1]}")
 
-            return data_json, df, date_accessed
+            return df, date_accessed
         
         except:
             print(f"Could not get data from local cache for endpoint={end_point[0:-1]}. Downloading instead.")
@@ -84,7 +96,7 @@ def get_data(end_point=None, **kwargs) -> tuple[list[dict], pd.DataFrame, str] |
     elif config.params['force_download']:
         print(f"Params configured to force download. Downloading endpoint={end_point[0:-1]}.")
 
-    elif not os.path.isfile(json_cache):
+    elif not os.path.isfile(csv_cache):
         print(f"No local cache was found for endpoint={end_point[0:-1]}. Downloading instead.")
 
     # Didn't get from local cache so download from the CODERS API
@@ -101,15 +113,16 @@ def get_data(end_point=None, **kwargs) -> tuple[list[dict], pd.DataFrame, str] |
             print(f"Downloaded CODERS data, endpoint={end_point[0:-1]}")
 
             try:
-                with open(json_cache, "w") as outfile:
-                    json.dump(data_json, outfile)
+                df_dates.loc[clean_endpoint] = date_accessed
+                df_dates.to_csv(dates_file)
+                df.to_csv(csv_cache)
                 print(f"Cached CODERS data locally, endpoint={end_point[0:-1]}.")
             except:
                 print(f"Could not cache CODERS data locally, endpoint={end_point[0:-1]}")
 
-            return data_json, df, date_accessed
+            return df, date_accessed
 
     except:
         print(f"Could not retrieve CODERS data from {coders_root}{end_point}key={api_key}")
 
-        return None, None, date_accessed
+        return None, date_accessed

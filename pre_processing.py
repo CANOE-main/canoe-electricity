@@ -21,32 +21,31 @@ def process():
     """
 
     # Add default global discount rate. No index on this table so clear it first.
-    curs.execute("DELETE FROM GlobalDiscountRate")
-    curs.execute(f"INSERT INTO GlobalDiscountRate(rate) VALUES({config.params['global_discount_rate']})")
+    # curs.execute(f"UPDATE MetaDataReal SET value = {config.params['global_discount_rate']} WHERE element == 'global_discount_rate'")
 
     # Add future model periods
-    for period in [*config.model_periods, config.model_periods[-1] + config.params['period_step']]: 
+    for i, period in enumerate([*config.model_periods, config.model_periods[-1] + config.params['period_step']]): 
         curs.execute(f"""REPLACE INTO
-                    time_periods(t_periods, flag)
-                    VALUES({period}, "f")""")
+                    TimePeriod(sequence, period, flag)
+                    VALUES({i}, {period}, "f")""")
 
     # Add regions
     for region in config.model_regions:
         description = "outside model" if region == "EX" else config.regions.loc[region, 'description']
         curs.execute(f"""REPLACE INTO
-                        regions(regions, region_note)
-                        VALUES("{region}", "{description}")""")
+                    Region(region, notes)
+                    VALUES("{region}", "{description}")""")
     
     # Add seasons and times of day
-    curs.execute(f"DELETE FROM time_season")
-    curs.execute(f"DELETE FROM time_of_day")
+    curs.execute(f"DELETE FROM SeasonLabel")
+    curs.execute(f"DELETE FROM TimeOfDay")
     for h, row in config.time.iterrows():
         curs.execute(f"""INSERT OR IGNORE INTO
-                    time_season(t_season)
+                    SeasonLabel(season)
                     VALUES("{row['season']}")""")
         curs.execute(f"""INSERT OR IGNORE INTO
-                    time_of_day(t_day)
-                    VALUES("{row['time_of_day']}")""")
+                    TimeOfDay(sequence, tod)
+                    VALUES({h}, "{row['tod']}")""")
 
 
     conn.commit()

@@ -17,43 +17,11 @@ import zipfile
 import datetime
 import pytz
 import pickle
-
+import time
 
 
 # Identify existing or tech variants
 def is_exs(tech: str) -> bool: return tech.endswith('-EXS')
-
-
-
-def fill_references_table():
-
-    conn = sqlite3.connect(config.database_file)
-    curs = conn.cursor()
-
-    references = set()
-
-    # Get all tables
-    all_tables = [fetch[0] for fetch in curs.execute("SELECT name FROM sqlite_master WHERE type='table';").fetchall()]
-
-    for table in all_tables:
-        if table == 'references': continue
-
-        # For any table with a reference column
-        cols = [description[0] for description in curs.execute(f"SELECT * FROM '{table}'").description]
-        if 'reference' in cols:
-
-            # Get all the unique references and add them to the set
-            refs = curs.execute(f"SELECT DISTINCT reference FROM '{table}' WHERE length(reference) > 1")
-            for ref in refs:
-                for r in ref[0].split('; '):
-                    references.add(r)
-
-    # Add all references in the set to the references tables
-    for reference in references:
-        if len(reference) > 1: curs.execute(f"REPLACE INTO 'references'(reference) VALUES('{reference}')")
-
-    conn.commit()
-    conn.close()
 
 
 
@@ -82,6 +50,15 @@ def compr_db_url(region, table_number):
 
 
 
+# Gets a formatted dataset ID
+def data_id(text: str = ''):
+
+    id = f"{config.params['data_id_prefix']}{text}{config.params['data_version']}"
+    config.data_ids.add(id)
+    return id
+
+
+
 df_atb: pd.DataFrame = None
 def _initialise_atb():
 
@@ -90,7 +67,7 @@ def _initialise_atb():
     # ATB data. CRP years is arbitrary unless using LCOE so use 20
     df_atb = get_data(config.params['atb']['url'], dtype='unicode', index_col=0)
     df_atb = df_atb.loc[(df_atb['core_metric_case']==config.params['atb']['core_metric_case']) & (df_atb['crpyears'].astype(int)==20)]
-    config.references['atb'] = config.params['atb']['reference']
+    config.refs.add('atb', config.params['atb']['reference'])
 
 
 
@@ -114,13 +91,16 @@ def atb_data(tech_config: pd.Series, **kwargs) -> tuple[pd.DataFrame, str]:
         df: pd.DataFrame | pd.Series = df.loc[df[key] == str(value)]
         note += f" - {value}"
 
+    if config.debug: print(f"Getting ATB data for {note}")
+
     if len(df.index) == 1: return df['value'], note
     elif len(df.index) > 1: return df, note
-    else: return None, note
+    else:
+        return None, note
 
 
 
-def get_statcan_table(table, save_as=None, **kwargs):
+def get_statcan_table(table, save_as=None, filter:'function'=None, **kwargs):
 
     if save_as == None: save_as = f"statcan_{table}.csv"
     if os.path.splitext(save_as)[1] != ".csv": save_as += ".csv"
@@ -131,7 +111,7 @@ def get_statcan_table(table, save_as=None, **kwargs):
 
             df = pd.read_csv(config.cache_dir + save_as, index_col=0)
             
-            print(f"Got Statcan table {table} from local cache.")
+            print(f"Got Statcan table {table} ({save_as}) from local cache.")
             return df
         
         except Exception as e:
@@ -140,21 +120,23 @@ def get_statcan_table(table, save_as=None, **kwargs):
 
     # Make a request from the API for the table, returns response status and url for download
     url = f"https://www150.statcan.gc.ca/t1/wds/rest/getFullTableDownloadCSV/{table}/en"
-    response = requests.get(url).json()
+    response = requests.get(url)
 
     # If successful, download the table
-    if response['status'] == 'SUCCESS':
+    if response.ok:
 
         print(f"Downloading Statcan table {table}...")
 
         # Download and open the zip file
-        filehandle,_ = urllib.request.urlretrieve(response['object'])
+        filehandle,_ = urllib.request.urlretrieve(response.json()['object'])
         zip_file_object = zipfile.ZipFile(filehandle, 'r')
 
         # Read the table from inside the zip file
         from_file = zip_file_object.open(f"{table}.csv", "r")
         df = pd.read_csv(from_file, **kwargs)
         from_file.close()
+
+        if filter: df = filter(df)
 
         df.to_csv(config.cache_dir + save_as)
 
@@ -163,7 +145,7 @@ def get_statcan_table(table, save_as=None, **kwargs):
 
     else:
 
-        print(f"Request for {table} from Statcan failed. Status: {response['status']}")
+        print(f"Request for {table} from Statcan failed. Status: {response.status_code}")
         return None
     
 
@@ -299,7 +281,7 @@ def realign_timezone(df: pd.DataFrame, from_timezone:str=None, to_timezone:str=N
     df_shifted = pd.concat([df_shifted.iloc[n_shift:], df_shifted.iloc[0:n_shift]])
 
     return df_shifted
-    
+
 
 
 class database_converter:
@@ -392,3 +374,136 @@ class database_converter:
                 ws.append(row.values.tolist())
 
         wb.save(to_excel_file)
+
+
+
+class renewables_ninja_api:
+
+    api_base = 'https://www.renewables.ninja/api/'
+    weather_year = config.params['weather_year']
+
+    def __init__(cls):
+
+        with open(config.input_files + '/rninja_api_token.txt', 'r') as file:
+            cls.token = file.read()
+        if cls.token == '':
+            raise ValueError('Must add a renewables ninja API token to rninja_api_token.txt!')
+
+    def get_pv_data(
+        cls,
+        lat: float,
+        lon: float,
+        date_from: str = f'{weather_year}-01-01',
+        date_to: str = f'{weather_year}-12-31',
+        dataset: str = 'merra2',
+        capacity: float = 1.0,
+        system_loss: float = 0.1,
+        tracking: int = 0,
+        tilt: int = 35,
+        azim: int = 180,
+        format: str = 'json'
+    ) -> tuple[pd.DataFrame, dict]:
+        
+        while True:
+
+            s = requests.session()
+            # Send token header with each request
+            s.headers = {'Authorization': 'Token ' + cls.token}
+
+            url = cls.api_base + 'data/pv'
+
+            args = {
+                'lat': lat,
+                'lon': lon,
+                'date_from': date_from,
+                'date_to': date_to,
+                'dataset': dataset,
+                'capacity': capacity,
+                'system_loss': system_loss,
+                'tracking': tracking,
+                'tilt': tilt,
+                'azim': azim,
+                'format': format
+            }
+
+            try:
+                response = s.get(url, params=args)
+
+                if response.ok:
+                    json = response.json()
+                    df = pd.DataFrame(json['data']).transpose()
+                    df.index = df.index.rename('timestamp')
+                    df.index = pd.to_datetime(df.index.astype(int), unit='ms')
+                    df = realign_timezone(df, from_timezone='UTC')
+                    metadata = json['metadata']
+                    return df, metadata
+                else:
+                    print(
+                        f'Failed to get data from the Renewables Ninja API. Error code: {response.status_code}. '
+                        'Trying again in 72 seconds...'
+                    )
+            except Exception as e:
+                print(e)
+                print(
+                    f'Failed to get data from the Renewables Ninja API. '
+                    'Trying again in 72 seconds...'
+                )
+
+            time.sleep(3600/50) # something went wrong give it a sec
+
+
+    def get_wind_data(
+        cls,
+        lat: float,
+        lon: float,
+        date_from: str = f'{weather_year}-01-01',
+        date_to: str = f'{weather_year}-12-31',
+        capacity: float = 1.0,
+        height: int = 90,
+        turbine: str = 'Vestas V90 2000',
+        format: str = 'json'
+    ) -> tuple[pd.DataFrame, dict]:
+        
+        while True:
+
+            s = requests.session()
+            # Send token header with each request
+            s.headers = {'Authorization': 'Token ' + cls.token}
+
+            url = cls.api_base + 'data/wind'
+
+            args = {
+                'lat': lat,
+                'lon': lon,
+                'date_from': date_from,
+                'date_to': date_to,
+                'capacity': capacity,
+                'height': height,
+                'turbine': turbine,
+                'format': format
+            }
+
+            try:
+                response = s.get(url, params=args)
+
+                if response.ok:
+                    json = response.json()
+                    df = pd.DataFrame(json['data']).transpose()
+                    df.index = df.index.rename('timestamp')
+                    df.index = pd.to_datetime(df.index.astype(int), unit='ms')
+                    df = realign_timezone(df, from_timezone='UTC')
+                    metadata = json['metadata']
+                    return df, metadata
+                else:
+                    print(
+                        f'Failed to get data from the Renewables Ninja API. Error code: {response.status_code}. '
+                        'Trying again in 72 seconds...'
+                    )
+            except Exception as e:
+                print(e)
+                print(
+                    f'Failed to get data from the Renewables Ninja API. '
+                    'Trying again in 72 seconds...'
+                )
+
+            time.sleep(3600/50) # something went wrong give it a sec

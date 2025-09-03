@@ -11,20 +11,22 @@ import capacity_credits
 import os
 import sqlite3
 import utils
+from currency_conversion import conv_curr
 
 atb_year = config.params['atb']['year']
-atb_reference = config.params['atb']['reference']
-vre_year = config.params['sutubra_vre']['year']
-vre_reference = config.params['sutubra_vre']['reference']
+atb_ref = config.refs.add('atb', config.params['atb']['reference'])
+sutubra_year = config.params['sutubra_vre']['year']
+sutubra_ref = config.refs.add('sutubra_vre', config.params['sutubra_vre']['reference'])
+combo_ref = config.refs.add('atb_sut_vre', f"{atb_ref.citation}; {sutubra_ref.citation}")
 
 
 
 def aggregate(df_rtv: pd.DataFrame):
-
-    for region in config.model_regions:
-        df_rtv_reg = df_rtv.loc[df_rtv['region'] == region]
-        aggregate_wind(df_rtv_reg.loc[df_rtv_reg['tech_code'] == 'wind_onshore'].copy(), region)
-        aggregate_solar(df_rtv_reg.loc[df_rtv_reg['tech_code'] == 'solar'].copy(), region)
+    if config.params['include_new_wind_solar']:
+        for region in config.model_regions:
+            df_rtv_reg = df_rtv.loc[df_rtv['region'] == region]
+            aggregate_wind(df_rtv_reg.loc[df_rtv_reg['tech_code'] == 'wind_onshore'].copy(), region)
+            aggregate_solar(df_rtv_reg.loc[df_rtv_reg['tech_code'] == 'solar'].copy(), region)
 
 
 
@@ -39,7 +41,8 @@ def aggregate_wind(df_rtv: pd.DataFrame, region: str):
     ##############################################################
     """
 
-    wind_dir = os.path.realpath(os.path.dirname(__name__)) + f"/provincial_data/{region}/new_wind/"
+    # wind_dir = os.path.realpath(os.path.dirname(__name__)) + f"/provincial_data/{region}/new_wind/"
+    wind_dir = os.path.realpath(os.path.dirname(__name__)) + f"/provincial_data/on/new_wind/" # TODO other provinces data
     df_comp = pd.read_csv(wind_dir + 'Cluster Composition.csv', index_col=0)
     df_cf = pd.read_csv(wind_dir + 'Cluster Capacity Factors.csv', index_col=0)
     df_cf = utils.realign_timezone(df_cf, from_utc_offset=-4)
@@ -77,15 +80,20 @@ def aggregate_wind(df_rtv: pd.DataFrame, region: str):
         
         # Invest and fixed costs and capacity factor improvements from ATB weighted by capacity fractions of turbine class for each cluster
         df_invest[cluster] = sum([class_data[t]['cost_invest'].astype(float) * comp[f"Fraction {t.upper()}"] for t in class_data.keys()])
-        df_invest[cluster] += df_spur_cost.loc[cluster, 'WeightedAvgSpur (USD/MW)'] / 1000 # plus spur line cost for invest $/MW -> $/kW
+        df_invest[cluster] += df_spur_cost.loc[cluster, 'WeightedAvgSpur (USD/MW)'] # note this is actually in /kW, just a typo
 
         df_fixed[cluster] = sum([class_data[t]['cost_fixed'].astype(float) * comp[f"Fraction {t.upper()}"] for t in class_data.keys()])
 
         df_cf_index[cluster] = sum([class_data[t]['capacity_factor'].astype(float) * comp[f"Fraction {t.upper()}"] for t in class_data.keys()])
         df_cf_index[cluster] = df_cf_index[cluster] / df_cf_index[cluster]['2030'] # index to ATB wind base year, 2030
 
+    # Convert cost denominator units
     df_invest *= config.units.loc['cost_invest', 'atb_conv_fact']
     df_fixed *= config.units.loc['cost_fixed', 'atb_conv_fact']
+
+    # Convert currency
+    df_invest = conv_curr(df_invest, config.params['atb']['currency_year'], config.params['atb']['currency'])
+    df_fixed = conv_curr(df_fixed, config.params['atb']['currency_year'], config.params['atb']['currency'])
 
     # Sort by LCOE, then take top n clusters where n = n_bins in generator techs csv
     l = df_rtv.iloc[0]['life']
@@ -133,18 +141,17 @@ def aggregate_wind(df_rtv: pd.DataFrame, region: str):
 
 
     ## MaxCapacity
-    note = f"Wind characterisation work done by Sutubra. Grid cells binned by ascending LCOE (Sutubra, {vre_year})."
-    reference = vre_reference
+    note = f"Wind characterisation work done by Sutubra. Grid cells binned by ascending LCOE."
     for cluster, rt in df_rt.iterrows():
         for period in config.model_periods:
 
             max_cap = rt['max_cap'] / 1000 # TODO MW vs GW
 
             curs.execute(f"""REPLACE INTO
-                         MaxCapacity(regions, periods, tech, maxcap, maxcap_units, maxcap_notes,
-                         reference, data_year, dq_est, dq_rel, dq_comp, dq_time, dq_geog, dq_tech)
-                         VALUES("{rt['region']}", {period}, "{rt['tech']}", {max_cap}, "({config.units.loc['capacity','units']})", "{note}",
-                         "{reference}", {vre_year}, 1, 1, 1, {utils.dq_time(config.params['weather_year'], period)}, 1, 1)""")
+                         LimitCapacity(region, period, tech_or_group, operator, capacity, units, notes,
+                         data_source, dq_cred, dq_geog, dq_struc, dq_tech, dq_time, data_id)
+                         VALUES("{rt['region']}", {period}, "{rt['tech']}", "le", {max_cap}, "({config.units.loc['capacity','units']})", "{note}",
+                         "{sutubra_ref.id}", 1, 1, 1, 1, 3, "{utils.data_id(rt['region'])}")""")
 
     
     # Indexed by region, tech, and vintage
@@ -152,59 +159,60 @@ def aggregate_wind(df_rtv: pd.DataFrame, region: str):
 
         ## Efficiency
         curs.execute(f"""REPLACE INTO
-                    Efficiency(regions, input_comm, tech, vintage, output_comm, efficiency, eff_notes)
-                    VALUES("{region}", "{input_comm['commodity']}", "{rtv['tech']}", {rtv['vint']}, "{output_comm['commodity']}", 1,
-                    "({input_comm['units']}/{output_comm['units']}) dummy input so arbitrary")""")
+                    Efficiency(region, input_comm, tech, vintage, output_comm, efficiency, notes, data_id)
+                    VALUES("{rtv['region']}", "{input_comm['commodity']}", "{rtv['tech']}", {rtv['vint']}, "{output_comm['commodity']}", 1,
+                    "({input_comm['units']}/{output_comm['units']}) dummy input so arbitrary", "{utils.data_id(rtv['region'])}")""")
         
         
         ## CostInvest
         note = (
             f"NREL ATB {rtv['vint']} {invest_metric} (NREL, {atb_year}) weighted by capacity shares of turbine class "
-            f"plus estimated spur line cost from existing transmissions lines (Sutubra, {vre_year}). "
+            f"plus estimated spur line cost from existing transmissions lines. "
         )
-        reference = f"{atb_reference}; {vre_reference}"
 
         ci = df_invest.loc[str(rtv['vint']), cluster]
 
         curs.execute(f"""REPLACE INTO
-                    CostInvest(regions, tech, vintage, cost_invest_units, cost_invest_notes, data_cost_invest, data_cost_year, data_curr, reference, dq_est)
-                    VALUES("{region}", "{rtv['tech']}", {rtv['vint']}, "({config.units.loc['cost_invest', 'units']})", "{note}", {ci},
-                    {config.params['atb']['currency_year']}, "{config.params['atb']['currency']}", "{config.references['atb']}", 1)""")
+                    CostInvest(region, tech, vintage, cost, units, notes, data_source, dq_cred, data_id)
+                    VALUES("{rtv['region']}", "{rtv['tech']}", {rtv['vint']}, {ci}, "({config.units.loc['cost_invest', 'units']})", "{note}",
+                    "{combo_ref.id}", 1, "{utils.data_id(rtv['region'])}")""")
 
 
         ## CapacityFactorProcess
         note = (
-            f"Wind characterisation work done by Sutubra. Grid cells binned by ascending LCOE (Sutubra, {vre_year}). "
+            f"Wind characterisation work done by Sutubra. Grid cells binned by ascending LCOE. "
             f"Capacity factors further indexed to those in NREL ATB, by construction year with 2030 as base year. "
-            f"Bounded to <= 1 (NREL, {atb_year})."
+            f"Bounded to <= 1."
         )
-        reference = vre_reference
 
         cf: pd.Series = df_cf[str(cluster)] * df_cf_index.loc[str(rtv['vint']), cluster]
         cf = cf.clip(0,1)
-        tod_0 = config.time.iloc[0]['time_of_day']
-        dq_time = utils.dq_time(vre_year, rtv['vint'])
+        tod_0 = config.time.iloc[0]['tod']
         
+        data = []
         for h, time in config.time.iterrows():
-            
             # Only add extraneous entries for first hour of each day otherwise this table is several GB per region
-            if time['time_of_day'] == tod_0:
-                curs.execute(f"""REPLACE INTO
-                            CapacityFactorProcess(regions, season_name, time_of_day_name, tech, vintage, cf_process, cf_process_notes,
-                            reference, data_year, dq_est, dq_rel, dq_comp, dq_time, dq_geog, dq_tech)
-                            VALUES('{rtv['region']}', '{time['season']}', '{time['time_of_day']}', '{rtv['tech']}', {rtv['vint']}, {cf.iloc[h]}, '{note}',
-                            '{reference}', {vre_year}, 1, 1, 1, {dq_time}, 1, 1)""")
+            if time['tod'] == tod_0:
+                data.append([rtv['region'], time['season'], time['tod'], rtv['tech'], rtv['vint'],
+                            cf.iloc[h], note, sutubra_ref.id, 1, 1, 1, 1, 3, utils.data_id(rtv['region'])])
             else:
-                curs.execute(f"""REPLACE INTO
-                            CapacityFactorProcess(regions, season_name, time_of_day_name, tech, vintage, cf_process)
-                            VALUES('{rtv['region']}', '{time['season']}', '{time['time_of_day']}', '{rtv['tech']}', {rtv['vint']}, {cf.iloc[h]})""")
+                data.append([rtv['region'], time['season'], time['tod'], rtv['tech'], rtv['vint'],
+                            cf.iloc[h], None, None, None, None, None, None, None, utils.data_id(rtv['region'])])
+        
+        for period in config.model_periods:
+
+            if rtv['vint'] > period or rtv['vint'] + rtv['life'] <= period: continue
+
+            curs.executemany(f"""REPLACE INTO
+                        CapacityFactorProcess(region, period, season, tod, tech, vintage, factor, notes,
+                        data_source, dq_cred, dq_geog, dq_struc, dq_tech, dq_time, data_id)
+                        VALUES(?,{period},?,?,?,?,?,?,?,?,?,?,?,?,?)""", data)
 
             
         
 
         ## CostFixed
-        note = f"NREL ATB {rtv['vint']} Fixed O&M (NREL, {atb_year}) weighted by capacity shares of turbine class (Sutubra, {vre_year})."
-        reference = f"{atb_reference}; {vre_reference}"
+        note = f"NREL ATB {rtv['vint']} Fixed O&M (NREL, {atb_year}) weighted by capacity shares of turbine class."
         for period in config.model_periods:
 
             if rtv['vint'] > period or rtv['vint'] + rtv['life'] <= period: continue
@@ -212,9 +220,9 @@ def aggregate_wind(df_rtv: pd.DataFrame, region: str):
             cf = df_fixed.loc[str(rtv['vint']), cluster]
 
             curs.execute(f"""REPLACE INTO
-                        CostFixed(regions, periods, tech, vintage, cost_fixed_units, cost_fixed_notes, data_cost_fixed, data_cost_year, data_curr, reference, dq_est)
-                        VALUES("{region}", {period}, "{rtv['tech']}", {rtv['vint']}, "({config.units.loc['cost_fixed', 'units']})", "{note}", {cf},
-                        {config.params['atb']['currency_year']}, "{config.params['atb']['currency']}", "{config.references['atb']}", 1)""")
+                        CostFixed(region, period, tech, vintage, cost, units, notes, data_source, dq_cred, data_id)
+                        VALUES("{rtv['region']}", {period}, "{rtv['tech']}", {rtv['vint']}, {cf}, "({config.units.loc['cost_fixed', 'units']})", "{note}",
+                        "{combo_ref.id}", 1, "{utils.data_id(rtv['region'])}")""")
 
 
     conn.commit()
@@ -235,7 +243,8 @@ def aggregate_solar(df_rtv: pd.DataFrame, region: str):
     ##############################################################
     """
 
-    solar_dir = os.path.realpath(os.path.dirname(__name__)) + f"/provincial_data/{region}/new_solar/"
+    # solar_dir = os.path.realpath(os.path.dirname(__name__)) + f"/provincial_data/{region}/new_solar/"
+    solar_dir = os.path.realpath(os.path.dirname(__name__)) + f"/provincial_data/on/new_solar/" # TODO other provinces
 
     df_bins = pd.read_csv(solar_dir + 'Solar Resource Summary.csv', index_col=False).astype(float)
     
@@ -258,17 +267,22 @@ def aggregate_solar(df_rtv: pd.DataFrame, region: str):
     invest_metric = config.params['atb']['cost_invest_metric'] # which ATB metric to use for cost invest
 
     ## Get ATB projections for each bin
-    invest, invest_note = utils.atb_data(solar_config, core_metric_parameter=invest_metric)
-    fixed, fixed_note = utils.atb_data(solar_config, core_metric_parameter='Fixed O&M')
+    df_invest, invest_note = utils.atb_data(solar_config, core_metric_parameter=invest_metric)
+    df_fixed, fixed_note = utils.atb_data(solar_config, core_metric_parameter='Fixed O&M')
     cf_index, cf_note = utils.atb_data(solar_config, core_metric_parameter='CF')
 
-    invest = invest.set_index('core_metric_variable')['value'].astype(float)
-    fixed = fixed.set_index('core_metric_variable')['value'].astype(float)
+    df_invest = df_invest.set_index('core_metric_variable')['value'].astype(float)
+    df_fixed = df_fixed.set_index('core_metric_variable')['value'].astype(float)
     cf_index = cf_index.set_index('core_metric_variable')['value'].astype(float)
     cf_index /= cf_index['2022'] # index to base year for solar, 2022
 
-    invest *= config.units.loc['cost_invest', 'atb_conv_fact']
-    fixed *= config.units.loc['cost_fixed', 'atb_conv_fact']
+    # Convert cost denominator units
+    df_invest *= config.units.loc['cost_invest', 'atb_conv_fact']
+    df_fixed *= config.units.loc['cost_fixed', 'atb_conv_fact']
+
+    # Convert currency
+    df_invest = conv_curr(df_invest, config.params['atb']['currency_year'], config.params['atb']['currency'])
+    df_fixed = conv_curr(df_fixed, config.params['atb']['currency_year'], config.params['atb']['currency'])
     
     # Aggregate capacity credits based on projected capacity factor
     for vint in df_rtv['vint'].unique():
@@ -299,20 +313,28 @@ def aggregate_solar(df_rtv: pd.DataFrame, region: str):
     input_comm = config.commodities.loc[solar_config['in_comm']]
     output_comm = config.commodities.loc[solar_config['out_comm']]
 
+    deg_rate = config.params['solar_degradation']['rate']
+    deg_ref = config.params['solar_degradation']['reference']
+    cf_note = (
+        f"Wind characterisation work done by Sutubra. Grid cells binned by ascending LCOE. "
+        f"Capacity factors further indexed to those in NREL ATB, by construction year with 2030 as base year. "
+        f"Bounded to <= 1. Finally, assume {deg_rate*100:.2f}% degradation per year."
+    )
+    cf_ref = config.refs.add("solar_cf", f"{sutubra_ref.citation}; {deg_ref}")
+
 
     ## MaxCapacity
-    note = f"Solar characterisation work done by Sutubra. Grid cells sorted by ascending LCOE (Sutubra, {vre_year})."
-    reference = vre_reference
+    note = f"Solar characterisation work done by Sutubra. Grid cells sorted by ascending LCOE."
     for cluster, rt in df_rt.iterrows():
         for period in config.model_periods:
 
             max_cap = rt['max_cap'] / 1000 # TODO MW vs GW
 
             curs.execute(f"""REPLACE INTO
-                         MaxCapacity(regions, periods, tech, maxcap, maxcap_units, maxcap_notes,
-                         reference, data_year, dq_est, dq_rel, dq_comp, dq_time, dq_geog, dq_tech)
-                         VALUES("{rt['region']}", {period}, "{rt['tech']}", {max_cap}, "({config.units.loc['capacity','units']})", "{note}",
-                         "{reference}", {vre_year}, 1, 1, 1, {utils.dq_time(config.params['weather_year'], period)}, 1, 1)""")
+                         LimitCapacity(region, period, tech_or_group, operator, capacity, units, notes,
+                         data_source, dq_cred, dq_geog, dq_struc, dq_tech, dq_time, data_id)
+                         VALUES("{rt['region']}", {period}, "{rt['tech']}", "le", {max_cap}, "({config.units.loc['capacity','units']})", "{note}",
+                         "{sutubra_ref.id}", 1, 1, 1, 1, 3, "{utils.data_id(rt['region'])}")""")
 
             
     # Indexed by region, tech, and vintage
@@ -322,68 +344,68 @@ def aggregate_solar(df_rtv: pd.DataFrame, region: str):
 
         ## Efficiency
         curs.execute(f"""REPLACE INTO
-                    Efficiency(regions, input_comm, tech, vintage, output_comm, efficiency, eff_notes)
-                    VALUES("{region}", "{input_comm['commodity']}", "{rtv['tech']}", {rtv['vint']}, "{output_comm['commodity']}", 1,
-                    "({input_comm['units']}/{output_comm['units']}) dummy input so arbitrary")""")
+                    Efficiency(region, input_comm, tech, vintage, output_comm, efficiency, notes, data_id)
+                    VALUES("{rtv['region']}", "{input_comm['commodity']}", "{rtv['tech']}", {rtv['vint']}, "{output_comm['commodity']}", 1,
+                    "({input_comm['units']}/{output_comm['units']}) dummy input so arbitrary", "{utils.data_id(rtv['region'])}")""")
         
         
         ## CostInvest
         note = (
             f"{invest_note}. "
-            f"Plus estimated spur line cost from existing transmissions lines (Sutubra, {vre_year}). "
+            f"Plus estimated spur line cost from existing transmissions lines. "
         )
-        reference = f"{atb_reference}; {vre_reference}"
 
-        ci = invest[str(rtv['vint'])] + bin_config['Interconnection Cost ($/kW)']
+        cost_invest = df_invest[str(rtv['vint'])] + bin_config['Interconnection Cost ($/kW)']
+        cost_invest = conv_curr(cost_invest, config.params['atb']['currency_year'], config.params['atb']['currency'])
 
         curs.execute(f"""REPLACE INTO
-                    CostInvest(regions, tech, vintage, cost_invest_units, cost_invest_notes, data_cost_invest, data_cost_year, data_curr, reference, dq_est)
-                    VALUES("{region}", "{rtv['tech']}", {rtv['vint']}, "({config.units.loc['cost_invest', 'units']})", "{note}", {ci},
-                    {config.params['atb']['currency_year']}, "{config.params['atb']['currency']}", "{config.references['atb']}", 1)""")
+                    CostInvest(region, tech, vintage, cost, units, notes, data_source, dq_cred, data_id)
+                    VALUES("{rtv['region']}", "{rtv['tech']}", {rtv['vint']}, {cost_invest}, "({config.units.loc['cost_invest', 'units']})", "{note}",
+                    "{combo_ref.id}", 1, "{utils.data_id(rtv['region'])}")""")
 
 
         ## CapacityFactorProcess
-        note = (
-            f"Wind characterisation work done by Sutubra. Grid cells binned by ascending LCOE (Sutubra, {vre_year}). "
-            f"Capacity factors further indexed to those in NREL ATB, by construction year with 2030 as base year. "
-            f"Bounded to <= 1 (NREL, {atb_year})."
-        )
-        reference = vre_reference
-            
         cf: pd.Series = df_cf[str(cluster)] * cf_index[str(rtv['vint'])]
         cf = cf.clip(0,1)
-        tod_0 = config.time.iloc[0]['time_of_day']
-        dq_time = utils.dq_time(vre_year, rtv['vint'])
-        
-        for h, time in config.time.iterrows():
+        tod_0 = config.time.iloc[0]['tod']
 
-            if time['time_of_day'] == tod_0:
-                curs.execute(f"""REPLACE INTO
-                            CapacityFactorProcess(regions, season_name, time_of_day_name, tech, vintage, cf_process, cf_process_notes,
-                            reference, data_year, dq_est, dq_rel, dq_comp, dq_time, dq_geog, dq_tech)
-                            VALUES('{rtv['region']}', '{time['season']}', '{time['time_of_day']}', '{rtv['tech']}', {rtv['vint']}, {cf.iloc[h]}, '{note}',
-                            '{reference}', {vre_year}, 1, 1, 1, {dq_time}, 1, 1)""")
-            else:
-                curs.execute(f"""REPLACE INTO
-                            CapacityFactorProcess(regions, season_name, time_of_day_name, tech, vintage, cf_process,
-                            data_year, dq_est, dq_rel, dq_comp, dq_time, dq_geog, dq_tech)
-                            VALUES('{rtv['region']}', '{time['season']}', '{time['time_of_day']}', '{rtv['tech']}', {rtv['vint']}, {cf.iloc[h]},
-                            {vre_year}, 1, 1, 1, {dq_time}, 1, 1)""")
-        
-
-        ## CostFixed
-        note = fixed_note
-        reference = f"{atb_reference}; {vre_reference}"
+        data = []
         for period in config.model_periods:
 
             if rtv['vint'] > period or rtv['vint'] + rtv['life'] <= period: continue
 
-            cf = fixed[str(rtv['vint'])]
+            deg_fact = (1.0 - deg_rate) ** (period - rtv['vint'])
+
+            for h, time in config.time.iterrows():
+
+                _cf = cf.iloc[h]*deg_fact
+
+                # Only add extraneous entries for first hour of each day otherwise this table is several GB per region
+                if time['tod'] == tod_0:
+                    data.append([rtv['region'], period, time['season'], time['tod'], rtv['tech'], rtv['vint'],
+                                _cf, cf_note, cf_ref.id, 1, 1, 1, 1, 3, utils.data_id(rtv['region'])])
+                else:
+                    data.append([rtv['region'], period, time['season'], time['tod'], rtv['tech'], rtv['vint'],
+                                _cf, None, None, None, None, None, None, None, utils.data_id(rtv['region'])])
+        
+        curs.executemany(f"""REPLACE INTO
+                    CapacityFactorProcess(region, period, season, tod, tech, vintage, factor, notes,
+                    data_source, dq_cred, dq_geog, dq_struc, dq_tech, dq_time, data_id)
+                    VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""", data)
+        
+
+        ## CostFixed
+        for period in config.model_periods:
+
+            if rtv['vint'] > period or rtv['vint'] + rtv['life'] <= period: continue
+
+            cost_fixed = df_fixed[str(rtv['vint'])]
+            cost_fixed = conv_curr(cost_fixed, config.params['atb']['currency_year'], config.params['atb']['currency'])
 
             curs.execute(f"""REPLACE INTO
-                        CostFixed(regions, periods, tech, vintage, cost_fixed_units, cost_fixed_notes, data_cost_fixed, data_cost_year, data_curr, reference, dq_est)
-                        VALUES("{region}", {period}, "{rtv['tech']}", {rtv['vint']}, "({config.units.loc['cost_fixed', 'units']})", "{note}", {cf},
-                        {config.params['atb']['currency_year']}, "{config.params['atb']['currency']}", "{config.references['atb']}", 1)""")
+                        CostFixed(region, period, tech, vintage, cost, units, notes, data_source, dq_cred, data_id)
+                        VALUES("{rtv['region']}", {period}, "{rtv['tech']}", {rtv['vint']}, {cost_fixed}, "({config.units.loc['cost_fixed', 'units']})",
+                        "{fixed_note}", "{atb_ref.id}", 1, "{utils.data_id(rtv['region'])}")""")
 
 
     conn.commit()

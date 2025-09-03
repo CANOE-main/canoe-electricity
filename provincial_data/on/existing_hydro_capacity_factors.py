@@ -6,6 +6,7 @@ Written by Ian David Elder for the CANOE model.
 
 import pandas as pd
 from setup import config
+from setup import reference
 import os
 import sqlite3
 import numpy as np
@@ -24,11 +25,14 @@ weather_year = config.params['weather_year']
 
 def aggregate_cfs(df_rtv: pd.DataFrame):
     
-    cfs, note, reference = get_capacity_factors(weather_year)
+    cfs, note, ref = get_capacity_factors(weather_year)
 
     conn = sqlite3.connect(config.database_file)
     curs = conn.cursor()
 
+    # CapacityFactorTech has no vintage index but still need to validate vintages
+    df_rtv['end'] = df_rtv['vint'] + df_rtv['life']
+    df_end = df_rtv.groupby(['region','tech','tech_code'])['end'].max()
     df_rt = df_rtv.groupby(['region','tech','tech_code']).sum(numeric_only=True).reset_index()
 
     # Run of river hydro
@@ -36,52 +40,50 @@ def aggregate_cfs(df_rtv: pd.DataFrame):
         
         # Summing curtailed generation to get net load for capacity credit calculations
         config.exs_vre_gen[rt['region']] += np.array(cfs['hydro_run']) * rt['capacity']
-                           
-        for h, time in config.time.iterrows():
 
-            if time['time_of_day'] == config.time.iloc[0]['time_of_day']:
-                _note = note
-                _ref = reference
-            else: _note=_ref=''
+        data = []
+        for period in config.model_periods:
 
-            curs.execute(f"""REPLACE INTO
-                        CapacityFactorTech(regions, season_name, time_of_day_name, tech, cf_tech, cf_tech_notes,
-                        reference, data_year, dq_rel, dq_comp, dq_time, dq_geog, dq_tech)
-                        VALUES('{rt['region']}', '{time['season']}', '{time['time_of_day']}', '{rt['tech']}', {cfs['hydro_run'][h]}, '{_note}',
-                        '{_ref}', {weather_year}, 1, 1, 1, 1, 1)""")
+            # Check that there exists an existing vintage that will exist in this period
+            if df_end.loc[(rt['region'], rt['tech'], rt['tech_code'])] <= period: continue
             
-    min_note = note + " Summed per day and multiplied by existing capacity. Times 0.99 for computational slack"
-    max_note = note + " Summed per day and multiplied by existing capacity. Times 1.01 for computational slack"
+            for h, time in config.time.iterrows():
+
+                if time['tod'] == config.time.iloc[0]['tod']:
+                    data.append([rt['region'], period, time['season'], time['tod'], rt['tech'], cfs['hydro_run'][h], note,
+                            ref.id, 1, 1, 1, 1, 3, utils.data_id(rt['region'])])
+                else:
+                    data.append([rt['region'], period, time['season'], time['tod'], rt['tech'], cfs['hydro_run'][h],
+                                 None, None, None, None, None, None, None, utils.data_id(rt['region'])])
+                 
+        curs.executemany(f"""REPLACE INTO
+                        CapacityFactorTech(region, period, season, tod, tech, factor, notes,
+                        data_source, dq_cred, dq_geog, dq_struc, dq_tech, dq_time, data_id)
+                        VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)""", data)
+            
+    note += " Averaged over each day."
             
     # Daily storage hydro
     # This will break if daily hydro isn't aggregated to a single vintage
     for _idx, rt in df_rt.loc[df_rt['tech_code'] == 'hydro_daily'].iterrows():
-        for seas in config.time['season'].unique():
+        for period in config.model_periods:
+            for seas in config.time['season'].unique():
 
-            hours = config.time.loc[config.time['season'] == seas].index.to_list()
-
-            cap = rt['capacity']
-            act_dly = cap * sum(cfs['hydro_daily'][min(hours):max(hours)+1]) * 3.6E-3 # GWh to PJ
-
-            for period in config.model_periods:
+                hours = config.time.loc[config.time['season'] == seas].index.to_list()
+                cf_dly = np.mean(cfs['hydro_daily'][min(hours):max(hours)+1])
 
                 curs.execute(f"""REPLACE INTO
-                            MinSeasonalActivity(regions, periods, season_name, tech, minact, minact_units, minact_notes,
-                            reference, data_year, dq_rel, dq_comp, dq_time, dq_geog, dq_tech)
-                            VALUES('{rt['region']}', {period}, '{seas}', '{rt['tech']}', {act_dly*0.99}, '(PJ)', '{min_note}',
-                            '{reference}', {weather_year}, 1, 1, 1, 1, 1)""")
-                curs.execute(f"""REPLACE INTO
-                            MaxSeasonalActivity(regions, periods, season_name, tech, maxact, maxact_units, maxact_notes,
-                            reference, data_year, dq_rel, dq_comp, dq_time, dq_geog, dq_tech)
-                            VALUES('{rt['region']}', {period}, '{seas}', '{rt['tech']}', {act_dly*1.01}, '(PJ)', '{max_note}',
-                            '{reference}', {weather_year}, 1, 1, 1, 1, 1)""")
+                            LimitSeasonalCapacityFactor(region, period, season, tech, operator, factor, notes,
+                            data_source, dq_cred, dq_geog, dq_struc, dq_tech, dq_time, data_id)
+                            VALUES('{rt['region']}', {period}, '{seas}', '{rt['tech']}', "le", {cf_dly}, '{note}',
+                            '{ref.id}', 1, 1, 1, 1, 3, "{utils.data_id(rt['region'])}")""")
     
     conn.commit()
     conn.close()
 
 
 
-def get_capacity_factors(year: int) -> tuple[dict[str, list[float]], str, str]:
+def get_capacity_factors(year: int) -> tuple[dict[str, list[float]], str, reference]:
 
     if year < 2019: cf_dly, cf_ror = get_annual_cfs_before_2019(year)
     elif year > 2019: cf_dly, cf_ror = get_annual_cfs_after_2019(year)
@@ -114,9 +116,9 @@ def get_capacity_factors(year: int) -> tuple[dict[str, list[float]], str, str]:
 
     # Referencing
     note = f"{year} hourly generator output divided by capability."
-    reference = f"{config.params['ieso_reference'].replace('<year>', str(year))}GenOutputCapabilityMonth/"
+    ref = config.refs.add('ieso_exs_monthly', f"{config.params['ieso_reference'].replace('<year>', str(year))}GenOutputCapabilityMonth/")
 
-    return {'hydro_daily': cf_dly, 'hydro_run': cf_ror}, note, reference
+    return {'hydro_daily': cf_dly, 'hydro_run': cf_ror}, note, ref
 
 
 def get_annual_cfs_before_2019(year) -> tuple[list[float], list[float]]:
@@ -157,7 +159,7 @@ def get_annual_cfs_before_2019(year) -> tuple[list[float], list[float]]:
 
     # CF is total output over total available capacity per hour
     df_cf = df_out / df_cap
-    df_cf.index = pd.date_range('2018-01-01', '2019-01-01', freq='1H', inclusive='left', tz=config.params['timezone']) # timezone index
+    df_cf.index = pd.date_range('2018-01-01', '2019-01-01', freq='1h', inclusive='left', tz=config.params['timezone']) # timezone index
     df_cf.to_csv(this_dir + "output_data/cf_all_hydro_2018.csv") # save to file
 
 

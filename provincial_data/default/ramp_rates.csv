@@ -1,0 +1,13 @@
+﻿code,hourly_rate
+biomass,0.10
+biomass_cg,0.10
+coal,0.10
+coal_ccs,0.10
+diesel_st,0.25
+ng_cc,0.25
+ng_ccs,0.25
+ng_cg,0.25
+nuclear_candu,0.01
+nuclear_pwr,0.01
+nuclear_smr,0.01
+oil_st,0.25

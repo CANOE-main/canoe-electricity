@@ -31,6 +31,16 @@ It will download a large number of files on the first run (as of now, 141 MB) bu
 
 
 
+=========================
+ Annual Update Checklist
+=========================
+
+1. Make a copy of the data cache and remove all its contents
+2. Update any links in the params.yaml file for updated data sources
+3. Fix any bugs that emerge
+
+
+
 ============
  Components
 ============

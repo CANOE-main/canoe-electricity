@@ -2,7 +2,7 @@ metric,coders_units,atb_units,units,coders_conv_fact,atb_conv_fact
 cost_invest,$/kW,$/kW,M$/GW,1,1
 cost_fixed,$/MWy,$/kWy,M$/GWy,0.001,1
 cost_variable,$/MWh,$/MWh,M$/PJ,0.277778,0.277778
-cost_fuel,$/GJ,$/MWh,M$/PJ,1,0.2777778
+cost_fuel,$/MMBtu,$/MWh,M$/PJ,0.947086,0.2777778
 capacity,MW,kW,GW,0.001,1.00E-06
 co2_emissions,t/MWh,lbs/MMbtu,kt/PJ,277.7778,0.429922
 so2_emissions,,lbs/MMbtu,t/PJ,,429.922
@@ -10,6 +10,6 @@ nox_emissions,,lbs/MMbtu,t/PJ,,429.922
 hg_emissions,,lbs/MMbtu,g/PJ,,4.30E+08
 ramp_rate,cap_frac/min,cap_frac/min,cap_frac/hour,60,60
 activity,MWh,MWh,PJ,3.60E-06,3.60E-06
-heat_rate,,MMBtu_MWh,%,,0.29307107
+heat_rate,MMBtu_MWh,MMBtu_MWh,%,0.29307107,0.29307107
 intertie_capacity,MWh/h,,GW,0.001,
 demand,GWh/y,,PJ/y,3.60E-03,

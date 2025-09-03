@@ -1,0 +1,11 @@
+,province,reserve_requirements_percent,system_line_losses_percent,water_rentals_CAD_per_MWh,notes
+0,Alberta,0.1500,0.0400,0.0000,
+1,British Columbia,0.1200,0.0700,6.5643,
+2,Manitoba,0.1200,0.0900,3.1100,Manitoba water use rental rate is $20.32/hP-year =$3.11/MWh
+3,New Brunswick,0.2000,0.0500,0.0000,
+4,Newfoundland and Labrador,0.1300,0.0800,3.3333,
+5,Nova Scotia,0.2100,0.0660,0.0000,
+6,Ontario,0.1900,0.0800,5.6000,"Ontario water rental determined as 4.5% + 9.5% = 14% (Electricity Act, 1998, s.92.1) of $40/MWh (Taxes and Charges on Hydro-Electric Generating Stations, O Reg 124/02, s.2)"
+7,Prince Edward Island,0.2100,0.0640,0.0000,
+8,Québec,0.0950,0.0740,3.8956,
+9,Saskatchewan,0.1300,0.0800,6.0070,

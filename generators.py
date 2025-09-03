@@ -13,6 +13,8 @@ import traceback
 import capacity_credits
 import capacity_factors
 import new_wind_solar
+import ramp_rates
+from currency_conversion import conv_curr
 
 df_generic: pd.DataFrame
 df_cost: pd.DataFrame
@@ -51,16 +53,16 @@ def initialise_data():
     global df_generic, df_cost
 
     # CODERS capital cost evolution
-    _cost_json, df_cost, date_accessed = coders_api.get_data(end_point='generation_cost_evolution')
-    config.references['generation_cost_evolution'] = config.params['coders']['reference'].replace("<date>", date_accessed).replace("<table>","generation_cost_evolution")
+    df_cost, date_accessed = coders_api.get_data(end_point='generation_cost_evolution')
+    config.refs.add('generation_cost_evolution', config.params['coders']['reference'].replace("<date>", date_accessed).replace("<table>","generation_cost_evolution"))
     df_cost['gen_type'] = df_cost['gen_type'].str.lower()
-    df_cost.set_index('gen_type', inplace=True)
+    df_cost = df_cost.set_index('gen_type')
 
     # CODERS generic generator data
-    _generic_json, df_generic, date_accessed = coders_api.get_data(end_point='generation_generic')
-    config.references['generation_generic'] = config.params['coders']['reference'].replace("<date>", date_accessed).replace("<table>","generation_generic")
+    df_generic, date_accessed = coders_api.get_data(end_point='generation_generic')
+    config.refs.add('generation_generic', config.params['coders']['reference'].replace("<date>", date_accessed).replace("<table>","generation_generic"))
     df_generic['gen_type'] = df_generic['gen_type'].str.lower()
-    df_generic.set_index('gen_type', inplace=True)
+    df_generic = df_generic.set_index('gen_type')
 
 
 
@@ -95,8 +97,8 @@ def aggregate_new_generators():
 
             ## Technologies
             curs.execute(f"""REPLACE INTO
-                        technologies(tech, flag, sector, tech_desc)
-                        VALUES("{new_techs[n]}", "{tech_config['flag']}", "electricity", "{tech_config['description']} - new")""")
+                        Technology(tech, flag, sector, description, data_id)
+                        VALUES("{new_techs[n]}", "{tech_config['flag']}", "electricity", "{tech_config['description']} - new", "{utils.data_id()}")""")
             
             for region in config.model_regions:
                 for period in config.model_periods:
@@ -144,6 +146,9 @@ def aggregate_new_storage():
 
         if not storage_config['include_new']: continue
 
+        citation = config.params['atb']['reference'].replace('<scenario>', storage_config['atb_scenario'])
+        ref = config.refs.add(f"atb_storage_{storage_config['atb_scenario']}", citation)
+
         # Commodity data
         input_comm = config.commodities.loc[storage_config['in_comm']]
         output_comm = config.commodities.loc[storage_config['out_comm']]
@@ -153,24 +158,24 @@ def aggregate_new_storage():
 
         ## Technologies
         curs.execute(f"""REPLACE INTO
-                    technologies(tech, flag, sector, tech_desc)
-                    VALUES("{tech}", "ps", "electricity", "{storage_config['description']} - new")""")
+                    Technology(tech, flag, sector, description, data_id)
+                    VALUES("{tech}", "ps", "electricity", "{storage_config['description']} - new", "{utils.data_id()}")""")
         
         for region in config.model_regions:
 
             ## StorageDuration
             curs.execute(f"""REPLACE INTO
-                        StorageDuration(regions, tech, duration, duration_notes)
-                        VALUES("{region}", "{tech}", "{storage_config['duration']}", "(hours of storage)")""")
+                        StorageDuration(region, tech, duration, notes, data_id)
+                        VALUES("{region}", "{tech}", "{storage_config['duration']}", "(hours of storage)", "{utils.data_id(region)}")""")
         
             for vint in config.model_periods:
                 rtv.append({'region': region, 'tech_code': code, 'tech': tech, 'vint': vint})
 
                 ## Efficiency
                 curs.execute(f"""REPLACE INTO
-                            Efficiency(regions, input_comm, tech, vintage, output_comm, efficiency, eff_notes, reference, dq_est)
+                            Efficiency(region, input_comm, tech, vintage, output_comm, efficiency, notes, data_source, dq_cred, data_id)
                             VALUES("{region}", "{input_comm['commodity']}", "{tech}", {vint}, "{output_comm['commodity']}", {storage_config['efficiency']},
-                            "{eff_units} Following assumptions in NREL ATB", "{config.params['atb']['reference'].replace('<scenario>', storage_config['atb_scenario'])}", 1)""")
+                            "{eff_units} Following assumptions in NREL ATB", "{ref.id}", 1, "{utils.data_id(region)}")""")
 
     conn.commit()
     conn.close()
@@ -197,19 +202,12 @@ def aggregate_existing_generators() -> pd.DataFrame:
     ##############################################################
     """
 
-    _exs, df_existing, date_accessed = coders_api.get_data(end_point='generators')
-    config.references['generators'] = config.params['coders']['reference'].replace("<date>", date_accessed).replace("<table>","generators")
-
-    # Maps all coders existing storage types to canoe techs
-    existing_map = dict()
-    for tech_code, row in config.gen_techs.iterrows():
-        if pd.isna(row['coders_existing']): continue
-        for coders_equiv in row['coders_existing'].split("+"):
-            existing_map[coders_equiv] = tech_code
+    df_existing, date_accessed = coders_api.get_data(end_point='generators')
+    config.refs.add('generators', config.params['coders']['reference'].replace("<date>", date_accessed).replace("<table>","generators"))
 
     # Get CANOE technologies
     df_existing['gen_type'] = df_existing['gen_type'].str.lower()
-    df_existing['tech_code'] = df_existing['gen_type'].map(existing_map)
+    df_existing['tech_code'] = df_existing['gen_type'].map(config.existing_map)
 
     # Remove any that have not been set as an equivalent in the config csv
     for idx, row in df_existing.iterrows():
@@ -230,6 +228,7 @@ def aggregate_existing_generators() -> pd.DataFrame:
         return
 
     # Delimiter for concatenating project names together for a description
+    df_existing['facilities'] = df_existing['generation_facility_code'] + ',' + df_existing['capacity'].astype(str) + ';' # for calculating CFs
     df_existing['description'] = df_existing['generation_facility_name'] + ' - '
 
     # Vintage is last renewal year if available otherwise start year
@@ -255,8 +254,9 @@ def aggregate_existing_generators() -> pd.DataFrame:
     # Add life because capacity credits need it as a check
     df_rtv['life'] = [df_generic.loc[config.gen_techs.loc[tc, 'coders_equiv'], 'service_life'] for tc in df_rtv['tech_code']]
 
-    # Remove any existing capacity that wouldn't reach the first model period
+    # Remove any existing capacity that's below threshold or wouldn't reach the first model period
     df_rtv = df_rtv.loc[df_rtv['vint'] + df_rtv['life'] > config.model_periods[0]]
+    df_rtv = df_rtv.loc[df_rtv['capacity'] > config.params['existing_capacity_threshold']]
 
     ## CapacityFactorTech
     capacity_factors.aggregate_existing(df_rtv)
@@ -274,8 +274,8 @@ def aggregate_existing_generators() -> pd.DataFrame:
 
         ## Technologies
         curs.execute(f"""REPLACE INTO
-                    technologies(tech, flag, sector, tech_desc)
-                    VALUES("{row['tech']}", "{tech_config['flag']}", "electricity", "{tech_config['description']} - {row['description']} - existing")""")
+                    Technology(tech, flag, sector, description, data_id)
+                    VALUES("{row['tech']}", "{tech_config['flag']}", "electricity", "{tech_config['description']} - {row['description']} - existing", "{utils.data_id()}")""")
 
     # Iterate over aggregated existing capacity
     for _idx, row in df_rtv.iterrows():
@@ -287,15 +287,15 @@ def aggregate_existing_generators() -> pd.DataFrame:
         else: note = f"aggregated to {step}-yearly vintages - {utils.string_cleaner(row['description'])}"
         
         curs.execute(f"""REPLACE INTO
-                    ExistingCapacity(regions, tech, vintage, exist_cap, exist_cap_units, exist_cap_notes, reference, data_flags, dq_est)
+                    ExistingCapacity(region, tech, vintage, capacity, units, notes, data_source, dq_cred, data_id)
                     VALUES("{row['region']}", "{row['tech']}", "{row['vint']}", "{row['capacity']}", "({config.units.loc['capacity', 'units']})",
-                    "{note}", "{config.references['generators']}", "coders", 1)""")
+                    "{note}", "{config.refs.get('generators').id}", 2, "{utils.data_id(row['region'])}")""")
     
 
     ## time_periods
     for vint in df_rtv['vint'].unique():
         curs.execute(f"""REPLACE INTO
-                    time_periods(t_periods, flag)
+                    TimePeriod(period, flag)
                     VALUES({vint}, 'e')""")
         
     conn.commit()
@@ -311,15 +311,16 @@ def aggregate_existing_generators() -> pd.DataFrame:
 def aggregate_existing_storage():
 
     print("Aggregating existing storage capacity data...")
-
+    
     """
     ##############################################################
         Existing storage
     ##############################################################
     """
 
-    _storage_exs, df_existing, date_accessed = coders_api.get_data(end_point='storage')
-    config.references['storage'] = config.params['coders']['reference'].replace("<date>", date_accessed).replace("<table>","storage")
+    df_existing, date_accessed = coders_api.get_data(end_point='storage')
+    citation = config.params['coders']['reference'].replace("<date>", date_accessed).replace("<table>","storage")
+    config.refs.add('storage', citation)
 
     # Maps all coders existing storage types to canoe techs
     existing_map = dict()
@@ -376,8 +377,9 @@ def aggregate_existing_storage():
     # Add life because capacity credits need it as a check
     df_rtdv['life'] = [df_generic.loc[config.storage_techs.loc[tc, 'coders_equiv'], 'service_life'] for tc in df_rtdv['tech_code']]
 
-    # Remove any existing capacity that wouldn't reach the first model period
+    # Remove any existing capacity that's below threshold or wouldn't reach the first model period
     df_rtdv = df_rtdv.loc[df_rtdv['vint'] + df_rtdv['life'] > config.model_periods[0]]
+    df_rtdv = df_rtdv.loc[df_rtdv['capacity'] > config.params['existing_capacity_threshold']]
 
     # Add -EXS tag
     df_rtdv['tech'] = [f"{config.storage_techs.loc[tc, 'base_tech']}-EXS" for tc in df_rtdv['tech_code']]
@@ -391,6 +393,8 @@ def aggregate_existing_storage():
         # Tech configuration data
         storage_config = config.storage_techs.loc[row['tech_code']]
 
+        ref = config.refs.add(f"atb_storage_{storage_config['atb_scenario']}", config.params['atb']['reference'].replace('<scenario>', storage_config['atb_scenario']))
+
         # Commodity data
         input_comm = config.commodities.loc[storage_config['in_comm']]
         output_comm = config.commodities.loc[storage_config['out_comm']]
@@ -399,37 +403,37 @@ def aggregate_existing_storage():
 
         ## Technologies
         curs.execute(f"""REPLACE INTO
-                    technologies(tech, flag, sector, tech_desc)
-                    VALUES("{row['tech']}", "ps", "electricity", "{storage_config['description']} - {row['description']} - existing")""")
+                    Technology(tech, flag, sector, description, data_id)
+                    VALUES("{row['tech']}", "ps", "electricity", "{storage_config['description']} - {row['description']} - existing", "{utils.data_id()}")""")
         
 
         ## Efficiency
         curs.execute(f"""REPLACE INTO
-                    Efficiency(regions, input_comm, tech, vintage, output_comm, efficiency, eff_notes, reference, dq_est)
+                    Efficiency(region, input_comm, tech, vintage, output_comm, efficiency, notes, data_source, dq_cred, data_id)
                     VALUES("{row['region']}", "{input_comm['commodity']}", "{row['tech']}", {row['vint']}, "{output_comm['commodity']}", {storage_config['efficiency']},
-                    "{eff_units} Following assumptions in NREL ATB", "{config.params['atb']['reference'].replace('<scenario>', storage_config['atb_scenario'])}", 1)""")
-
+                    "{eff_units} Following assumptions in NREL ATB", "{ref.id}", 1, "{utils.data_id(row['region'])}")""")
 
         ## ExistingCapacity
         if storage_config['no_retirement']: note = f"no retirement so aggregated to last existing vintage - {utils.string_cleaner(row['description'])}"
         else: note = f"aggregated to {step}-yearly vintages - {utils.string_cleaner(row['description'])}"
 
         curs.execute(f"""REPLACE INTO
-                    ExistingCapacity(regions, tech, vintage, exist_cap, exist_cap_units, exist_cap_notes, reference, data_flags, dq_est)
+                    ExistingCapacity(region, tech, vintage, capacity, units, notes, data_source, dq_cred, data_id)
                     VALUES("{row['region']}", "{row['tech']}", "{row['vint']}", "{row['capacity']}", "({config.units.loc['capacity', 'units']})",
-                    "{note}", "{config.references['storage']}", "coders", 1)""")
+                    "{note}", "{config.refs.get('storage').id}", 2, "{utils.data_id(row['region'])}")""")
 
 
         ## StorageDuration
         curs.execute(f"""REPLACE INTO
-                    StorageDuration(regions, tech, duration, duration_notes, reference, data_flags, dq_est)
-                    VALUES("{row['region']}", "{row['tech']}", "{row['storage_duration']}", "(hours of storage)", "{config.references['storage']}", "coders", 1)""")
+                    StorageDuration(region, tech, duration, notes, data_source, data_id)
+                    VALUES("{row['region']}", "{row['tech']}", "{row['storage_duration']}", "(hours of storage)",
+                    "{config.refs.get('storage').id}", "{utils.data_id(row['region'])}")""")
     
     
     ## time_periods
     for vint in df_rtdv['vint'].unique():
         curs.execute(f"""REPLACE INTO
-                    time_periods(t_periods, flag)
+                    TimePeriod(period, flag)
                     VALUES({vint}, 'e')""")
         
 
@@ -478,7 +482,8 @@ def aggregate_storage_generic(df_rtv: pd.DataFrame):
     global conn, curs
 
     ## CapacityCredit
-    if config.params['include_reserve_margin']: capacity_credits.aggregate_storage(df_rtv)
+    # Note: no longer used after dynamic reserve margin rework
+    # if config.params['include_reserve_margin']: capacity_credits.aggregate_storage(df_rtv)
 
     conn = sqlite3.connect(config.database_file)
     curs = conn.cursor()
@@ -538,26 +543,30 @@ def aggregate_rt_all(region, tech, tech_config):
 
     # Add to specified sets
     if not pd.isna(tech_config['tech_sets']):
-        for tech_set in tech_config['tech_sets'].split('+'):
-            curs.execute(f"""REPLACE INTO {tech_set}(tech) VALUES('{tech}')""")
+        for tech_set in tech_config['tech_sets'].split(','):
+            curs.execute(f"""UPDATE Technology SET {tech_set}=1 WHERE tech == '{tech}'""")
 
 
     ## LifetimeTech
     if tech_config['no_retirement']:
         curs.execute(f"""REPLACE INTO
-                    LifetimeTech(regions, tech, life, life_notes)
-                    VALUES("{region}", "{tech}", 100, "(y) no retirement")""")
+                    LifetimeTech(region, tech, lifetime, notes, data_id)
+                    VALUES("{region}", "{tech}", 100, "(y) no retirement", "{utils.data_id(region)}")""")
     else:
         curs.execute(f"""REPLACE INTO
-                    LifetimeTech(regions, tech, life, life_notes, reference, data_flags, dq_est)
+                    LifetimeTech(region, tech, lifetime, notes, data_source, dq_cred, data_id)
                     VALUES("{region}", "{tech}", "{coders_gen['service_life']}", "(y) {tech_config['coders_equiv']} service life years",
-                    "{config.references['generation_generic']}", "coders", 1)""")
+                    "{config.refs.get('generation_generic').id}", 2, "{utils.data_id(region)}")""")
 
 
     ## CapacityToActivity
     curs.execute(f"""REPLACE INTO
-                CapacityToActivity(regions, tech, c2a, c2a_notes)
-                VALUES("{region}", "{tech}", "{config.params['c2a']}", "({config.params['c2a_unit']})")""")
+                CapacityToActivity(region, tech, c2a, notes, data_id)
+                VALUES("{region}", "{tech}", "{config.params['c2a']}", "({config.params['c2a_unit']})", "{utils.data_id(region)}")""")
+    
+
+    ## RampUp/DownHourly
+    ramp_rates.aggregate(region, tech, tech_config.name, curs)
     
 
 
@@ -575,6 +584,7 @@ def aggregate_rt_atb(region, tech, tech_config):
     
     
     ## RampUp and RampDown
+    # TODO need some actual hourly values for this
     # Take from ATB tsv table if available, otherwise use CODERS
     if tsv is None: aggregate_ramp_rt_coders(region, tech, tech_config)
     else:
@@ -589,13 +599,11 @@ def aggregate_rt_atb(region, tech, tech_config):
                 note = f"({config.units.loc['ramp_rate', 'units']}) {tsv_note} ramp_rate_%_min times {config.units.loc['ramp_rate', 'coders_conv_fact']}"
 
                 curs.execute(f"""REPLACE INTO
-                            RampUp(regions, tech, ramp_up, reference, dq_est, additional_notes)
-                            VALUES("{region}", "{tech}", "{ramp_rate}", "{config.references[tsv_note]}", 1, "{note}")""")
+                            RampUpHourly(region, tech, rate, data_source, notes, data_id)
+                            VALUES("{region}", "{tech}", "{ramp_rate}", "{config.refs.get(tsv_note).id}", 1, "{note}", "{utils.data_id(region)}")""")
                 curs.execute(f"""REPLACE INTO
-                            RampDown(regions, tech, ramp_down, reference, dq_est, additional_notes)
-                            VALUES("{region}", "{tech}", "{ramp_rate}", "{config.references[tsv_note]}", 1, "{note}")""")
-                
-                curs.execute(f"""REPLACE INTO tech_ramping(tech) VALUES("{tech}")""")
+                            RampDownHourly(region, tech, rate, data_source, notes, data_id)
+                            VALUES("{region}", "{tech}", "{ramp_rate}", "{config.refs.get(tsv_note).id}", 1, "{note}", "{utils.data_id(region)}")""")
     
 
     ## CostInvest
@@ -603,14 +611,14 @@ def aggregate_rt_atb(region, tech, tech_config):
         for vint in config.model_periods:
 
             metric = config.params['atb']['cost_invest_metric']
-            cost_invest, note = utils.atb_data(tech_config, core_metric_parameter=metric, core_metric_variable=max(2021,vint))
-            cost_invest = config.units.loc['cost_invest', 'atb_conv_fact'] * float(cost_invest.iloc[0])
+            cost_invest, note = utils.atb_data(tech_config, core_metric_parameter=metric, core_metric_variable=int(max(tech_config['atb_min_year'],vint)))
+            cost_invest = conv_curr(float(cost_invest.iloc[0]), config.params['atb']['currency_year'], config.params['atb']['currency'])
             
-            if cost_invest != 0:
+            if cost_invest != 0 and not pd.isna(cost_invest):
                 curs.execute(f"""REPLACE INTO
-                            CostInvest(regions, tech, vintage, cost_invest_units, cost_invest_notes, data_cost_invest, data_cost_year, data_curr, reference, dq_est)
-                            VALUES("{region}", "{tech}", {vint}, "({config.units.loc['cost_invest', 'units']})", "{note}", {cost_invest}, {config.params['atb']['currency_year']},
-                            "{config.params['atb']['currency']}", "{config.references['atb']}", 1)""")
+                            CostInvest(region, tech, vintage, cost, units, notes, data_source, dq_cred, data_id)
+                            VALUES("{region}", "{tech}", {vint}, {cost_invest}, "({config.units.loc['cost_invest', 'units']})",
+                            "{note}", "{config.refs.get('atb').id}", 1, "{utils.data_id(region)}")""")
 
 
 
@@ -622,6 +630,7 @@ def aggregate_rtv_atb(region, tech, vint, tech_config):
         Generic data from NREL ATB, indexed by region, tech, vint
     ##############################################################
     """
+    # TODO output captured co2?
 
     # CODERS data as a backup where not available in ATB
     coders_gen = df_generic.loc[tech_config['coders_equiv']]
@@ -634,6 +643,7 @@ def aggregate_rtv_atb(region, tech, vint, tech_config):
     eff_units = f"({input_comm['units']}/{output_comm['units']})"
 
     # If configured for ccs retrofits change output commodity to an intermediary
+    data_id = utils.data_id(region)
     if tech_config.name in config.ccs_techs['generator'].values and config.params['include_ccs_retrofits']:
         output_comm = output_comm.copy()
         output_comm['commodity'] += f"_{tech_config.name}"
@@ -642,13 +652,16 @@ def aggregate_rtv_atb(region, tech, vint, tech_config):
     ## Efficiency    
     # Efficiency is arbitrary for ethos (e.g. renewables)
     if "ethos" in input_comm['commodity']:
+
+        eff = 1
         
         curs.execute(f"""REPLACE INTO
-                    Efficiency(regions, input_comm, tech, vintage, output_comm, efficiency, eff_notes)
-                    VALUES("{region}", "{input_comm['commodity']}", "{tech}", {vint}, "{output_comm['commodity']}", 1, "{eff_units} dummy input so arbitrary")""")
+                    Efficiency(region, input_comm, tech, vintage, output_comm, efficiency, notes, data_id)
+                    VALUES("{region}", "{input_comm['commodity']}", "{tech}", {vint}, "{output_comm['commodity']}",
+                    1, "{eff_units} dummy input so arbitrary", "{data_id}")""")
     
     else:
-        eff, note = utils.atb_data(tech_config, core_metric_parameter='Heat Rate', core_metric_variable=max(2021,vint))
+        eff, note = utils.atb_data(tech_config, core_metric_parameter='Heat Rate', core_metric_variable=int(max(tech_config['atb_min_year'],vint)))
 
         # If eff is None should be a storage tech and efficiency is already added so skip
         if eff is not None:
@@ -657,13 +670,13 @@ def aggregate_rtv_atb(region, tech, vint, tech_config):
             eff = 1 / (config.units.loc['heat_rate', 'atb_conv_fact'] * float(eff.iloc[0]))
             
             curs.execute(f"""REPLACE INTO
-                    Efficiency(regions, input_comm, tech, vintage, output_comm, efficiency, eff_notes, reference, dq_est)
+                    Efficiency(region, input_comm, tech, vintage, output_comm, efficiency, notes, data_source, dq_cred, data_id)
                     VALUES("{region}", "{input_comm['commodity']}", "{tech}", {vint}, "{output_comm['commodity']}", {eff}, "{eff_units} {note}",
-                    "{config.references['atb']}", 1)""")
+                    "{config.refs.get('atb').id}", 1, "{data_id}")""")
 
 
     ## EmissionActivity
-    if config.params['include_emissions']:
+    if config.params['include_emissions'] and eff is not None:
 
         if tsv is None: # no ATB emissions data so use CODERS
             aggregate_emissions_rtv_coders(region, tech, vint, input_comm, output_comm, coders_gen, tech_config)
@@ -671,15 +684,15 @@ def aggregate_rtv_atb(region, tech, vint, tech_config):
         else: # use ATB emissions data
             for emis in ['co2','so2','nox','hg']:
 
-                emis_act = config.units.loc[f"{emis}_emissions", 'atb_conv_fact'] * float(tsv[f"emissions_{emis}_lbs_MMBtu"])
+                emis_act = config.units.loc[f"{emis}_emissions", 'atb_conv_fact'] * float(tsv[f"emissions_{emis}_lbs_MMBtu"]) / eff
                 emis_comm = config.commodities.loc[emis]
                 emis_units = f"({emis_comm['units']}/{output_comm['units']})"
 
-                if emis_act != 0:
+                if emis_act != 0 and not pd.isna(emis_act):
                     curs.execute(f"""REPLACE INTO
-                                EmissionActivity(regions, emis_comm, input_comm, tech, vintage, output_comm, emis_act, emis_act_units, emis_act_notes, reference, dq_est)
+                                EmissionActivity(region, emis_comm, input_comm, tech, vintage, output_comm, activity, units, notes, data_source, dq_cred, data_id)
                                 VALUES("{region}", "{emis_comm['commodity']}", "{input_comm['commodity']}", "{tech}", {vint}, "{output_comm['commodity']}",
-                                {emis_act}, "{emis_units}", "{tsv_note} - emissions_{emis}_lbs_MMBtu", "{config.references[tsv_note]}", 1)""")
+                                {emis_act}, "{emis_units}", "{tsv_note} - emissions_{emis}_lbs_MMBtu", "{config.refs.get(tsv_note).id}", 1, "{data_id}")""")
 
 
     # Indexed by period and vintage
@@ -689,18 +702,19 @@ def aggregate_rtv_atb(region, tech, vint, tech_config):
         
 
         ## CostFixed
-        cost_fixed, note = utils.atb_data(tech_config, core_metric_parameter='Fixed O&M', core_metric_variable=max(2021,vint))
+        cost_fixed, note = utils.atb_data(tech_config, core_metric_parameter='Fixed O&M', core_metric_variable=int(max(tech_config['atb_min_year'],vint)))
         cost_fixed = config.units.loc['cost_fixed', 'atb_conv_fact'] * float(cost_fixed.iloc[0])
+        cost_fixed = conv_curr(cost_fixed, config.params['atb']['currency_year'], config.params['atb']['currency'])
 
-        if cost_fixed != 0:
+        if cost_fixed != 0 and not pd.isna(cost_fixed):
             curs.execute(f"""REPLACE INTO
-                        CostFixed(regions, periods, tech, vintage, cost_fixed_units, cost_fixed_notes, data_cost_fixed, data_cost_year, data_curr, reference, dq_est)
-                        VALUES("{region}", {period}, "{tech}", {vint}, "({config.units.loc['cost_fixed', 'units']})", "{note}", {cost_fixed}, {config.params['atb']['currency_year']},
-                        "{config.params['atb']['currency']}", "{config.references['atb']}", 1)""")
+                        CostFixed(region, period, tech, vintage, cost, units, notes, data_source, dq_cred, data_id)
+                        VALUES("{region}", {period}, "{tech}", {vint}, {cost_fixed}, "({config.units.loc['cost_fixed', 'units']})",
+                        "{note}", "{config.refs.get('atb').id}", 1, "{utils.data_id(region)}")""")
 
 
         ## CostVariable
-        cost_variable, var_note = utils.atb_data(tech_config, core_metric_parameter='Variable O&M', core_metric_variable=max(2021,vint))
+        cost_variable, var_note = utils.atb_data(tech_config, core_metric_parameter='Variable O&M', core_metric_variable=int(max(tech_config['atb_min_year'],vint)))
         cost_fuel, fuel_note = utils.atb_data(tech_config, core_metric_parameter='Fuel', core_metric_variable=period)
 
         # If asking for fuel costs and ATB doesn't have it, use CODERS for all variable cost (can't mix currencies)
@@ -717,11 +731,13 @@ def aggregate_rtv_atb(region, tech, vint, tech_config):
                 note = f"variable o&m plus fuel cost - {var_note} - {fuel_note}"
             else: note = var_note
 
-            if cost_variable != 0:
+            cost_variable = conv_curr(cost_variable, config.params['atb']['currency_year'], config.params['atb']['currency'])
+
+            if cost_variable != 0 and not pd.isna(cost_variable):
                 curs.execute(f"""REPLACE INTO
-                            CostVariable(regions, periods, tech, vintage, cost_variable_units, cost_variable_notes, data_cost_variable, data_cost_year, data_curr, reference, dq_est)
-                            VALUES("{region}", {period}, "{tech}", {vint}, "({config.units.loc['cost_variable', 'units']})", "{note}", {cost_variable}, {config.params['atb']['currency_year']},
-                            "{config.params['atb']['currency']}", "{config.references['atb']}", 1)""")
+                            CostVariable(region, period, tech, vintage, cost, units, notes, data_source, dq_cred, data_id)
+                            VALUES("{region}", {period}, "{tech}", {vint}, {cost_variable}, "({config.units.loc['cost_variable', 'units']})",
+                            "{note}", "{config.refs.get('atb').id}", 1, "{utils.data_id(region)}")""")
 
 
 
@@ -745,11 +761,12 @@ def aggregate_rt_coders(region, tech, tech_config):
         for vint in config.model_periods:
 
             cost = config.units.loc['cost_invest', 'coders_conv_fact'] * float(cost_invest[f"{vint}_CAD_per_kW"])
+            cost = conv_curr(cost, config.params['coders']['currency_year'], config.params['coders']['currency'])
             # 'cost_invest_notes, data_cost_invest, data_cost_year, data_curr,' -> 'cost_invest_notes, data_cost_invest, data_cost_year, data_curr,'
             curs.execute(f"""REPLACE INTO
-                        CostInvest(regions, tech, vintage, cost_invest_units, cost_invest_notes, data_cost_invest, data_cost_year, data_curr, reference, data_flags, dq_est)
-                        VALUES("{region}", "{tech}", {vint}, "({config.units.loc['cost_invest', 'units']})", "{tech_config['coders_equiv']} CAD_per_kW by vintage", {cost}, {config.params['coders']['currency_year']},
-                        "{config.params['coders']['currency']}", "{config.references['generation_cost_evolution']}", "coders", 1)""")
+                        CostInvest(region, tech, vintage, cost, units, notes, data_source, dq_cred, data_id)
+                        VALUES("{region}", "{tech}", {vint}, {cost}, "({config.units.loc['cost_invest', 'units']})",
+                        "{tech_config['coders_equiv']} CAD_per_kW by vintage", "{config.refs.get('generation_cost_evolution').id}", 2, "{utils.data_id(region)}")""")
 
 
 
@@ -767,15 +784,11 @@ def aggregate_ramp_rt_coders(region, tech, tech_config):
             note = f"({config.units.loc['ramp_rate', 'units']}) {tech_config['coders_equiv']} ramp_rate_percent_per_min times {config.units.loc['ramp_rate', 'coders_conv_fact']}"
 
             curs.execute(f"""REPLACE INTO
-                        RampUp(regions, tech, ramp_up, reference, data_flags, dq_est, additional_notes)
-                        VALUES("{region}", "{tech}", "{ramp_rate}", "{config.references['generation_generic']}",
-                        "coders", 1, "{note}")""")
+                        RampUpHourly(region, tech, rate, notes data_source, dq_cred, data_id)
+                        VALUES("{region}", "{tech}", "{ramp_rate}", "{note}", "{config.refs.get('generation_generic').id}", 2, "{utils.data_id(region)}")""")
             curs.execute(f"""REPLACE INTO
-                        RampDown(regions, tech, ramp_down, reference, data_flags, dq_est, additional_notes)
-                        VALUES("{region}", "{tech}", "{ramp_rate}", "{config.references['generation_generic']}",
-                        "coders", 1, "{note}")""")
-            
-            curs.execute(f"""REPLACE INTO tech_ramping(tech) VALUES("{tech}")""")
+                        RampDownHourly(region, tech, rate, notes, data_source, dq_cred, data_id)
+                        VALUES("{region}", "{tech}", "{ramp_rate}", "{note}", "{config.refs.get('generation_generic').id}", 2, "{utils.data_id(region)}")""")
 
 
 
@@ -797,6 +810,7 @@ def aggregate_rtv_coders(region, tech, vint, tech_config):
     eff_units = f"({input_comm['units']}/{output_comm['units']})"
 
     # If configured for ccs retrofits change output commodity to an intermediary
+    data_id = utils.data_id(region)
     if tech_config.name in config.ccs_techs['generator'].values and config.params['include_ccs_retrofits']:
         output_comm = output_comm.copy()
         output_comm['commodity'] += f"_{tech_config.name}"
@@ -807,16 +821,17 @@ def aggregate_rtv_coders(region, tech, vint, tech_config):
     if "ethos" in input_comm['commodity']:
 
         curs.execute(f"""REPLACE INTO
-                    Efficiency(regions, input_comm, tech, vintage, output_comm, efficiency, eff_notes)
-                    VALUES("{region}", "{input_comm['commodity']}", "{tech}", {vint}, "{output_comm['commodity']}", 1, "{eff_units} dummy input so arbitrary")""")
+                    Efficiency(region, input_comm, tech, vintage, output_comm, efficiency, notes, data_id)
+                    VALUES("{region}", "{input_comm['commodity']}", "{tech}", {vint}, "{output_comm['commodity']}",
+                    1, "{eff_units} dummy input so arbitrary", "{data_id}")""")
     
     # CODERS database provides an efficiency
-    elif coders_gen['efficiency'] is not None:
+    elif not pd.isna(coders_gen['efficiency']):
 
         curs.execute(f"""REPLACE INTO
-                    Efficiency(regions, input_comm, tech, vintage, output_comm, efficiency, eff_notes, reference, data_flags, dq_est)
+                    Efficiency(region, input_comm, tech, vintage, output_comm, efficiency, notes, data_source, dq_cred, data_id)
                     VALUES("{region}", "{input_comm['commodity']}", "{tech}", {vint}, "{output_comm['commodity']}", "{coders_gen['efficiency']}",
-                    "{eff_units} {tech_config['coders_equiv']} efficiency", "{config.references['generation_generic']}", "coders", 1)""")
+                    "{eff_units} {tech_config['coders_equiv']} efficiency", "{config.refs.get('generation_generic').id}", 2, "{data_id}")""")
     
 
     ## EmissionActivity
@@ -831,13 +846,15 @@ def aggregate_rtv_coders(region, tech, vint, tech_config):
 
         
         ## CostFixed
-        cost_fixed = config.units.loc['cost_fixed', 'coders_conv_fact'] * coders_gen['fixed_om_cost_CAD_per_MWyear']
+        cost_fixed = config.units.loc['cost_fixed', 'coders_conv_fact'] * coders_gen['fixed_om_costs']
+        cost_fixed = conv_curr(cost_fixed, config.params['coders']['currency_year'], config.params['coders']['currency'])
 
-        if cost_fixed != 0:
+        if cost_fixed != 0 and not pd.isna(cost_fixed):
             curs.execute(f"""REPLACE INTO
-                        CostFixed(regions, periods, tech, vintage, cost_fixed_units, cost_fixed_notes, data_cost_fixed, data_cost_year, data_curr, reference, data_flags, dq_est)
-                        VALUES("{region}", {period}, "{tech}", {vint}, "({config.units.loc['cost_fixed', 'units']})", "{tech_config['coders_equiv']} fixed_om_cost_CAD_per_MWyear", {cost_fixed}, {config.params['coders']['currency_year']},
-                        "{config.params['coders']['currency']}", "{config.references['generation_cost_evolution']}", "coders", 1)""")
+                        CostFixed(region, period, tech, vintage, cost, units, notes, data_source, dq_cred, data_id)
+                        VALUES("{region}", {period}, "{tech}", {vint}, {cost_fixed}, "({config.units.loc['cost_fixed', 'units']})",
+                        "{tech_config['coders_equiv']} fixed_om_costs", "{config.refs.get('generation_cost_evolution').id}",
+                        2, "{utils.data_id(region)}")""")
         
         ## CostVariable
         aggregate_cost_var_rtvp_coders(region, tech, vint, period, coders_gen, tech_config)
@@ -850,32 +867,35 @@ def aggregate_emissions_rtv_coders(region, tech, vint, input_comm, output_comm, 
     emis_comm = config.commodities.loc['co2e']
     emis_units = f"({emis_comm['units']}/{output_comm['units']})"
 
-    if emis_act != 0:
+    if emis_act != 0 and not pd.isna(emis_act):
         curs.execute(f"""REPLACE INTO
-                    EmissionActivity(regions, emis_comm, input_comm, tech, vintage, output_comm, emis_act, emis_act_units, emis_act_notes, reference, data_flags, dq_est)
+                    EmissionActivity(region, emis_comm, input_comm, tech, vintage, output_comm, activity, units, notes, data_source, dq_cred, data_id)
                     VALUES("{region}", "{emis_comm['commodity']}", "{input_comm['commodity']}", "{tech}", {vint}, "{output_comm['commodity']}",
-                    {emis_act}, "{emis_units}", "{tech_config['coders_equiv']} carbon_emissions", "{config.references['generation_generic']}", "coders", 1)""")
+                    {emis_act}, "{emis_units}", "{tech_config['coders_equiv']} carbon_emissions", "{config.refs.get('generation_generic').id}", 2, "{utils.data_id(region)}")""")
 
 
 
 def aggregate_cost_var_rtvp_coders(region, tech, vint, period, coders_gen, tech_config):
 
-    cost_variable = config.units.loc['cost_variable', 'coders_conv_fact'] * float(coders_gen['variable_om_cost_CAD_per_MWh'])
-    description = f"{tech_config['coders_equiv']} variable_om_cost_CAD_per_MWh"
+    cost_variable = config.units.loc['cost_variable', 'coders_conv_fact'] * float(coders_gen['variable_om_costs'])
+    description = f"{tech_config['coders_equiv']} variable_om_costs"
 
     if config.params['include_tech_fuel_cost'] and tech_config['include_fuel_cost']:
 
-        fuel_price = coders_gen['average_fuel_price_CAD_per_GJ']
+        fuel_price = coders_gen['average_fuel_price_CAD_per_MMBtu']
 
         if not pd.isna(fuel_price) and coders_gen['efficiency'] is not None:
             cost_variable += config.units.loc['cost_fuel', 'coders_conv_fact'] * float(fuel_price) / float(coders_gen['efficiency'])
-            description += " plus average_fuel_price_CAD_per_GJ divided by efficiency"
+            description += " plus average_fuel_price_CAD_per_MMBtu to M$/PJ and divided by efficiency"
 
-    if cost_variable != 0:
+    if cost_variable != 0 and not pd.isna(cost_variable):
+
+        cost_variable = conv_curr(cost_variable, config.params['coders']['currency_year'], config.params['coders']['currency'])
+
         curs.execute(f"""REPLACE INTO
-                    CostVariable(regions, periods, tech, vintage, cost_variable_units, cost_variable_notes, data_cost_variable, data_cost_year, data_curr, reference, data_flags, dq_est)
-                    VALUES("{region}", {period}, "{tech}", {vint}, "({config.units.loc['cost_variable', 'units']})", "{description}", {cost_variable}, {config.params['coders']['currency_year']},
-                    "{config.params['coders']['currency']}", "{config.references['generation_generic']}", "coders", 1)""")
+                    CostVariable(region, period, tech, vintage, cost, units, notes, data_source, dq_cred, data_id)
+                    VALUES("{region}", {period}, "{tech}", {vint}, {cost_variable}, "({config.units.loc['cost_variable', 'units']})",
+                    "{description}", "{config.refs.get('generation_generic').id}", 2, "{utils.data_id(region)}")""")
 
 
 
@@ -893,8 +913,7 @@ def aggregate_ccs_retrofits(df_rtv_all: pd.DataFrame):
     curs = conn.cursor()
 
     if not config.params['include_emissions']:
-        print("Can't include CCS retrofits without including emissions, too! Skipped CCS retrofits.")
-        return
+        print("Including ccs retrofits but not other emissions. Are emissions being included upstream?")
     
     print("Aggregating CCS retrofits data...")
 
@@ -950,24 +969,23 @@ def aggregate_ccs_retrofits(df_rtv_all: pd.DataFrame):
         # Name of CCS retrofit bypass tech
         bypass_tech = f"{gen_config['base_tech']}_RFIT_BYPASS"
 
-
         ## Commodities
         curs.execute(f"""REPLACE INTO
-                    commodities(comm_name, flag, comm_desc)
+                    Commodity(name, flag, description, data_id)
                     VALUES('{input_comm['commodity']}', 'p',
-                    '({input_comm['units']}) intermediate commodity going either to {ccs_config['tech']} or straight to {output_comm['commodity']}')""")
+                    '({input_comm['units']}) intermediate commodity going either to {ccs_config['tech']} or straight to {output_comm['commodity']}', "{utils.data_id()}")""")
 
 
         ## Technologies
         # Bypass tech
         curs.execute(f"""REPLACE INTO
-                    technologies(tech, flag, sector, tech_desc)
-                    VALUES("{bypass_tech}", "p", "electricity", "dummy bypass for ccs retrofit")""")
+                    Technology(tech, flag, sector, description, data_id)
+                    VALUES("{bypass_tech}", "p", "electricity", "dummy bypass for ccs retrofit", "{utils.data_id()}")""")
         
         # Retrofit tech
         curs.execute(f"""REPLACE INTO
-                    technologies(tech, flag, sector, tech_desc)
-                    VALUES("{ccs_config['tech']}", "p", "electricity", "{ccs_config['description']}")""")
+                    Technology(tech, flag, sector, description, data_id)
+                    VALUES("{ccs_config['tech']}", "p", "electricity", "{ccs_config['description']}", "{utils.data_id('CCS')}")""")
 
 
         for region in config.model_regions:
@@ -980,23 +998,13 @@ def aggregate_ccs_retrofits(df_rtv_all: pd.DataFrame):
                 ## CapacityToActivity
                 # Bypass tech
                 curs.execute(f"""REPLACE INTO
-                            CapacityToActivity(regions, tech, c2a, c2a_notes)
-                            VALUES("{region}", "{bypass_tech}", "{config.params['c2a']}", "({config.params['c2a_unit']})")""")
+                            CapacityToActivity(region, tech, c2a, notes, data_id)
+                            VALUES("{region}", "{bypass_tech}", "{config.params['c2a']}", "({config.params['c2a_unit']})", "{utils.data_id(region)}")""")
                 
                 # Retrofit tech
                 curs.execute(f"""REPLACE INTO
-                            CapacityToActivity(regions, tech, c2a, c2a_notes)
-                            VALUES("{region}", "{ccs_config['tech']}", "{config.params['c2a']}", "({config.params['c2a_unit']})")""")
-                
-
-                ## LifetimeTech
-                life = round(coders_gen['service_life'] / 2) # retrofit so average half the life of the existing generator
-
-                curs.execute(f"""REPLACE INTO
-                            LifetimeTech(regions, tech, life, life_notes, reference, data_flags, dq_est)
-                            VALUES("{region}", "{ccs_config['tech']}", "{life}",
-                            "(y) retrofit so assumed half the life of the retrofitted generator on average - {gen_config['coders_equiv']} service life years",
-                            "{config.references['generation_generic']}", "coders", 1)""")
+                            CapacityToActivity(region, tech, c2a, notes, data_id)
+                            VALUES("{region}", "{ccs_config['tech']}", "{config.params['c2a']}", "({config.params['c2a_unit']})", "{utils.data_id('CCS' + region)}")""")
                 
                 
                 # This is the vintage of the CCS retrofit, not the attached generator
@@ -1006,8 +1014,19 @@ def aggregate_ccs_retrofits(df_rtv_all: pd.DataFrame):
                     if len(exs_vints.loc[(exs_vints <= vint) & (exs_vints + coders_gen['service_life'] > vint)]) == 0: continue
 
 
+                    ## LifetimeTech
+                    # To avoid network orphans, the CCS retrofits must die when their upstream generators do
+                    life = min(coders_gen['service_life'], max(exs_vints + coders_gen['service_life']) - vint)
+
+                    curs.execute(f"""REPLACE INTO
+                                LifetimeProcess(region, tech, vintage, lifetime, notes, data_source, dq_cred, data_id)
+                                VALUES("{region}", "{ccs_config['tech']}", {vint}, "{life}",
+                                "(y) retrofit so assumed half the life of the retrofitted generator on average - {gen_config['coders_equiv']} service life years",
+                                "{config.refs.get('generation_generic').id}", 2, "{utils.data_id('CCS' + region)}")""")
+
+
                     ## Efficiency
-                    penalty, note = utils.atb_data(ccs_config, core_metric_parameter='Net Output Penalty', core_metric_variable=max(2021,vint))
+                    penalty, note = utils.atb_data(ccs_config, core_metric_parameter='Net Output Penalty', core_metric_variable=int(max(ccs_config['atb_min_year'],vint)))
 
                     # Efficiency penalty to efficiency
                     eff = 1 + float(penalty.iloc[0])
@@ -1015,14 +1034,15 @@ def aggregate_ccs_retrofits(df_rtv_all: pd.DataFrame):
 
                     # CCS retrofit
                     curs.execute(f"""REPLACE INTO
-                                Efficiency(regions, input_comm, tech, vintage, output_comm, efficiency, eff_notes, reference, dq_est)
+                                Efficiency(region, input_comm, tech, vintage, output_comm, efficiency, notes, data_source, dq_cred, data_id)
                                 VALUES("{region}", "{input_comm['commodity']}", "{ccs_config['tech']}", {vint}, "{output_comm['commodity']}",
-                                "{eff}", "{eff_units} {note}", "{config.references['atb']}", 1)""")
+                                "{eff}", "{eff_units} {note}", "{config.refs.get('atb').id}", 1, "{utils.data_id('CCS' + region)}")""")
                     
                     # Dummy retrofit bypass
                     curs.execute(f"""REPLACE INTO
-                                Efficiency(regions, input_comm, tech, vintage, output_comm, efficiency, eff_notes)
-                                VALUES("{region}", "{input_comm['commodity']}", "{bypass_tech}", {vint}, "{output_comm['commodity']}", 1, "{eff_units} dummy bypass")""")
+                                Efficiency(region, input_comm, tech, vintage, output_comm, efficiency, notes, data_id)
+                                VALUES("{region}", "{input_comm['commodity']}", "{bypass_tech}", {vint}, "{output_comm['commodity']}", 1,
+                                "{eff_units} dummy bypass", "{utils.data_id(region)}")""")
                     
 
                     ## EmissionActivity
@@ -1031,27 +1051,28 @@ def aggregate_ccs_retrofits(df_rtv_all: pd.DataFrame):
                     # Add as both negative CO2 and negative that same number CO2e (1:1)
                     # CANOE currently tracks both separate GHGs and an aggregate CO2e (double counting)
                     curs.execute(f"""REPLACE INTO
-                                EmissionActivity(regions, emis_comm, input_comm, tech, vintage, output_comm, emis_act, emis_act_units, emis_act_notes, reference, dq_est)
+                                EmissionActivity(region, emis_comm, input_comm, tech, vintage, output_comm, activity, units, notes, data_source, dq_cred, data_id)
                                 VALUES("{region}", "{co2_comm['commodity']}", "{input_comm['commodity']}", "{ccs_config['tech']}", {vint}, "{output_comm['commodity']}",
                                 {emis_act}, "{co2_units}", "Minus capture rate times {gen_config.name} co2 emissions divided by {ccs_code} efficiency",
-                                "{config.references['atb']}", 1)""")
+                                "{config.refs.get('atb').id}", 1, "{utils.data_id('CCS' + region)}")""")
                     curs.execute(f"""REPLACE INTO
-                                EmissionActivity(regions, emis_comm, input_comm, tech, vintage, output_comm, emis_act, emis_act_units, emis_act_notes, reference, dq_est)
+                                EmissionActivity(region, emis_comm, input_comm, tech, vintage, output_comm, activity, units, notes, data_source, dq_cred, data_id)
                                 VALUES("{region}", "{co2e_comm['commodity']}", "{input_comm['commodity']}", "{ccs_config['tech']}", {vint}, "{output_comm['commodity']}",
                                 {emis_act}, "{co2e_units}", "Minus capture rate times {gen_config.name} co2 emissions divided by {ccs_code} efficiency",
-                                "{config.references['atb']}", 1)""")
+                                "{config.refs.get('atb').id}", 1, "{utils.data_id('CCS' + region)}")""")
                     
 
                     ## CostInvest
                     metric = config.params['atb']['ccs_retrofit_cost_invest_metric']
-                    cost_invest, note = utils.atb_data(ccs_config, core_metric_parameter=metric, core_metric_variable=max(2021,vint))
+                    cost_invest, note = utils.atb_data(ccs_config, core_metric_parameter=metric, core_metric_variable=int(max(ccs_config['atb_min_year'],vint)))
                     cost_invest = config.units.loc['cost_invest', 'atb_conv_fact'] * float(cost_invest.iloc[0])
+                    cost_invest = conv_curr(cost_invest, config.params['atb']['currency_year'], config.params['atb']['currency'])
 
-                    if cost_invest != 0:
+                    if cost_invest != 0 and not pd.isna(cost_invest):
                         curs.execute(f"""REPLACE INTO
-                                    CostInvest(regions, tech, vintage, cost_invest_units, cost_invest_notes, data_cost_invest, data_cost_year, data_curr, reference, dq_est)
-                                    VALUES("{region}", "{ccs_config['tech']}", {vint}, "({config.units.loc['cost_invest', 'units']})", "{note}", {cost_invest}, {config.params['atb']['currency_year']},
-                                    "{config.params['atb']['currency']}", "{config.references['atb']}", 1)""")
+                                    CostInvest(region, tech, vintage, cost, units, notes, data_source, dq_cred, data_id)
+                                    VALUES("{region}", "{ccs_config['tech']}", {vint}, {cost_invest}, "({config.units.loc['cost_invest', 'units']})",
+                                    "{note}", "{config.refs.get('atb').id}", 1, "{utils.data_id('CCS' + region)}")""")
                     
 
                     # Add CCS retrofit options for all future model periods
@@ -1064,35 +1085,37 @@ def aggregate_ccs_retrofits(df_rtv_all: pd.DataFrame):
                         # This period is beyond end-of-life of all retrofittable generators
                         if period >= max(exs_vints + coders_gen['service_life']):
                             curs.execute(f"""REPLACE INTO
-                                        MaxActivity(regions, periods, tech, maxact, maxact_units, maxact_notes)
-                                        VALUES("{region}", {period}, "{ccs_config['tech']}", 0, "({output_comm['units']})",
-                                        "beyond end-of-life of all retrofittable generators")""")
+                                        LimitActivity(region, period, tech_or_group, operator, activity, units, notes, data_id)
+                                        VALUES("{region}", {period}, "{ccs_config['tech']}", "le", 0, "({output_comm['units']})",
+                                        "beyond end-of-life of all retrofittable generators", "{utils.data_id('CCS' + region)}")""")
                             curs.execute(f"""REPLACE INTO
-                                        MaxActivity(regions, periods, tech, maxact, maxact_units, maxact_notes)
-                                        VALUES("{region}", {period}, "{bypass_tech}", 0, "({output_comm['units']})",
-                                        "beyond end-of-life of all retrofittable generators")""")
+                                        LimitActivity(region, period, tech_or_group, operator, activity, units, notes, data_id)
+                                        VALUES("{region}", {period}, "{bypass_tech}", "le", 0, "({output_comm['units']})",
+                                        "beyond end-of-life of all retrofittable generators", "{utils.data_id('CCS' + region)}")""")
 
 
                         ## CostFixed
-                        cost_fixed, note = utils.atb_data(ccs_config, core_metric_parameter='Fixed O&M', core_metric_variable=max(2021,vint))
+                        cost_fixed, note = utils.atb_data(ccs_config, core_metric_parameter='Fixed O&M', core_metric_variable=int(max(ccs_config['atb_min_year'],vint)))
                         cost_fixed = config.units.loc['cost_fixed', 'atb_conv_fact'] * float(cost_fixed.iloc[0])
+                        cost_fixed = conv_curr(cost_fixed, config.params['atb']['currency_year'], config.params['atb']['currency'])
 
-                        if cost_fixed != 0:
+                        if cost_fixed != 0 and not pd.isna(cost_fixed):
                             curs.execute(f"""REPLACE INTO
-                                        CostFixed(regions, periods, tech, vintage, cost_fixed_units, cost_fixed_notes, data_cost_fixed, data_cost_year, data_curr, reference, dq_est)
-                                        VALUES("{region}", {period}, "{ccs_config['tech']}", {vint}, "({config.units.loc['cost_fixed', 'units']})", "{note}", {cost_fixed}, {config.params['atb']['currency_year']},
-                                        "{config.params['atb']['currency']}", "{config.references['atb']}", 1)""")
+                                        CostFixed(region, period, tech, vintage, cost, units, notes, data_source, dq_cred, data_id)
+                                        VALUES("{region}", {period}, "{ccs_config['tech']}", {vint}, {cost_fixed}, "({config.units.loc['cost_fixed', 'units']})",
+                                        "{note}", "{config.refs.get('atb').id}", 1, "{utils.data_id('CCS' + region)}")""")
 
 
                         ## CostVariable
-                        cost_variable, note = utils.atb_data(ccs_config, core_metric_parameter='Variable O&M', core_metric_variable=max(2021,vint))
+                        cost_variable, note = utils.atb_data(ccs_config, core_metric_parameter='Variable O&M', core_metric_variable=int(max(ccs_config['atb_min_year'],vint)))
                         cost_variable = config.units.loc['cost_variable', 'atb_conv_fact'] * float(cost_variable.iloc[0])
+                        cost_variable = conv_curr(cost_variable, config.params['atb']['currency_year'], config.params['atb']['currency'])
 
-                        if cost_variable != 0:
+                        if cost_variable != 0 and not pd.isna(cost_variable):
                             curs.execute(f"""REPLACE INTO
-                                        CostVariable(regions, periods, tech, vintage, cost_variable_units, cost_variable_notes, data_cost_variable, data_cost_year, data_curr, reference, dq_est)
-                                        VALUES("{region}", {period}, "{ccs_config['tech']}", {vint}, "({config.units.loc['cost_variable', 'units']})", "{note}", {cost_variable}, {config.params['atb']['currency_year']},
-                                        "{config.params['atb']['currency']}", "{config.references['atb']}", 1)""")
+                                        CostVariable(region, period, tech, vintage, cost, units, notes, data_source, dq_cred, data_id)
+                                        VALUES("{region}", {period}, "{ccs_config['tech']}", {vint}, {cost_variable}, "({config.units.loc['cost_variable', 'units']})",
+                                        "{note}", "{config.refs.get('atb').id}", 1, "{utils.data_id('CCS' + region)}")""")
 
     conn.commit()
     conn.close()
@@ -1114,7 +1137,7 @@ def atb_tsv(sheet, row) -> pd.DataFrame:
 
     cache_file = config.cache_dir + f"atb_technology_specific_variables_{sheet}.csv"
 
-    config.references[f"{sheet} - {row}"] = config.params['atb']['master_reference'].replace('<sheet>', sheet)
+    config.refs.add(f"{sheet} - {row}", config.params['atb']['master_reference'].replace('<sheet>', f"{sheet} - {row}"))
 
     # If TSV already loaded, return it
     if sheet in tsv_tables.keys(): return tsv_tables[sheet].loc[row]
@@ -1129,7 +1152,7 @@ def atb_tsv(sheet, row) -> pd.DataFrame:
 
     df = pd.read_excel(config.atb_master_file, dtype='unicode', sheet_name=sheet, usecols=table['columns'],
                        skiprows=int(table['first_row'])-1, nrows=int(table['last_row'])-int(table['first_row']), index_col=0)
-    
+
     # Just to concatenate annoyingly split-up headers
     none_if_unnamed = lambda string: string.replace(' ','') if 'Unnamed' not in string else ''
     none_if_na = lambda val: str(val).replace(' ','') if not pd.isna(val) else ''

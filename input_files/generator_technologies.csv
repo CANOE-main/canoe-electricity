@@ -1,25 +1,25 @@
-code,base_tech,description,include_new,coders_existing,coders_equiv,atb_display_name,atb_master_sheet,atb_tsv_row,atb_scenario,in_comm,out_comm,new_cap_batches,flag,tech_sets,include_fuel_cost,no_retirement
-biogas,E_BIO_G,biogas generation,FALSE,biogas,biogas,,,,,biogas,elcg_rps,,p,,TRUE,FALSE
-biomass,E_BIO_M,biomass generation,TRUE,biomass+msw,biomass,Biopower - Dedicated,Biopower,Dedicated,Moderate,biomass,elcg_rps,,p,,TRUE,FALSE
-biomass_cg,E_BIO_M_CG,biomass heat and power cogeneration,FALSE,biomass_cg,biomass_cg,Biopower - Dedicated,Biopower,Dedicated,Moderate,biomass,elcg_rps,,p,,TRUE,FALSE
-coal,E_COAL,coal generation,FALSE,coal,coal,Coal-new,Coal_FE,Coal-new,Moderate,coal,elcg,,p,,TRUE,FALSE
-coal_ccs,E_COAL_CCS,coal generation with 95% ccs,FALSE,coal_ccs,coal_ccs,Coal-95%-CCS,Coal_FE,Coal-CCS-95%,Moderate,coal,elcg,,p,,TRUE,FALSE
-diesel_ct,E_DIES_CT,diesel combustion turbine generation,FALSE,diesel_ct,diesel_ct,,,,,diesel,elcg,,p,,TRUE,FALSE
-diesel_st,E_DIES_ST,diesel steam turbine generation,FALSE,diesel_st,diesel_st,,,,,diesel,elcg,,p,,TRUE,FALSE
-geothermal,E_GEO,geothermal generation,FALSE,geothermal,geothermal,Geothermal - Hydro / Flash,,,Moderate,ethos,elcg_rps,,p,,TRUE,FALSE
-gasoline_ct,E_GSL_CT,gasoline combustion turbine generation,FALSE,gasoline_ct,gasoline_ct,,,,,gasoline,elcg,,p,,TRUE,FALSE
-hydro_daily,E_HYD_DLY,hydroelectric generation with daily reservoir storage,FALSE,hydro_daily,hydro_daily,,,,,ethos,elcg_rps,,p,,TRUE,TRUE
-hydro_monthly,E_HYD_MLY,hydroelectric generation with monthly reservoir storage,FALSE,hydro_monthly,hydro_monthly,,,,,ethos,elcg_rps,,p,,TRUE,TRUE
-hydro_run,E_HYD_ROR,hydroelectric run-of-river generation,FALSE,hydro_run,hydro_run,,,,,ethos,elcg_rps,,p,tech_curtailment,TRUE,TRUE
-ng_cc,E_NG_CC,natural gas combined cycle generation,TRUE,ng_cc,ng_cc,NG Combined Cycle (H-Frame),Natural Gas_FE,NG H-Frame CC,Moderate,ng,elcg,,p,,TRUE,FALSE
-ng_ccs,E_NG_CCS,natural gas combined cycle generation with 95% ccs,TRUE,ng_ccs,ng_ccs,NG Combined Cycle (H-Frame) 95% CCS,Natural Gas_FE,NG H-Frame CC 95% CCS,Moderate,ng,elcg,,p,,TRUE,FALSE
-ng_cg,E_NG_CG,natural gas heat and power cogeneration,FALSE,ng_cg,ng_cg,,,,,ng,elcg,,p,,TRUE,FALSE
-ng_ct,E_NG_CT,natural gas combustion turbine generation,TRUE,ng_sc+ng_ct+gas_ct,ng_sc,NG Combustion Turbine (F-Frame),Natural Gas_FE,NG F-Frame CT,Moderate,ng,elcg,,p,,TRUE,FALSE
-nuclear_candu,E_NUC_CANDU,nuclear candu generation,FALSE,nuclear,nuclear,,,,,u_nat,elcg_rps,,pb,,TRUE,FALSE
-nuclear_pwr,E_NUC_PWR,nuclear pressurised water reactor generation,TRUE,,nuclear,Nuclear - AP1000,Nuclear,Nuclear,Moderate,u_enr,elcg_rps,,pb,,TRUE,FALSE
-nuclear_smr,E_NUC_SMR,nuclear small modular reactor generation,TRUE,nuclear_smr,nuclear_smr,Nuclear - Small Modular Reactor,Nuclear,Nuclear,Moderate,u_enr,elcg_rps,,pb,,TRUE,FALSE
-oil_ct,E_OIL_CT,oil combustion turbine generation,FALSE,oil_ct,oil_ct,,,,,oil,elcg,,p,,TRUE,FALSE
-oil_st,E_OIL_ST,oil steam turbine generation,FALSE,oil_st,oil_st,,,,,oil,elcg,,p,,TRUE,FALSE
-solar,E_SOL_PV,utility-scale solar photovoltaic generation,TRUE,solar_pv+solar,solar_pv,Utility PV - Class 3,,,Moderate,ethos,elcg_rps,10,p,tech_curtailment,TRUE,FALSE
-wind_offshore,E_WND_OFF,offshore wind generation,FALSE,wind_ofs,wind_ofs,Offshore Wind - Class 3,,,Moderate,ethos,elcg_rps,,p,tech_curtailment,TRUE,FALSE
-wind_onshore,E_WND_ON,onshore wind generation,TRUE,wind_ons,wind_ons,Land-Based Wind - Class 7 - Technology 1,,,Moderate,ethos,elcg_rps,13,p,tech_curtailment,TRUE,FALSE
+code,base_tech,description,include_new,coders_existing,coders_equiv,atb_display_name,atb_master_sheet,atb_tsv_row,atb_scenario,atb_min_year,in_comm,out_comm,new_cap_batches,flag,tech_sets,include_fuel_cost,no_retirement
+biogas,E_BIO_G,biogas generation,FALSE,biogas,biogas,,,,,2022,biogas,elc_dx,,pb,reserve,TRUE,FALSE
+biomass,E_BIO_M,biomass generation,TRUE,biomass+msw,biomass,Biopower - Dedicated,Biopower,Dedicated,Moderate,2022,biomass,elc_tx,,p,reserve,TRUE,FALSE
+biomass_cg,E_BIO_M_CG,biomass heat and power cogeneration,FALSE,biomass_cg,biomass_cg,Biopower - Dedicated,Biopower,Dedicated,Moderate,2022,biomass,elc_dx,,p,reserve,TRUE,FALSE
+coal,E_COAL,coal generation,FALSE,coal,coal,Coal-new,Coal_FE,Coal-new,Moderate,2022,coal,elc_tx,,p,reserve,TRUE,FALSE
+coal_ccs,E_COAL_CCS,coal generation with 95% ccs,FALSE,coal_ccs,coal_ccs,Coal-95%-CCS,Coal_FE,Coal-CCS-95%,Moderate,2022,coal,elc_tx,,p,reserve,TRUE,FALSE
+diesel_ct,E_DIES_CT,diesel combustion turbine generation,FALSE,diesel_ct,diesel_ct,,,,,2022,diesel,elc_tx,,p,reserve,TRUE,FALSE
+diesel_st,E_DIES_ST,diesel steam turbine generation,FALSE,diesel_st,diesel_st,,,,,2022,diesel,elc_tx,,p,reserve,TRUE,FALSE
+geothermal,E_GEO,geothermal generation,FALSE,geothermal,geothermal,Geothermal - Hydro / Flash,,,Moderate,2022,ethos,elc_tx,,p,reserve,TRUE,FALSE
+gasoline_ct,E_GSL_CT,gasoline combustion turbine generation,FALSE,gasoline_ct,gasoline_ct,,,,,2022,gasoline,elc_tx,,p,reserve,TRUE,FALSE
+hydro_daily,E_HYD_DLY,hydroelectric generation with daily reservoir storage,FALSE,hydro_daily,hydro_daily,,,,,2022,ethos,elc_tx,,p,reserve,TRUE,TRUE
+hydro_monthly,E_HYD_MLY,hydroelectric generation with monthly reservoir storage,FALSE,hydro_monthly,hydro_monthly,,,,,2022,ethos,elc_tx,,p,reserve,TRUE,TRUE
+hydro_run,E_HYD_ROR,hydroelectric run-of-river generation,FALSE,hydro_run,hydro_run,,,,,2022,ethos,elc_dx,,p,"curtail,reserve",TRUE,TRUE
+ng_cc,E_NG_CC,natural gas combined cycle generation,TRUE,ng_cc,ng_cc,NG 2-on-1 Combined Cycle (H-Frame),Natural Gas_FE,NG 2x1 H-Frame CC,Moderate,2022,ng,elc_tx,,p,reserve,TRUE,FALSE
+ng_ccs,E_NG_CCS,natural gas combined cycle generation with 95% ccs,TRUE,ng_ccs,ng_ccs,NG 2-on-1 Combined Cycle (H-Frame) 95% CCS,Natural Gas_FE,NG 2x1 H-Frame CC 95% CCS,Moderate,2022,ng,elc_tx,,p,reserve,TRUE,FALSE
+ng_cg,E_NG_CG,natural gas heat and power cogeneration,FALSE,ng_cg,ng_cg,,,,,2022,ng,elc_dx,,p,reserve,TRUE,FALSE
+ng_ct,E_NG_CT,natural gas combustion turbine generation,TRUE,ng_sc+ng_ct+gas_ct,ng_sc,NG Combustion Turbine (F-Frame),Natural Gas_FE,NG F-Frame CT,Moderate,2022,ng,elc_tx,,p,reserve,TRUE,FALSE
+nuclear_candu,E_NUC_CANDU,nuclear candu generation,FALSE,nuclear,nuclear,,,,,2022,u_nat,elc_tx,,pb,reserve,TRUE,FALSE
+nuclear_pwr,E_NUC_PWR,nuclear pressurised water reactor generation,TRUE,,nuclear,Nuclear - Large,Nuclear,Nuclear - Large,Moderate,2030,u_enr,elc_tx,,pb,reserve,TRUE,FALSE
+nuclear_smr,E_NUC_SMR,nuclear small modular reactor generation,TRUE,nuclear_smr,nuclear_smr,Nuclear - Small,Nuclear,Nuclear - Small,Moderate,2030,u_enr,elc_tx,,pb,reserve,TRUE,FALSE
+oil_ct,E_OIL_CT,oil combustion turbine generation,FALSE,oil_ct,oil_ct,,,,,2022,oil,elc_tx,,p,reserve,TRUE,FALSE
+oil_st,E_OIL_ST,oil steam turbine generation,FALSE,oil_st,oil_st,,,,,2022,oil,elc_tx,,p,reserve,TRUE,FALSE
+solar,E_SOL_PV,utility-scale solar photovoltaic generation,TRUE,solar_pv+solar,solar_pv,Utility PV - Class 3,,,Moderate,2022,ethos,elc_tx,10,p,"curtail,reserve",TRUE,FALSE
+wind_offshore,E_WND_OFF,offshore wind generation,FALSE,wind_ofs,wind_offshore,Offshore Wind - Class 3,,,Moderate,2022,ethos,elc_tx,,p,"curtail,reserve",TRUE,FALSE
+wind_onshore,E_WND_ON,onshore wind generation,TRUE,wind_ons,wind_onshore,Land-Based Wind - Class 7 - Technology 1,,,Moderate,2022,ethos,elc_tx,13,p,"curtail,reserve",TRUE,FALSE
