@@ -960,6 +960,7 @@ def aggregate_ccs_retrofits(df_rtv_all: pd.DataFrame):
         co2e_comm = config.commodities.loc['co2']
         co2_units = f"({co2_comm['units']}/{output_comm['units']})"
         co2e_units = f"({co2e_comm['units']}/{output_comm['units']})"
+        eff_units = f"({output_comm['units']}/{output_comm['units']})"
 
         # Create new intermediate commodity between generator and retrofit
         input_comm = output_comm.copy()
@@ -979,13 +980,13 @@ def aggregate_ccs_retrofits(df_rtv_all: pd.DataFrame):
         ## Technologies
         # Bypass tech
         curs.execute(f"""REPLACE INTO
-                    Technology(tech, flag, sector, description, data_id)
-                    VALUES("{bypass_tech}", "p", "electricity", "dummy bypass for ccs retrofit", "{utils.data_id()}")""")
+                    Technology(tech, flag, sector, unlim_cap, description, data_id)
+                    VALUES("{bypass_tech}", "p", "electricity", 1, "dummy bypass for ccs retrofit", "{utils.data_id()}")""")
         
         # Retrofit tech
         curs.execute(f"""REPLACE INTO
                     Technology(tech, flag, sector, description, data_id)
-                    VALUES("{ccs_config['tech']}", "p", "electricity", "{ccs_config['description']}", "{utils.data_id('CCS')}")""")
+                    VALUES("{ccs_config['tech']}", "p", "electricity", "{ccs_config['description']}", "{utils.data_id()}")""")
 
 
         for region in config.model_regions:
@@ -1004,7 +1005,23 @@ def aggregate_ccs_retrofits(df_rtv_all: pd.DataFrame):
                 # Retrofit tech
                 curs.execute(f"""REPLACE INTO
                             CapacityToActivity(region, tech, c2a, notes, data_id)
-                            VALUES("{region}", "{ccs_config['tech']}", "{config.params['c2a']}", "({config.params['c2a_unit']})", "{utils.data_id('CCS' + region)}")""")
+                            VALUES("{region}", "{ccs_config['tech']}", "{config.params['c2a']}", "({config.params['c2a_unit']})", "{utils.data_id(region)}")""")
+                
+            
+                # Efficiency dummy retrofit bypass
+                curs.execute(f"""REPLACE INTO
+                            Efficiency(region, input_comm, tech, vintage, output_comm, efficiency, notes, data_id)
+                            VALUES("{region}", "{input_comm['commodity']}", "{bypass_tech}", {config.model_periods[0]}, "{output_comm['commodity']}", 1,
+                            "{eff_units} dummy bypass", "{utils.data_id(region)}")""")
+                
+                # Dummy processes have to retire when their generators reach end of life or they'll be orphaned
+                life = max(exs_vints + coders_gen['service_life']) - config.model_periods[0]
+                curs.execute(
+                    f"""REPLACE INTO
+                    LifetimeTech(region, tech, lifetime, notes, data_id)
+                    VALUES("{region}", "{bypass_tech}", {life},
+                    "(y) matched to end of life of retrofittable generators", "{utils.data_id(region)}")"""
+                )
                 
                 
                 # This is the vintage of the CCS retrofit, not the attached generator
@@ -1017,32 +1034,22 @@ def aggregate_ccs_retrofits(df_rtv_all: pd.DataFrame):
                     ## LifetimeTech
                     # To avoid network orphans, the CCS retrofits must die when their upstream generators do
                     life = min(coders_gen['service_life'], max(exs_vints + coders_gen['service_life']) - vint)
-
                     curs.execute(f"""REPLACE INTO
                                 LifetimeProcess(region, tech, vintage, lifetime, notes, data_source, dq_cred, data_id)
-                                VALUES("{region}", "{ccs_config['tech']}", {vint}, "{life}",
-                                "(y) retrofit so assumed half the life of the retrofitted generator on average - {gen_config['coders_equiv']} service life years",
-                                "{config.refs.get('generation_generic').id}", 2, "{utils.data_id('CCS' + region)}")""")
+                                VALUES("{region}", "{ccs_config['tech']}", {vint}, {life},
+                                "(y) {gen_config['coders_equiv']} service life years - capped at end of life of retrofittable generators",
+                                "{config.refs.get('generation_generic').id}", 2, "{utils.data_id(region)}")""")
 
 
                     ## Efficiency
                     penalty, note = utils.atb_data(ccs_config, core_metric_parameter='Net Output Penalty', core_metric_variable=int(max(ccs_config['atb_min_year'],vint)))
 
-                    # Efficiency penalty to efficiency
+                    # Penalty to efficiency
                     eff = 1 + float(penalty.iloc[0])
-                    eff_units = f"({output_comm['units']}/{output_comm['units']})"
-
-                    # CCS retrofit
                     curs.execute(f"""REPLACE INTO
                                 Efficiency(region, input_comm, tech, vintage, output_comm, efficiency, notes, data_source, dq_cred, data_id)
                                 VALUES("{region}", "{input_comm['commodity']}", "{ccs_config['tech']}", {vint}, "{output_comm['commodity']}",
-                                "{eff}", "{eff_units} {note}", "{config.refs.get('atb').id}", 1, "{utils.data_id('CCS' + region)}")""")
-                    
-                    # Dummy retrofit bypass
-                    curs.execute(f"""REPLACE INTO
-                                Efficiency(region, input_comm, tech, vintage, output_comm, efficiency, notes, data_id)
-                                VALUES("{region}", "{input_comm['commodity']}", "{bypass_tech}", {vint}, "{output_comm['commodity']}", 1,
-                                "{eff_units} dummy bypass", "{utils.data_id(region)}")""")
+                                "{eff}", "{eff_units} {note}", "{config.refs.get('atb').id}", 1, "{utils.data_id(region)}")""")
                     
 
                     ## EmissionActivity
@@ -1054,12 +1061,12 @@ def aggregate_ccs_retrofits(df_rtv_all: pd.DataFrame):
                                 EmissionActivity(region, emis_comm, input_comm, tech, vintage, output_comm, activity, units, notes, data_source, dq_cred, data_id)
                                 VALUES("{region}", "{co2_comm['commodity']}", "{input_comm['commodity']}", "{ccs_config['tech']}", {vint}, "{output_comm['commodity']}",
                                 {emis_act}, "{co2_units}", "Minus capture rate times {gen_config.name} co2 emissions divided by {ccs_code} efficiency",
-                                "{config.refs.get('atb').id}", 1, "{utils.data_id('CCS' + region)}")""")
+                                "{config.refs.get('atb').id}", 1, "{utils.data_id(region)}")""")
                     curs.execute(f"""REPLACE INTO
                                 EmissionActivity(region, emis_comm, input_comm, tech, vintage, output_comm, activity, units, notes, data_source, dq_cred, data_id)
                                 VALUES("{region}", "{co2e_comm['commodity']}", "{input_comm['commodity']}", "{ccs_config['tech']}", {vint}, "{output_comm['commodity']}",
                                 {emis_act}, "{co2e_units}", "Minus capture rate times {gen_config.name} co2 emissions divided by {ccs_code} efficiency",
-                                "{config.refs.get('atb').id}", 1, "{utils.data_id('CCS' + region)}")""")
+                                "{config.refs.get('atb').id}", 1, "{utils.data_id(region)}")""")
                     
 
                     ## CostInvest
@@ -1072,7 +1079,7 @@ def aggregate_ccs_retrofits(df_rtv_all: pd.DataFrame):
                         curs.execute(f"""REPLACE INTO
                                     CostInvest(region, tech, vintage, cost, units, notes, data_source, dq_cred, data_id)
                                     VALUES("{region}", "{ccs_config['tech']}", {vint}, {cost_invest}, "({config.units.loc['cost_invest', 'units']})",
-                                    "{note}", "{config.refs.get('atb').id}", 1, "{utils.data_id('CCS' + region)}")""")
+                                    "{note}", "{config.refs.get('atb').id}", 1, "{utils.data_id(region)}")""")
                     
 
                     # Add CCS retrofit options for all future model periods
@@ -1087,11 +1094,11 @@ def aggregate_ccs_retrofits(df_rtv_all: pd.DataFrame):
                             curs.execute(f"""REPLACE INTO
                                         LimitActivity(region, period, tech_or_group, operator, activity, units, notes, data_id)
                                         VALUES("{region}", {period}, "{ccs_config['tech']}", "le", 0, "({output_comm['units']})",
-                                        "beyond end-of-life of all retrofittable generators", "{utils.data_id('CCS' + region)}")""")
+                                        "beyond end-of-life of all retrofittable generators", "{utils.data_id(region)}")""")
                             curs.execute(f"""REPLACE INTO
                                         LimitActivity(region, period, tech_or_group, operator, activity, units, notes, data_id)
                                         VALUES("{region}", {period}, "{bypass_tech}", "le", 0, "({output_comm['units']})",
-                                        "beyond end-of-life of all retrofittable generators", "{utils.data_id('CCS' + region)}")""")
+                                        "beyond end-of-life of all retrofittable generators", "{utils.data_id(region)}")""")
 
 
                         ## CostFixed
@@ -1103,7 +1110,7 @@ def aggregate_ccs_retrofits(df_rtv_all: pd.DataFrame):
                             curs.execute(f"""REPLACE INTO
                                         CostFixed(region, period, tech, vintage, cost, units, notes, data_source, dq_cred, data_id)
                                         VALUES("{region}", {period}, "{ccs_config['tech']}", {vint}, {cost_fixed}, "({config.units.loc['cost_fixed', 'units']})",
-                                        "{note}", "{config.refs.get('atb').id}", 1, "{utils.data_id('CCS' + region)}")""")
+                                        "{note}", "{config.refs.get('atb').id}", 1, "{utils.data_id(region)}")""")
 
 
                         ## CostVariable
@@ -1115,7 +1122,7 @@ def aggregate_ccs_retrofits(df_rtv_all: pd.DataFrame):
                             curs.execute(f"""REPLACE INTO
                                         CostVariable(region, period, tech, vintage, cost, units, notes, data_source, dq_cred, data_id)
                                         VALUES("{region}", {period}, "{ccs_config['tech']}", {vint}, {cost_variable}, "({config.units.loc['cost_variable', 'units']})",
-                                        "{note}", "{config.refs.get('atb').id}", 1, "{utils.data_id('CCS' + region)}")""")
+                                        "{note}", "{config.refs.get('atb').id}", 1, "{utils.data_id(region)}")""")
 
     conn.commit()
     conn.close()
