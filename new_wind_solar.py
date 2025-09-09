@@ -45,7 +45,7 @@ def aggregate_wind(df_rtv: pd.DataFrame, region: str):
     wind_dir = os.path.realpath(os.path.dirname(__name__)) + f"/provincial_data/on/new_wind/" # TODO other provinces data
     df_comp = pd.read_csv(wind_dir + 'Cluster Composition.csv', index_col=0)
     df_cf = pd.read_csv(wind_dir + 'Cluster Capacity Factors.csv', index_col=0)
-    df_cf = utils.realign_timezone(df_cf, from_utc_offset=-4)
+    df_cf = utils.realign_timezone(df_cf, from_utc_offset=-4) # TODO this was a temp bug fix
     df_spur_cost = pd.read_csv(wind_dir + 'Cluster Spur Costs.csv', index_col=0)
 
     ## Get cost data for each class of turbine T1-3

@@ -182,8 +182,8 @@ def aggregate_boundary_interface(r1_r2: tuple, interface: pd.DataFrame):
 
         ## Technology
         curs.execute(f"""REPLACE INTO
-                    Technology(tech, flag, sector, description, data_id)
-                    VALUES("{tech}", "p", "electricity", "{desc}", "{data_id}")""")
+                    Technology(tech, flag, sector, unlim_cap, annual, description, data_id)
+                    VALUES("{tech}", "p", "electricity", 1, 1, "{desc}", "{data_id}")""")
 
 
         ## Efficiency

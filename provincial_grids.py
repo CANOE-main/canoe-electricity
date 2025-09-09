@@ -189,8 +189,8 @@ def aggregate_demand():
 
         ## Technology
         curs.execute(f"""REPLACE INTO
-                    Technology(tech, flag, sector, unlim_cap, description, data_id)
-                    VALUES("{tech_config['tech']}", "p", "electricity", 1, "{tech_config['description']}", "{data_id}")""")
+                    Technology(tech, flag, sector, unlim_cap, annual, description, data_id)
+                    VALUES("{tech_config['tech']}", "p", "electricity", 1, 1, "{tech_config['description']}", "{data_id}")""")
 
 
         ## Efficiency
