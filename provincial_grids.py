@@ -120,9 +120,9 @@ def aggregate_transmission():
         output_comm = config.commodities.loc[tech_config['out_comm']]
 
         curs.execute(f"""REPLACE INTO
-                    Efficiency(region, input_comm, tech, vintage, output_comm, efficiency, notes)
+                    Efficiency(region, input_comm, tech, vintage, output_comm, efficiency, notes, data_id)
                     VALUES("{region}", "{input_comm['commodity']}", "{tech_config['tech']}", {config.model_periods[0]}, "{output_comm['commodity']}",
-                    1, "dummy tech for distribution costs")""")
+                    1, "dummy tech for distribution costs", "{utils.data_id(region)}")""")
 
     print(f"Transmission aggregated into {os.path.basename(config.database_file)}\n")
 
