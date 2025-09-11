@@ -10,7 +10,8 @@ import os
 from matplotlib import pyplot as pp
 import pandas as pd
 import utils
-import cost_tx_dx
+
+from provincial_data.default import cost_tx_dx
 
 # Provincial parameters
 df_sys: pd.DataFrame

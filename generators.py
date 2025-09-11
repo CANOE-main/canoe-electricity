@@ -13,7 +13,7 @@ import traceback
 import capacity_credits
 import capacity_factors
 import new_wind_solar
-import ramp_rates
+import constraints
 from currency_conversion import conv_curr
 
 df_generic: pd.DataFrame
@@ -121,6 +121,9 @@ def aggregate_new_generators():
 
     ## CapacityFactorTech
     capacity_factors.aggregate_new(df_rtv)
+
+    ## Other constraints
+    constraints.aggregate(df_rtv)
 
     # Aggregate remaining technoeconomic data
     aggregate_generators_generic(df_rtv)
@@ -263,6 +266,9 @@ def aggregate_existing_generators() -> pd.DataFrame:
 
     ## CapacityCredit
     if config.params['include_reserve_margin']: capacity_credits.aggregate_existing(df_rtv)
+
+    ## Other constraints
+    constraints.aggregate(df_rtv)
 
     conn = sqlite3.connect(config.database_file)
     curs = conn.cursor()
@@ -563,10 +569,6 @@ def aggregate_rt_all(region, tech, tech_config):
     curs.execute(f"""REPLACE INTO
                 CapacityToActivity(region, tech, c2a, notes, data_id)
                 VALUES("{region}", "{tech}", "{config.params['c2a']}", "({config.params['c2a_unit']})", "{utils.data_id(region)}")""")
-    
-
-    ## RampUp/DownHourly
-    ramp_rates.aggregate(region, tech, tech_config.name, curs)
     
 
 
