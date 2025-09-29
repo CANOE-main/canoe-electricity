@@ -128,6 +128,9 @@ def aggregate_new_generators():
     # Aggregate remaining technoeconomic data
     aggregate_generators_generic(df_rtv)
 
+    # Add reservoir storage for monthly hydro
+    setup_monthly_hydro(df_rtv.loc[df_rtv['tech_code'] == 'hydro_monthly'])
+
 
 
 def aggregate_new_storage():
@@ -169,7 +172,7 @@ def aggregate_new_storage():
             ## StorageDuration
             curs.execute(f"""REPLACE INTO
                         StorageDuration(region, tech, duration, notes, data_id)
-                        VALUES("{region}", "{tech}", "{storage_config['duration']}", "(hours of storage)", "{utils.data_id(region)}")""")
+                        VALUES("{region}", "{tech}", {storage_config['duration']}, "(hours of storage)", "{utils.data_id(region)}")""")
         
             for vint in config.model_periods:
                 rtv.append({'region': region, 'tech_code': code, 'tech': tech, 'vint': vint})
@@ -310,6 +313,9 @@ def aggregate_existing_generators() -> pd.DataFrame:
     # Aggregate remaining technoeconomic data
     aggregate_generators_generic(df_rtv[['region','tech_code','tech','vint']].copy())
 
+    # Add reservoir storage for monthly hydro
+    setup_monthly_hydro(df_rtv.loc[df_rtv['tech_code'] == 'hydro_monthly'])
+
     return df_rtv
 
 
@@ -432,7 +438,7 @@ def aggregate_existing_storage():
         ## StorageDuration
         curs.execute(f"""REPLACE INTO
                     StorageDuration(region, tech, duration, notes, data_source, data_id)
-                    VALUES("{row['region']}", "{row['tech']}", "{row['storage_duration']}", "(hours of storage)",
+                    VALUES("{row['region']}", "{row['tech']}", {row['storage_duration']}, "(hours of storage)",
                     "{config.refs.get('storage').id}", "{utils.data_id(row['region'])}")""")
     
     
@@ -1125,6 +1131,106 @@ def aggregate_ccs_retrofits(df_rtv_all: pd.DataFrame):
                                         CostVariable(region, period, tech, vintage, cost, units, notes, data_source, dq_cred, data_id)
                                         VALUES("{region}", {period}, "{ccs_config['tech']}", {vint}, {cost_variable}, "({config.units.loc['cost_variable', 'units']})",
                                         "{note}", "{config.refs.get('atb').id}", 1, "{utils.data_id(region)}")""")
+
+    conn.commit()
+    conn.close()
+
+
+
+"""
+##############################################################
+    Monthly hydro
+##############################################################
+"""
+
+def setup_monthly_hydro(df_rtv: pd.DataFrame):
+    """
+    We need to add an intermediate commodity and technology to act as the reservoir storage.
+    To keep things simple, keep the existing MLY-EXS and duplicate some data, 
+    creating MLY-EXS-IN, which fills the reservoir. Changes to make:
+    1. Duplicate ExistingCapacity so both have this existing capacity
+    2. Duplicate and rename Efficiency so it is ethos --IN-> storage --EXS-> electricity
+    3. Duplicate Technology for IN, make it baseload 'pb'
+    4. Make EXS a seasonal storage tech ('ps' tag and seas_stor = 1 in the Technology table)
+    5. Give EXS a StorageDuration of 730 hours (one month... it'll do for now)
+    6. Rename LimitSeasonalCapacityFactor to IN
+    7. Duplicate CapacityToActivity for IN
+    """
+
+    conn = sqlite3.connect(config.database_file)
+    curs = conn.cursor()
+
+    for base_tech in df_rtv['tech'].unique():
+
+        tech_config = config.gen_techs.loc['hydro_monthly']
+
+        in_tech = f'{base_tech}-IN'
+
+        storage_comm = config.commodities.loc['hyd_mly']
+        out_comm = config.commodities.loc[tech_config['out_comm']]
+        
+        ## ExistingCapacity
+        curs.execute(
+            "INSERT INTO "
+            "ExistingCapacity(region, tech, vintage, capacity, units, notes, data_source, dq_cred, data_id) " 
+            f"SELECT region, '{in_tech}' as tech, vintage, capacity, units, notes, data_source, dq_cred, data_id "
+            "FROM ExistingCapacity "
+            f"WHERE tech == '{base_tech}' "
+        )
+
+        ## Efficiency
+        note = f"({out_comm['units']}/{storage_comm['units']}) storage units are available generation"
+        curs.execute(
+            "INSERT INTO "
+            "Efficiency(region, input_comm, tech, vintage, output_comm, efficiency, notes, data_source, dq_cred, data_id) " 
+            f"SELECT region, input_comm, '{in_tech}' as tech, vintage, '{storage_comm['commodity']}' as output_comm, efficiency, '{note}' as notes, data_source, dq_cred, data_id "
+            "FROM Efficiency "
+            f"WHERE tech == '{base_tech}' "
+        )
+        curs.execute(
+            "UPDATE Efficiency "
+            f"SET input_comm = '{storage_comm['commodity']}', "
+            f"notes = '{note}' "
+            f"WHERE tech == '{base_tech}'"
+        )
+
+        ## Technology
+        desc = 'inflow to reservoir for monthly hydroelectric generation'
+        curs.execute(
+            "INSERT INTO "
+            "Technology(tech, flag, sector, description, data_id) " 
+            f"SELECT '{in_tech}' as tech, 'pb' as flag, sector, '{desc}' as description, data_id "
+            "FROM Technology "
+            f"WHERE tech == '{base_tech}' "
+        )
+        curs.execute(
+            "UPDATE Technology "
+            f"SET "
+            "flag = 'ps', "
+            "seas_stor = 1 "
+            f"WHERE tech == '{base_tech}'"
+        )
+
+        ## CapacityToActivity
+        curs.execute(
+            "INSERT INTO "
+            "CapacityToActivity(region, tech, c2a, notes, data_id) " 
+            f"SELECT region, '{in_tech}' as tech, c2a, notes, data_id "
+            "FROM CapacityToActivity "
+            f"WHERE tech == '{base_tech}' "
+        )
+
+        ## LimitSeasonalCapacityFactor
+        curs.execute(f"UPDATE LimitSeasonalCapacityFactor SET tech = '{in_tech}' WHERE tech == '{base_tech}'")
+        
+        ## StorageDuration
+        for region in df_rtv.loc[df_rtv['tech'] == base_tech]['region'].unique():
+            curs.execute(
+                f"""REPLACE INTO
+                StorageDuration(region, tech, duration, notes, data_id)
+                VALUES("{region}", "{base_tech}", 730,
+                "(hours of storage) one month", "{utils.data_id(region)}")"""
+            )
 
     conn.commit()
     conn.close()
