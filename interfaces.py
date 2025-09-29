@@ -340,7 +340,7 @@ def aggregate_endogenous_interfaces(df_interfaces: pd.DataFrame):
         ## Technology
         curs.execute(f"""REPLACE INTO
                     Technology(tech, flag, sector, exchange, description, data_id)
-                    VALUES("{tech_config['tech']}", "p", "electricity", 1, "{tech_config['description']}", "{data_id}")""")
+                    VALUES("{tech_config['tech']}", "p", "electricity", 1, "{tech_config['description']}", "{utils.data_id()}")""")
 
 
         ## Efficiency
