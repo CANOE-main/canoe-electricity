@@ -99,29 +99,24 @@ def aggregate_boundary_interfaces(df_interfaces):
     
     # Get associated intertie names for each boundary interface
     df_interties['intertie_names'] = [df_interfaces.loc[(r1_r2[0], r1_r2[1]), 'associated_interties'] for r1_r2 in df_interties[['region_1','region_2']].values]
-
+    
     # Only want boundary interfaces
     if config.params['full_dataset']:
-        # If either region is in the model, aggregate that data
-        df_boundary = df_interties.loc[df_interties['region_1'].isin(config.model_regions) | df_interties['region_2'].isin(config.model_regions)]
+        # If either region is in the model, aggregate the data in that direction
+        for (r1, r2), interface in df_interties.groupby(['region_1','region_2']):
+            if r1 in config.model_regions: aggregate_boundary_interface(r1, r2, interface)
+            if r2 in config.model_regions: aggregate_boundary_interface(r2, r1, interface)
     else:
-        # If only ONE of the regions is in the model, aggregate that data
-        df_boundary = df_interties.loc[df_interties['region_1'].isin(config.model_regions) != df_interties['region_2'].isin(config.model_regions)]
-
-    # Aggregate all intertie flows leaving or entering each model region. Only one of region_1 or region_2 is endogenous
-    for r1_r2, interface in df_boundary.groupby(['region_1','region_2']): aggregate_boundary_interface(r1_r2, interface)
-
+        # If only ONE of the regions is in the model, aggregate that data only in the OUTWARD direction
+        for (r1, r2), interface in df_interties.groupby(['region_1','region_2']):
+            if r1 in config.model_regions and r2 not in config.model_regions: aggregate_boundary_interface(r1, r2, interface)
+            elif r2 in config.model_regions and r1 not in config.model_regions: aggregate_boundary_interface(r2, r1, interface)
 
 
-def aggregate_boundary_interface(r1_r2: tuple, interface: pd.DataFrame):
 
-    region_1 = r1_r2[0]
-    region_2 = r1_r2[1]
-    intertie_names = interface['intertie_names'].values[0]
+def aggregate_boundary_interface(in_region: str, out_region: str, interface: pd.DataFrame):
     
-    # Work out which region is inside and which is outside the model
-    in_region = region_1 if region_1 in config.model_regions else region_2
-    out_region = region_2 if region_1 == in_region else region_1
+    intertie_names = interface['intertie_names'].values[0]
 
     data_id = utils.data_id(f"BINT{in_region}{out_region}")
 
@@ -152,7 +147,7 @@ def aggregate_boundary_interface(r1_r2: tuple, interface: pd.DataFrame):
 
     # If no flows on this boundary at all, skip
     if in_mwh is None or out_mwh is None or (max(in_mwh) == 0 and max(out_mwh) == 0):
-        print(f"No flows found for boundary interface {region_1}-{region_2} so it was skipped.")
+        print(f"No flows found for boundary interface {in_region}-{out_region} so it was skipped.")
         return
 
     pp.figure()
@@ -236,7 +231,9 @@ def aggregate_boundary_interface(r1_r2: tuple, interface: pd.DataFrame):
         curs.executemany(f"""REPLACE INTO
                     DemandSpecificDistribution(region, period, season, tod, demand_name, dsd, notes, data_source, dq_cred, data_id)
                     VALUES(?,?,?,?,?,?,?,?,?,?)""", data)
-        
+    
+    else:
+        print(f"Got zero flow for boundary intertie from {in_region} out to {out_region}. Skipped outgoing intertie.")
 
     
     """
@@ -302,6 +299,9 @@ def aggregate_boundary_interface(r1_r2: tuple, interface: pd.DataFrame):
         curs.executemany(f"""REPLACE INTO
                     CapacityFactorTech(region, period, season, tod, tech, factor, notes, data_source, dq_cred, data_id)
                     VALUES(?,?,?,?,?,?,?,?,?,?)""", data)
+        
+    else:
+        print(f"Got zero flow for boundary intertie from {out_region} into {in_region}. Skipped incoming intertie.")
 
 
 
