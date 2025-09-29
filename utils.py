@@ -140,7 +140,7 @@ def get_statcan_table(table, save_as=None, filter:'function'=None, **kwargs):
 
         df.to_csv(config.cache_dir + save_as)
 
-        print(f"Cached Statcan table {table}.")
+        print(f"Cached Statcan table {table} as {save_as}.")
         return df
 
     else:
