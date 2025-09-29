@@ -1,21 +1,22 @@
 code,commodity,description,flag,units
-biogas,E_bio_g,biogas for electricity generation,p,PJ
-biomass,E_bio_m,biomass for electricity generation,p,PJ
 ethos,E_ethos,dummy commodity,s,PJ
-ng,E_ng,natural gas for electricity generation,p,PJ
-coal,E_coal,coal for electricity generation,p,PJ
-oil,E_oil,oil for electricity generation,p,PJ
-diesel,E_dies,diesel for electricity generation,p,PJ
-u_nat,E_u_nat,uranium (natural) for electricity generation,p,PJ
-u_enr,E_u_enr,uranium (enriched) for electricity generation,p,PJ
-gasoline,E_gsl,gasoline for electricity generation,p,PJ
+biogas,E_bio_g,biogas for electricity generation,a,PJ
+biomass,E_bio_m,biomass for electricity generation,a,PJ
+ng,E_ng,natural gas for electricity generation,a,PJ
+coal,E_coal,coal for electricity generation,a,PJ
+oil,E_oil,oil for electricity generation,a,PJ
+diesel,E_dies,diesel for electricity generation,a,PJ
+u_nat,E_u_nat,uranium (natural) for electricity generation,a,PJ
+u_enr,E_u_enr,uranium (enriched) for electricity generation,a,PJ
+gasoline,E_gsl,gasoline for electricity generation,a,PJ
+hyd_mly,E_hyd_mly_stor,available generation stored in monthly hydro reservoir,p,PJ
 elc_tx,E_elc_tx,transmission-side electricity,p,PJ
 elc_dx,E_elc_dx,distribution-side electricity,p,PJ
 elc_dem,E_elc_dem,demand-side electricity,p,PJ
 demand,E_D_elc,demand for electricity,d,PJ
+demand_int,E_D_elc_int,demanded for exogenous electricity from boundary interties,d,PJ
 co2e,co2e,carbon-dioxide-equivalent,e,ktCO2eq
 co2,co2,carbon dioxide,e,ktCO2eq
 so2,so2,sulfur dioxide,e,tSO2
 nox,nox,nitrous oxide,e,tNOx
 hg,hg,mercury,e,gHg
-demand_int,E_D_elc_int,demanded for exogenous electricity from boundary interties,d,PJ
