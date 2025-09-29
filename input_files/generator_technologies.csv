@@ -20,6 +20,6 @@ nuclear_pwr,E_NUC_PWR,nuclear pressurised water reactor generation,TRUE,,nuclear
 nuclear_smr,E_NUC_SMR,nuclear small modular reactor generation,TRUE,nuclear_smr,nuclear_smr,Nuclear - Small,Nuclear,Nuclear - Small,Moderate,2030,u_enr,elc_tx,,pb,reserve,TRUE,FALSE
 oil_ct,E_OIL_CT,oil combustion turbine generation,FALSE,oil_ct,oil_ct,,,,,2022,oil,elc_tx,,p,reserve,TRUE,FALSE
 oil_st,E_OIL_ST,oil steam turbine generation,FALSE,oil_st,oil_st,,,,,2022,oil,elc_tx,,p,reserve,TRUE,FALSE
-solar,E_SOL_PV,utility-scale solar photovoltaic generation,TRUE,solar_pv+solar,solar_pv,Utility PV - Class 3,,,Moderate,2022,ethos,elc_tx,10,p,"curtail,reserve",TRUE,FALSE
+solar,E_SOL_PV,utility-scale solar photovoltaic generation,TRUE,solar_pv+solar,solar_pv,Utility PV - Class 3,,,Moderate,2022,ethos,elc_tx,5,p,"curtail,reserve",TRUE,FALSE
 wind_offshore,E_WND_OFF,offshore wind generation,FALSE,wind_ofs,wind_offshore,Offshore Wind - Class 3,,,Moderate,2022,ethos,elc_tx,,p,"curtail,reserve",TRUE,FALSE
 wind_onshore,E_WND_ON,onshore wind generation,TRUE,wind_ons,wind_onshore,Land-Based Wind - Class 7 - Technology 1,,,Moderate,2022,ethos,elc_tx,13,p,"curtail,reserve",TRUE,FALSE
