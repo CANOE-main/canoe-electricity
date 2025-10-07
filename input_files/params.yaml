@@ -92,7 +92,7 @@ coders:
 
 atb:
   url: 'https://oedi-data-lake.s3.amazonaws.com/ATB/electricity/csv/2024/v3.0.0/ATBe.csv'
-  reference: "NREL. (2024). Annual Technology Baseline. <scenario> scenario. Retrieved from https://atb.nrel.gov/"
+  reference: "NREL. (2024). Annual Technology Baseline. Retrieved from https://atb.nrel.gov/"
   master_url: "https://data.openei.org/files/6006/2024_v3_Workbook.xlsx"
   master_reference: "NREL. (2024). Annual Technology Baseline. Excel workbook sheet <sheet>. Retrieved from https://atb.nrel.gov/"
   year: 2024
