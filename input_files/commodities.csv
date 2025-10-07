@@ -5,7 +5,7 @@ biomass,E_bio_m,biomass for electricity generation,a,PJ
 ng,E_ng,natural gas for electricity generation,a,PJ
 coal,E_coal,coal for electricity generation,a,PJ
 oil,E_oil,oil for electricity generation,a,PJ
-diesel,E_dies,diesel for electricity generation,a,PJ
+diesel,E_dsl,diesel for electricity generation,a,PJ
 u_nat,E_u_nat,uranium (natural) for electricity generation,a,PJ
 u_enr,E_u_enr,uranium (enriched) for electricity generation,a,PJ
 gasoline,E_gsl,gasoline for electricity generation,a,PJ

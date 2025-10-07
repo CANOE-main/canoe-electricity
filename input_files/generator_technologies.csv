@@ -4,8 +4,8 @@ biomass,E_BIO_M,biomass generation,TRUE,biomass+msw,biomass,Biopower - Dedicated
 biomass_cg,E_BIO_M_CG,biomass heat and power cogeneration,FALSE,biomass_cg,biomass_cg,Biopower - Dedicated,Biopower,Dedicated,Moderate,2022,biomass,elc_dx,,p,reserve,TRUE,FALSE
 coal,E_COAL,coal generation,FALSE,coal,coal,Coal-new,Coal_FE,Coal-new,Moderate,2022,coal,elc_tx,,p,reserve,TRUE,FALSE
 coal_ccs,E_COAL_CCS,coal generation with 95% ccs,FALSE,coal_ccs,coal_ccs,Coal-95%-CCS,Coal_FE,Coal-CCS-95%,Moderate,2022,coal,elc_tx,,p,reserve,TRUE,FALSE
-diesel_ct,E_DIES_CT,diesel combustion turbine generation,FALSE,diesel_ct,diesel_ct,,,,,2022,diesel,elc_tx,,p,reserve,TRUE,FALSE
-diesel_st,E_DIES_ST,diesel steam turbine generation,FALSE,diesel_st,diesel_st,,,,,2022,diesel,elc_tx,,p,reserve,TRUE,FALSE
+diesel_ct,E_DSL_CT,diesel combustion turbine generation,FALSE,diesel_ct,diesel_ct,,,,,2022,diesel,elc_tx,,p,reserve,TRUE,FALSE
+diesel_st,E_DSL_ST,diesel steam turbine generation,FALSE,diesel_st,diesel_st,,,,,2022,diesel,elc_tx,,p,reserve,TRUE,FALSE
 geothermal,E_GEO,geothermal generation,FALSE,geothermal,geothermal,Geothermal - Hydro / Flash,,,Moderate,2022,ethos,elc_tx,,p,reserve,TRUE,FALSE
 gasoline_ct,E_GSL_CT,gasoline combustion turbine generation,FALSE,gasoline_ct,gasoline_ct,,,,,2022,gasoline,elc_tx,,p,reserve,TRUE,FALSE
 hydro_daily,E_HYD_DLY,hydroelectric generation with daily reservoir storage,FALSE,hydro_daily,hydro_daily,,,,,2022,ethos,elc_tx,,p,reserve,TRUE,TRUE
