@@ -100,6 +100,7 @@ atb:
   currency_year: 2021 # TODO check
   currency: 'USD'
   tsv_headers: # translates technology specific variables headers
+    'HeatRate(MMBtu/MWh)': 'heat_rate_MMBtu_MWh'
     'OutageRates(%)Forced': 'forced_outage_%'
     'Planned': 'planned_outage_%'
     'Emissions(lbs/MMBtu)SO2': 'emissions_so2_lbs_MMBtu'
