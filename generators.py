@@ -684,7 +684,7 @@ def aggregate_rtv_atb(region, tech, vint, tech_config):
 
 
     ## EmissionActivity
-    if config.params['include_emissions'] and eff is not None:
+    if (tech_config['ccs'] or config.params['include_emissions']) and eff is not None:
 
         if tsv is None: # no ATB emissions data so use CODERS
             aggregate_emissions_rtv_coders(region, tech, vint, input_comm, output_comm, coders_gen, tech_config)
@@ -695,6 +695,11 @@ def aggregate_rtv_atb(region, tech, vint, tech_config):
                 emis_act = config.units.loc[f"{emis}_emissions", 'atb_conv_fact'] * float(tsv[f"emissions_{emis}_lbs_MMBtu"]) / eff
                 emis_comm = config.commodities.loc[emis]
                 emis_units = f"({emis_comm['units']}/{output_comm['units']})"
+
+                # Emissions are accounted upstream so negative emissions here to offset
+                if not config.params['include_emissions']:
+                    if emis != 'co2': continue
+                    emis_act = -emis_act * (tech_config['ccs']) / (1 - tech_config['ccs'])
 
                 if emis_act != 0 and not pd.isna(emis_act):
                     curs.execute(f"""REPLACE INTO
@@ -843,7 +848,7 @@ def aggregate_rtv_coders(region, tech, vint, tech_config):
     
 
     ## EmissionActivity
-    if config.params['include_emissions']:
+    if tech_config['ccs'] or config.params['include_emissions']:
         aggregate_emissions_rtv_coders(region, tech, vint, input_comm, output_comm, coders_gen, tech_config)
 
 
@@ -874,6 +879,10 @@ def aggregate_emissions_rtv_coders(region, tech, vint, input_comm, output_comm, 
     emis_act = config.units.loc['co2_emissions', 'coders_conv_fact'] * float(coders_gen['carbon_emissions'])
     emis_comm = config.commodities.loc['co2e']
     emis_units = f"({emis_comm['units']}/{output_comm['units']})"
+
+    # Emissions are accounted upstream so negative emissions here to offset
+    if not config.params['include_emissions']:
+        emis_act = -emis_act * (tech_config['ccs']) / (1 - tech_config['ccs'])
 
     if emis_act != 0 and not pd.isna(emis_act):
         curs.execute(f"""REPLACE INTO
@@ -919,11 +928,11 @@ def aggregate_ccs_retrofits(df_rtv_all: pd.DataFrame):
 
     conn = sqlite3.connect(config.database_file)
     curs = conn.cursor()
-
-    if not config.params['include_emissions']:
-        print("Including ccs retrofits but not other emissions. Are emissions being included upstream?")
     
     print("Aggregating CCS retrofits data...")
+
+    if not config.params['include_emissions']:
+        print("Including ccs retrofits but not other emissions. Assuming emissions are accounted upstream.")
 
     # Get region-tech-vint sets for techs with CCS retrofits
     if df_rtv_all is None: df_rtv_all = pd.DataFrame(columns=['region','tech_code','vint'])
