@@ -950,13 +950,14 @@ def aggregate_ccs_retrofits(df_rtv_all: pd.DataFrame):
 
         try:
             tsv = atb_tsv(gen_config['atb_master_sheet'], gen_config['atb_tsv_row'])
-            gen_emis = config.units.loc[f"co2_emissions", 'atb_conv_fact'] * float(tsv[f"emissions_co2_lbs_MMBtu"])
+            gen_emis = config.units.loc[f"co2_emissions", 'atb_conv_fact'] * float(tsv["emissions_co2_lbs_MMBtu"]) \
+                * float(tsv["heat_rate_MMBtu_MWh"]) * config.units.loc[f"heat_rate", 'atb_conv_fact']
         except Exception as e:
-            gen_emis = config.units.loc['co2_emissions', 'coders_conv_fact'] * float(coders_gen['carbon_emissions'])
+            gen_emis = config.units.loc['co2_emissions', 'coders_conv_fact'] * float(coders_gen['carbon_emissions']) \
+                / float(coders_gen['efficiency'])
             print(traceback.format_exc())
             print(f"\nTrying to aggregate {ccs_code} but could not get CO2 emissions of retrofitted generator {gen_config.name} from ATB workbook."
                   f"\nWill use CODERS emissions data for now but this will be capturing CO2-equivalent emissions!")
-            continue
 
         if gen_emis <= 0:
             print(f"Tried to aggregate {ccs_code} but retrofitted generator {gen_config.name} had {gen_emis} CO2 emissions!")
@@ -1171,7 +1172,7 @@ def setup_monthly_hydro(df_rtv: pd.DataFrame):
         
         ## ExistingCapacity
         curs.execute(
-            "INSERT INTO "
+            "REPLACE INTO "
             "ExistingCapacity(region, tech, vintage, capacity, units, notes, data_source, dq_cred, data_id) " 
             f"SELECT region, '{in_tech}' as tech, vintage, capacity, units, notes, data_source, dq_cred, data_id "
             "FROM ExistingCapacity "
@@ -1181,7 +1182,7 @@ def setup_monthly_hydro(df_rtv: pd.DataFrame):
         ## Efficiency
         note = f"({out_comm['units']}/{storage_comm['units']}) storage units are available generation"
         curs.execute(
-            "INSERT INTO "
+            "REPLACE INTO "
             "Efficiency(region, input_comm, tech, vintage, output_comm, efficiency, notes, data_source, dq_cred, data_id) " 
             f"SELECT region, input_comm, '{in_tech}' as tech, vintage, '{storage_comm['commodity']}' as output_comm, efficiency, '{note}' as notes, data_source, dq_cred, data_id "
             "FROM Efficiency "
@@ -1197,7 +1198,7 @@ def setup_monthly_hydro(df_rtv: pd.DataFrame):
         ## Technology
         desc = 'inflow to reservoir for monthly hydroelectric generation'
         curs.execute(
-            "INSERT INTO "
+            "REPLACE INTO "
             "Technology(tech, flag, sector, description, data_id) " 
             f"SELECT '{in_tech}' as tech, 'pb' as flag, sector, '{desc}' as description, data_id "
             "FROM Technology "
@@ -1213,7 +1214,7 @@ def setup_monthly_hydro(df_rtv: pd.DataFrame):
 
         ## CapacityToActivity
         curs.execute(
-            "INSERT INTO "
+            "REPLACE INTO "
             "CapacityToActivity(region, tech, c2a, notes, data_id) " 
             f"SELECT region, '{in_tech}' as tech, c2a, notes, data_id "
             "FROM CapacityToActivity "
