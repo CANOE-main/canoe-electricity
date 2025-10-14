@@ -963,7 +963,7 @@ CREATE TABLE IF NOT EXISTS LimitAnnualCapacityFactor
     FOREIGN KEY (data_source, data_id) REFERENCES DataSource (source_id, data_id),
     FOREIGN KEY (tech, data_id) REFERENCES Technology (tech, data_id),
     FOREIGN KEY (output_comm, data_id) REFERENCES Commodity (name, data_id),
-    PRIMARY KEY (region, period, tech, operator, data_id),
+    PRIMARY KEY (region, period, tech, output_comm, operator, data_id),
     CHECK (factor >= 0 AND factor <= 1)
 );
 CREATE TABLE IF NOT EXISTS LimitCapacity
