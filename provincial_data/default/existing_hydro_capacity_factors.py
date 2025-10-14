@@ -91,6 +91,7 @@ def aggregate_cfs(df_rtv: pd.DataFrame):
         hourly /= 1000 # MW to GW
 
         cf = hourly / rt['capacity'] # GW / GW
+        cf[cf < config.params['cf_tolerance']] = 0
         cfs[rt['region']][rt['tech_code']] = cf
 
         if rt['tech_code'] != 'hydro_run': continue # only need CFs for plotting
@@ -129,6 +130,7 @@ def aggregate_cfs(df_rtv: pd.DataFrame):
                 hourly *= rt['unit_average_annual_energy'] / df_total_energy.loc[rt['region']]
                 hourly /= 1000
                 cf_seas = hourly / rt['capacity'] # GW / GW
+                cf_seas[cf_seas < config.params['cf_tolerance']] = 0
 
                 curs.execute(f"""REPLACE INTO
                             LimitSeasonalCapacityFactor(region, period, season, tech, operator, factor, notes,

@@ -88,6 +88,9 @@ def get_capacity_factors() -> tuple[dict[str, np.ndarray], str, reference]:
     cf_wind = np.clip(hourly_wind / np.mean(hourly_wind) * cf_ann_wind, 0, 1)
     cf_solar = np.clip(hourly_solar / np.mean(hourly_solar) * cf_ann_solar, 0, 1)
 
+    cf_wind[cf_wind < config.params['cf_tolerance']] = 0
+    cf_solar[cf_solar < config.params['cf_tolerance']] = 0
+
     # Save as csv for readability
     this_dir = os.path.realpath(os.path.dirname(__file__)) + "/"
     pd.DataFrame(cf_wind).to_csv(this_dir + f"output_data/cf_wind_{weather_year}.csv")

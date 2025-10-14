@@ -107,6 +107,7 @@ def aggregate_vre(df_rtv: pd.DataFrame, cf_file: str):
         # Adjust for expected annual energy and clip to [0:1] again
         cf: pd.Series = energy_adjust * gen_mwh / rt['capacity']
         cf = cf.clip(0, 1)
+        cf[cf < config.params['cf_tolerance']] = 0
         
         # For net load for capacity credit calculations
         config.exs_vre_gen[rt['region']] += cf * capacity
