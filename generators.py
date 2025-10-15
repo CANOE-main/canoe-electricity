@@ -702,10 +702,22 @@ def aggregate_rtv_atb(region, tech, vint, tech_config):
                     emis_act = -emis_act * (tech_config['ccs']) / (1 - tech_config['ccs'])
 
                 if emis_act != 0 and not pd.isna(emis_act):
-                    curs.execute(f"""REPLACE INTO
-                                EmissionActivity(region, emis_comm, input_comm, tech, vintage, output_comm, activity, units, notes, data_source, dq_cred, data_id)
-                                VALUES("{region}", "{emis_comm['commodity']}", "{input_comm['commodity']}", "{tech}", {vint}, "{output_comm['commodity']}",
-                                {emis_act}, "{emis_units}", "{tsv_note} - emissions_{emis}_lbs_MMBtu", "{config.refs.get(tsv_note).id}", 1, "{data_id}")""")
+                    curs.execute(
+                        f"""REPLACE INTO
+                        EmissionActivity(region, emis_comm, input_comm, tech, vintage, output_comm, activity, units, notes, data_source, dq_cred, data_id)
+                        VALUES("{region}", "{emis_comm['commodity']}", "{input_comm['commodity']}", "{tech}", {vint}, "{output_comm['commodity']}",
+                        {emis_act}, "{emis_units}", "{tsv_note} - emissions_{emis}_lbs_MMBtu", "{config.refs.get(tsv_note).id}", 1, "{data_id}")"""
+                    )
+                    # Duplicate co2 for co2e
+                    if emis == 'co2':
+                        emis_comm = config.commodities.loc['co2e']
+                        emis_units = f"({emis_comm['units']}/{output_comm['units']})"
+                        curs.execute(
+                            f"""REPLACE INTO
+                            EmissionActivity(region, emis_comm, input_comm, tech, vintage, output_comm, activity, units, notes, data_source, dq_cred, data_id)
+                            VALUES("{region}", "{emis_comm['commodity']}", "{input_comm['commodity']}", "{tech}", {vint}, "{output_comm['commodity']}",
+                            {emis_act}, "{emis_units}", "{tsv_note} - emissions_{emis}_lbs_MMBtu", "{config.refs.get(tsv_note).id}", 1, "{data_id}")"""
+                        )
 
 
     # Indexed by period and vintage
@@ -974,10 +986,6 @@ def aggregate_ccs_retrofits(df_rtv_all: pd.DataFrame):
         
         # Commodities data
         output_comm = config.commodities.loc[gen_config['out_comm']]
-        co2_comm = config.commodities.loc['co2']
-        co2e_comm = config.commodities.loc['co2']
-        co2_units = f"({co2_comm['units']}/{output_comm['units']})"
-        co2e_units = f"({co2e_comm['units']}/{output_comm['units']})"
         eff_units = f"({output_comm['units']}/{output_comm['units']})"
 
         # Create new intermediate commodity between generator and retrofit
@@ -1075,16 +1083,21 @@ def aggregate_ccs_retrofits(df_rtv_all: pd.DataFrame):
 
                     # Add as both negative CO2 and negative that same number CO2e (1:1)
                     # CANOE currently tracks both separate GHGs and an aggregate CO2e (double counting)
-                    curs.execute(f"""REPLACE INTO
-                                EmissionActivity(region, emis_comm, input_comm, tech, vintage, output_comm, activity, units, notes, data_source, dq_cred, data_id)
-                                VALUES("{region}", "{co2_comm['commodity']}", "{input_comm['commodity']}", "{ccs_config['tech']}", {vint}, "{output_comm['commodity']}",
-                                {emis_act}, "{co2_units}", "Minus capture rate times {gen_config.name} co2 emissions divided by {ccs_code} efficiency",
-                                "{config.refs.get('atb').id}", 1, "{utils.data_id(region)}")""")
-                    curs.execute(f"""REPLACE INTO
-                                EmissionActivity(region, emis_comm, input_comm, tech, vintage, output_comm, activity, units, notes, data_source, dq_cred, data_id)
-                                VALUES("{region}", "{co2e_comm['commodity']}", "{input_comm['commodity']}", "{ccs_config['tech']}", {vint}, "{output_comm['commodity']}",
-                                {emis_act}, "{co2e_units}", "Minus capture rate times {gen_config.name} co2 emissions divided by {ccs_code} efficiency",
-                                "{config.refs.get('atb').id}", 1, "{utils.data_id(region)}")""")
+                    for e in ('co2', 'co2e'):
+                        
+                        emis_comm = config.commodities.loc[e]
+                        units = f"({emis_comm['units']}/{output_comm['units']})"
+
+                        curs.execute(f"""REPLACE INTO
+                                    EmissionActivity(region, emis_comm, input_comm, tech, vintage, output_comm, activity, units, notes, data_source, dq_cred, data_id)
+                                    VALUES("{region}", "{emis_comm['commodity']}", "{input_comm['commodity']}", "{ccs_config['tech']}", {vint}, "{output_comm['commodity']}",
+                                    {emis_act}, "{units}", "Minus capture rate times {gen_config.name} co2 emissions divided by {ccs_code} efficiency",
+                                    "{config.refs.get('atb').id}", 1, "{utils.data_id(region)}")""")
+                        curs.execute(f"""REPLACE INTO
+                                    EmissionActivity(region, emis_comm, input_comm, tech, vintage, output_comm, activity, units, notes, data_source, dq_cred, data_id)
+                                    VALUES("{region}", "{emis_comm['commodity']}", "{input_comm['commodity']}", "{ccs_config['tech']}", {vint}, "{output_comm['commodity']}",
+                                    {emis_act}, "{units}", "Minus capture rate times {gen_config.name} co2 emissions divided by {ccs_code} efficiency",
+                                    "{config.refs.get('atb').id}", 1, "{utils.data_id(region)}")""")
                     
 
                     ## CostInvest
