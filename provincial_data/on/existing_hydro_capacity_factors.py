@@ -97,8 +97,8 @@ def get_capacity_factors(year: int) -> tuple[dict[str, list[float]], str, refere
     cf_dly = cf_dly[0:8760]
     cf_ror = cf_ror[0:8760]
 
-    cf_dly[cf_dly < config.params['cf_tolerance']] = 0
-    cf_ror[cf_ror < config.params['cf_tolerance']] = 0
+    [cf * (cf < config.params['cf_tolerance']) for cf in cf_dly]
+    [cf * (cf < config.params['cf_tolerance']) for cf in cf_ror]
 
     # Save as csvs so other scripts can pull from them
     pd.DataFrame(cf_dly).to_csv(this_dir + f"output_data/cf_hydro_run_{year}.csv")

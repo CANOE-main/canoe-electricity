@@ -187,6 +187,7 @@ def aggregate_wind(df_rtv: pd.DataFrame, region: str):
 
         cf: pd.Series = df_cf[str(cluster)] * df_cf_index.loc[str(rtv['vint']), cluster]
         cf = cf.clip(0,1)
+        cf[cf < config.params['cf_tolerance']] = 0
         tod_0 = config.time.iloc[0]['tod']
         
         data = []
@@ -367,6 +368,7 @@ def aggregate_solar(df_rtv: pd.DataFrame, region: str):
         ## CapacityFactorProcess
         cf: pd.Series = df_cf[str(cluster)] * cf_index[str(rtv['vint'])]
         cf = cf.clip(0,1)
+        cf[cf < config.params['cf_tolerance']] = 0
         tod_0 = config.time.iloc[0]['tod']
 
         data = []
