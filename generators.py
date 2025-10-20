@@ -684,7 +684,7 @@ def aggregate_rtv_atb(region, tech, vint, tech_config):
 
 
     ## EmissionActivity
-    if config.params['include_emissions'] and eff is not None:
+    if (tech_config['ccs'] or config.params['include_emissions']) and eff is not None:
 
         if tsv is None: # no ATB emissions data so use CODERS
             aggregate_emissions_rtv_coders(region, tech, vint, input_comm, output_comm, coders_gen, tech_config)
@@ -696,11 +696,28 @@ def aggregate_rtv_atb(region, tech, vint, tech_config):
                 emis_comm = config.commodities.loc[emis]
                 emis_units = f"({emis_comm['units']}/{output_comm['units']})"
 
+                # Emissions are accounted upstream so negative emissions here to offset
+                if not config.params['include_emissions']:
+                    if emis != 'co2': continue
+                    emis_act = -emis_act * (tech_config['ccs']) / (1 - tech_config['ccs'])
+
                 if emis_act != 0 and not pd.isna(emis_act):
-                    curs.execute(f"""REPLACE INTO
-                                EmissionActivity(region, emis_comm, input_comm, tech, vintage, output_comm, activity, units, notes, data_source, dq_cred, data_id)
-                                VALUES("{region}", "{emis_comm['commodity']}", "{input_comm['commodity']}", "{tech}", {vint}, "{output_comm['commodity']}",
-                                {emis_act}, "{emis_units}", "{tsv_note} - emissions_{emis}_lbs_MMBtu", "{config.refs.get(tsv_note).id}", 1, "{data_id}")""")
+                    curs.execute(
+                        f"""REPLACE INTO
+                        EmissionActivity(region, emis_comm, input_comm, tech, vintage, output_comm, activity, units, notes, data_source, dq_cred, data_id)
+                        VALUES("{region}", "{emis_comm['commodity']}", "{input_comm['commodity']}", "{tech}", {vint}, "{output_comm['commodity']}",
+                        {emis_act}, "{emis_units}", "{tsv_note} - emissions_{emis}_lbs_MMBtu", "{config.refs.get(tsv_note).id}", 1, "{data_id}")"""
+                    )
+                    # Duplicate co2 for co2e
+                    if emis == 'co2':
+                        emis_comm = config.commodities.loc['co2e']
+                        emis_units = f"({emis_comm['units']}/{output_comm['units']})"
+                        curs.execute(
+                            f"""REPLACE INTO
+                            EmissionActivity(region, emis_comm, input_comm, tech, vintage, output_comm, activity, units, notes, data_source, dq_cred, data_id)
+                            VALUES("{region}", "{emis_comm['commodity']}", "{input_comm['commodity']}", "{tech}", {vint}, "{output_comm['commodity']}",
+                            {emis_act}, "{emis_units}", "{tsv_note} - emissions_{emis}_lbs_MMBtu", "{config.refs.get(tsv_note).id}", 1, "{data_id}")"""
+                        )
 
 
     # Indexed by period and vintage
@@ -843,7 +860,7 @@ def aggregate_rtv_coders(region, tech, vint, tech_config):
     
 
     ## EmissionActivity
-    if config.params['include_emissions']:
+    if tech_config['ccs'] or config.params['include_emissions']:
         aggregate_emissions_rtv_coders(region, tech, vint, input_comm, output_comm, coders_gen, tech_config)
 
 
@@ -874,6 +891,10 @@ def aggregate_emissions_rtv_coders(region, tech, vint, input_comm, output_comm, 
     emis_act = config.units.loc['co2_emissions', 'coders_conv_fact'] * float(coders_gen['carbon_emissions'])
     emis_comm = config.commodities.loc['co2e']
     emis_units = f"({emis_comm['units']}/{output_comm['units']})"
+
+    # Emissions are accounted upstream so negative emissions here to offset
+    if not config.params['include_emissions']:
+        emis_act = -emis_act * (tech_config['ccs']) / (1 - tech_config['ccs'])
 
     if emis_act != 0 and not pd.isna(emis_act):
         curs.execute(f"""REPLACE INTO
@@ -919,11 +940,11 @@ def aggregate_ccs_retrofits(df_rtv_all: pd.DataFrame):
 
     conn = sqlite3.connect(config.database_file)
     curs = conn.cursor()
-
-    if not config.params['include_emissions']:
-        print("Including ccs retrofits but not other emissions. Are emissions being included upstream?")
     
     print("Aggregating CCS retrofits data...")
+
+    if not config.params['include_emissions']:
+        print("Including ccs retrofits but not other emissions. Assuming emissions are accounted upstream.")
 
     # Get region-tech-vint sets for techs with CCS retrofits
     if df_rtv_all is None: df_rtv_all = pd.DataFrame(columns=['region','tech_code','vint'])
@@ -950,13 +971,14 @@ def aggregate_ccs_retrofits(df_rtv_all: pd.DataFrame):
 
         try:
             tsv = atb_tsv(gen_config['atb_master_sheet'], gen_config['atb_tsv_row'])
-            gen_emis = config.units.loc[f"co2_emissions", 'atb_conv_fact'] * float(tsv[f"emissions_co2_lbs_MMBtu"])
+            gen_emis = config.units.loc[f"co2_emissions", 'atb_conv_fact'] * float(tsv["emissions_co2_lbs_MMBtu"]) \
+                * float(tsv["heat_rate_MMBtu_MWh"]) * config.units.loc[f"heat_rate", 'atb_conv_fact']
         except Exception as e:
-            gen_emis = config.units.loc['co2_emissions', 'coders_conv_fact'] * float(coders_gen['carbon_emissions'])
+            gen_emis = config.units.loc['co2_emissions', 'coders_conv_fact'] * float(coders_gen['carbon_emissions']) \
+                / float(coders_gen['efficiency'])
             print(traceback.format_exc())
             print(f"\nTrying to aggregate {ccs_code} but could not get CO2 emissions of retrofitted generator {gen_config.name} from ATB workbook."
                   f"\nWill use CODERS emissions data for now but this will be capturing CO2-equivalent emissions!")
-            continue
 
         if gen_emis <= 0:
             print(f"Tried to aggregate {ccs_code} but retrofitted generator {gen_config.name} had {gen_emis} CO2 emissions!")
@@ -964,10 +986,6 @@ def aggregate_ccs_retrofits(df_rtv_all: pd.DataFrame):
         
         # Commodities data
         output_comm = config.commodities.loc[gen_config['out_comm']]
-        co2_comm = config.commodities.loc['co2']
-        co2e_comm = config.commodities.loc['co2']
-        co2_units = f"({co2_comm['units']}/{output_comm['units']})"
-        co2e_units = f"({co2e_comm['units']}/{output_comm['units']})"
         eff_units = f"({output_comm['units']}/{output_comm['units']})"
 
         # Create new intermediate commodity between generator and retrofit
@@ -1065,16 +1083,21 @@ def aggregate_ccs_retrofits(df_rtv_all: pd.DataFrame):
 
                     # Add as both negative CO2 and negative that same number CO2e (1:1)
                     # CANOE currently tracks both separate GHGs and an aggregate CO2e (double counting)
-                    curs.execute(f"""REPLACE INTO
-                                EmissionActivity(region, emis_comm, input_comm, tech, vintage, output_comm, activity, units, notes, data_source, dq_cred, data_id)
-                                VALUES("{region}", "{co2_comm['commodity']}", "{input_comm['commodity']}", "{ccs_config['tech']}", {vint}, "{output_comm['commodity']}",
-                                {emis_act}, "{co2_units}", "Minus capture rate times {gen_config.name} co2 emissions divided by {ccs_code} efficiency",
-                                "{config.refs.get('atb').id}", 1, "{utils.data_id(region)}")""")
-                    curs.execute(f"""REPLACE INTO
-                                EmissionActivity(region, emis_comm, input_comm, tech, vintage, output_comm, activity, units, notes, data_source, dq_cred, data_id)
-                                VALUES("{region}", "{co2e_comm['commodity']}", "{input_comm['commodity']}", "{ccs_config['tech']}", {vint}, "{output_comm['commodity']}",
-                                {emis_act}, "{co2e_units}", "Minus capture rate times {gen_config.name} co2 emissions divided by {ccs_code} efficiency",
-                                "{config.refs.get('atb').id}", 1, "{utils.data_id(region)}")""")
+                    for e in ('co2', 'co2e'):
+                        
+                        emis_comm = config.commodities.loc[e]
+                        units = f"({emis_comm['units']}/{output_comm['units']})"
+
+                        curs.execute(f"""REPLACE INTO
+                                    EmissionActivity(region, emis_comm, input_comm, tech, vintage, output_comm, activity, units, notes, data_source, dq_cred, data_id)
+                                    VALUES("{region}", "{emis_comm['commodity']}", "{input_comm['commodity']}", "{ccs_config['tech']}", {vint}, "{output_comm['commodity']}",
+                                    {emis_act}, "{units}", "Minus capture rate times {gen_config.name} co2 emissions divided by {ccs_code} efficiency",
+                                    "{config.refs.get('atb').id}", 1, "{utils.data_id(region)}")""")
+                        curs.execute(f"""REPLACE INTO
+                                    EmissionActivity(region, emis_comm, input_comm, tech, vintage, output_comm, activity, units, notes, data_source, dq_cred, data_id)
+                                    VALUES("{region}", "{emis_comm['commodity']}", "{input_comm['commodity']}", "{ccs_config['tech']}", {vint}, "{output_comm['commodity']}",
+                                    {emis_act}, "{units}", "Minus capture rate times {gen_config.name} co2 emissions divided by {ccs_code} efficiency",
+                                    "{config.refs.get('atb').id}", 1, "{utils.data_id(region)}")""")
                     
 
                     ## CostInvest
@@ -1171,7 +1194,7 @@ def setup_monthly_hydro(df_rtv: pd.DataFrame):
         
         ## ExistingCapacity
         curs.execute(
-            "INSERT INTO "
+            "REPLACE INTO "
             "ExistingCapacity(region, tech, vintage, capacity, units, notes, data_source, dq_cred, data_id) " 
             f"SELECT region, '{in_tech}' as tech, vintage, capacity, units, notes, data_source, dq_cred, data_id "
             "FROM ExistingCapacity "
@@ -1181,7 +1204,7 @@ def setup_monthly_hydro(df_rtv: pd.DataFrame):
         ## Efficiency
         note = f"({out_comm['units']}/{storage_comm['units']}) storage units are available generation"
         curs.execute(
-            "INSERT INTO "
+            "REPLACE INTO "
             "Efficiency(region, input_comm, tech, vintage, output_comm, efficiency, notes, data_source, dq_cred, data_id) " 
             f"SELECT region, input_comm, '{in_tech}' as tech, vintage, '{storage_comm['commodity']}' as output_comm, efficiency, '{note}' as notes, data_source, dq_cred, data_id "
             "FROM Efficiency "
@@ -1197,7 +1220,7 @@ def setup_monthly_hydro(df_rtv: pd.DataFrame):
         ## Technology
         desc = 'inflow to reservoir for monthly hydroelectric generation'
         curs.execute(
-            "INSERT INTO "
+            "REPLACE INTO "
             "Technology(tech, flag, sector, description, data_id) " 
             f"SELECT '{in_tech}' as tech, 'pb' as flag, sector, '{desc}' as description, data_id "
             "FROM Technology "
@@ -1213,7 +1236,7 @@ def setup_monthly_hydro(df_rtv: pd.DataFrame):
 
         ## CapacityToActivity
         curs.execute(
-            "INSERT INTO "
+            "REPLACE INTO "
             "CapacityToActivity(region, tech, c2a, notes, data_id) " 
             f"SELECT region, '{in_tech}' as tech, c2a, notes, data_id "
             "FROM CapacityToActivity "

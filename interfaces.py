@@ -290,6 +290,7 @@ def aggregate_boundary_interface(in_region: str, out_region: str, interface: pd.
             for h, time in config.time.iterrows():
 
                 cf = in_mwh[h] / max(in_mwh)
+                if cf < config.params['cf_tolerance']: cf = 0
 
                 if time['tod'] == config.time.iloc[0]['tod']:
                     data.append([in_region, period, time['season'], time['tod'], tech, cf, note, ref.id, 2, data_id])
@@ -385,6 +386,7 @@ def aggregate_endogenous_interfaces(df_interfaces: pd.DataFrame):
                 for h, time in config.time.iterrows():
 
                     cf = interface[f"ttc_{time['summer_winter']}"] * config.units.loc['capacity', 'coders_conv_fact'] / capacity
+                    if cf < config.params['cf_tolerance']: cf = 0
 
                     if time['tod'] == config.time.iloc[0]['tod']:
                         data.append([r1r2, period, time['season'], time['tod'], tech_config['tech'], cf,

@@ -34,6 +34,9 @@ global_discount_rate: 0.03 # A temporary fix to calculate VRE LCOEs # TODO calcu
 # For computational reasons
 dsd_tolerance: 0.02
 
+# Set capacity factor to zero if less than this, for computational reasons.
+cf_tolerance: 0.01
+
 sqlite_schema: "canoe_dataset_schema.sql"
 sqlite_database: "electricity.sqlite"
 excel_template: "Template spreadsheet (make a copy).xlsx"
@@ -100,6 +103,7 @@ atb:
   currency_year: 2021 # TODO check
   currency: 'USD'
   tsv_headers: # translates technology specific variables headers
+    'HeatRate(MMBtu/MWh)': 'heat_rate_MMBtu_MWh'
     'OutageRates(%)Forced': 'forced_outage_%'
     'Planned': 'planned_outage_%'
     'Emissions(lbs/MMBtu)SO2': 'emissions_so2_lbs_MMBtu'

@@ -91,6 +91,7 @@ def aggregate_cfs(df_rtv: pd.DataFrame):
         hourly /= 1000 # MW to GW
 
         cf = hourly / rt['capacity'] # GW / GW
+        cf[cf < config.params['cf_tolerance']] = 0
         cfs[rt['region']][rt['tech_code']] = cf
 
         if rt['tech_code'] != 'hydro_run': continue # only need CFs for plotting
@@ -120,7 +121,7 @@ def aggregate_cfs(df_rtv: pd.DataFrame):
             
     # Daily and monthly storage hydro
     # This will break if hydro isn't aggregated to a single vintage
-    _note = note + ' Available energy assumed constant for each day within each month.' # TODO LDES
+    _note = note + ' Available energy assumed constant for each day within each month.'
     for _idx, rt in df_rt.loc[df_rt['tech_code'].isin(('hydro_daily','hydro_monthly'))].iterrows():
         for period in config.model_periods:
             for seas in config.time['season'].unique():
@@ -129,6 +130,8 @@ def aggregate_cfs(df_rtv: pd.DataFrame):
                 hourly *= rt['unit_average_annual_energy'] / df_total_energy.loc[rt['region']]
                 hourly /= 1000
                 cf_seas = hourly / rt['capacity'] # GW / GW
+                if cf_seas < config.params['cf_tolerance']:
+                    cf_seas = 0
 
                 curs.execute(f"""REPLACE INTO
                             LimitSeasonalCapacityFactor(region, period, season, tech, operator, factor, notes,
