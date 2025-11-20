@@ -38,9 +38,11 @@ def process():
     # Add any used comms to the commodities table
     for code, comm in config.commodities.iterrows():
         if comm['commodity'] in used_comms:
-            curs.execute(f"""REPLACE INTO
-                        Commodity(name, flag, description, data_id)
-                        VALUES('{comm['commodity']}', '{comm['flag']}', '({comm['units']}) {comm['description']}', "{utils.data_id()}")""")
+            curs.execute(
+                f"""REPLACE INTO
+                Commodity(name, flag, description, data_id)
+                VALUES('{comm['commodity']}', '{comm['flag']}', '({comm['units']}) {comm['description']}', "{utils.data_id()}")"""
+            )
         
 
     """

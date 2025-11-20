@@ -14,7 +14,7 @@ elc_tx,E_elc_tx,transmission-side electricity,p,PJ
 elc_dx,E_elc_dx,distribution-side electricity,p,PJ
 elc_dem,E_elc_dem,demand-side electricity,p,PJ
 demand,E_D_elc,demand for electricity,d,PJ
-demand_int,E_D_elc_int,demanded for exogenous electricity from boundary interties,d,PJ
+demand_int,E_D_elc_int,demanded for exogenous electricity from boundary intertie,d,PJ
 co2e,co2e,carbon-dioxide-equivalent,e,ktCO2eq
 co2,co2,carbon dioxide,e,ktCO2
 so2,so2,sulfur dioxide,e,tSO2

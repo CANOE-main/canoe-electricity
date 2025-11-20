@@ -169,7 +169,9 @@ def aggregate_boundary_interface(in_region: str, out_region: str, interface: pd.
 
         tech_config = config.trans_techs.loc['int_out']
         input_comm = config.commodities.loc[tech_config['in_comm']]
-        output_comm = config.commodities.loc[tech_config['out_comm']]
+        dem_comm = config.commodities.loc[tech_config['out_comm']].copy()
+        dem_comm['commodity'] += f'_{out_region.lower()}'
+        ann_dem = sum(out_mwh) * config.units.loc['activity', 'coders_conv_fact'] # MWh to PJ
 
         tech = f"{tech_config['tech']}-{out_region}"
         desc = f"{tech_config['description']} - {in_region} out to {out_region}"
@@ -183,11 +185,11 @@ def aggregate_boundary_interface(in_region: str, out_region: str, interface: pd.
 
         ## Efficiency
         eff = 1.0 - float(df_sys.loc[in_region, 'system_line_losses_percent'])
-        note = f"({output_comm['units']}/{input_comm['units']}) {in_region} system_line_losses_percent"
+        note = f"({dem_comm['units']}/{input_comm['units']}) {in_region} system_line_losses_percent"
 
         curs.execute(f"""REPLACE INTO
                     Efficiency(region, input_comm, tech, vintage, output_comm, efficiency, notes, data_source, dq_cred, data_id)
-                    VALUES("{in_region}", "{input_comm['commodity']}", "{tech}", {vint},"{output_comm['commodity']}",
+                    VALUES("{in_region}", "{input_comm['commodity']}", "{tech}", {vint},"{dem_comm['commodity']}",
                     {eff}, "{note}", "{config.refs.get('ca_system_parameters').id}", 2, "{data_id}")""")
         
 
@@ -195,10 +197,13 @@ def aggregate_boundary_interface(in_region: str, out_region: str, interface: pd.
         curs.execute(f"""REPLACE INTO
                     CapacityToActivity(region, tech, c2a, notes, data_id)
                     VALUES("{in_region}", "{tech}", "{config.params['c2a']}", "({config.params['c2a_unit']})", "{data_id}")""")
-    
-
-        ann_dem = sum(out_mwh) * config.units.loc['activity', 'coders_conv_fact'] # MWh to PJ
-        dem_comm = config.commodities.loc[tech_config['out_comm']]
+        
+        ## Commodity
+        curs.execute(
+            f"""REPLACE INTO
+            Commodity(name, flag, description, data_id)
+            VALUES("{dem_comm['commodity']}", "d", "{dem_comm['description']}", "{data_id}")"""
+        )
 
         for period in config.model_periods:
 
