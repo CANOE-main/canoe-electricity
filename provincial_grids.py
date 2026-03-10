@@ -242,13 +242,14 @@ def aggregate_demand():
 
         ## Demand
         for period in config.model_periods:
-
-            ann_dem = config.units.loc['demand', 'coders_conv_fact'] * df_annual.loc[region, str(period)]
+            
+            demand_year = str(utils.data_year(period))
+            ann_dem = config.units.loc['demand', 'coders_conv_fact'] * df_annual.loc[region, demand_year]
 
             curs.execute(f"""REPLACE INTO
                         Demand(region, period, commodity, demand, units, notes, data_source, dq_cred, data_id)
                         VALUES("{region}", {period}, "{dem_comm['commodity']}", {ann_dem}, "({dem_comm['units']})",
-                        "provincial electricity demand projection {df_annual.loc[region, 'province']} {period}",
+                        "provincial electricity demand projection {df_annual.loc[region, 'province']} {demand_year}",
                         "{config.refs.get("forecasted_annual_demand").id}", 2, "{data_id}")""")
             
     

@@ -14,14 +14,13 @@ model_periods:
   - 2035
   - 2040
   - 2045
-  - 2050
 
 base_year: 2020 # year to pull data from by default
 weather_year: 2018 # year to pull timeseries data for
 timezone: 'EST' # final model timezone
 
 data_id_prefix: 'ELCHR'
-data_version: '001'
+data_version: '002'
 
 # Currency, data costs are exchanged and inflated in post processing
 final_currency: 'CAD' # Not configured to output currencies other than CAD yet
