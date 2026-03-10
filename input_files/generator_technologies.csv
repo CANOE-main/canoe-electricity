@@ -13,7 +13,7 @@ hydro_monthly,E_HYD_MLY,hydroelectric generation with monthly reservoir storage,
 hydro_run,E_HYD_ROR,hydroelectric run-of-river generation,FALSE,hydro_run,hydro_run,,,,,2022,ethos,elc_dx,,p,"curtail,reserve",TRUE,TRUE,0
 ng_cc,E_NG_CC,natural gas combined cycle generation,TRUE,ng_cc,ng_cc,NG 2-on-1 Combined Cycle (H-Frame),Natural Gas_FE,NG 2x1 H-Frame CC,Moderate,2022,ng,elc_tx,,p,reserve,TRUE,FALSE,0
 ng_ccs,E_NG_CCS,natural gas combined cycle generation with 95% ccs,TRUE,ng_ccs,ng_ccs,NG 2-on-1 Combined Cycle (H-Frame) 95% CCS,Natural Gas_FE,NG 2x1 H-Frame CC 95% CCS,Moderate,2022,ng,elc_tx,,p,reserve,TRUE,FALSE,0.95
-ng_cg,E_NG_CG,natural gas heat and power cogeneration,FALSE,ng_cg,ng_cg,,,,,2022,ng,elc_dx,,p,reserve,TRUE,FALSE,0
+ng_cg,E_NG_CG,natural gas heat and power cogeneration,FALSE,ng_cg,ng_cg,,,,,2022,ng,elc_dx,,p,"reserve,annual",TRUE,FALSE,0
 ng_ct,E_NG_CT,natural gas combustion turbine generation,TRUE,ng_sc+ng_ct+gas_ct,ng_sc,NG Combustion Turbine (F-Frame),Natural Gas_FE,NG F-Frame CT,Moderate,2022,ng,elc_tx,,p,reserve,TRUE,FALSE,0
 nuclear_candu,E_NUC_CANDU,nuclear candu generation,FALSE,nuclear,nuclear,,,,,2022,u_nat,elc_tx,,pb,reserve,TRUE,FALSE,0
 nuclear_pwr,E_NUC_PWR,nuclear pressurised water reactor generation,TRUE,,nuclear,Nuclear - Large,Nuclear,Nuclear - Large,Moderate,2030,u_enr,elc_tx,,pb,reserve,TRUE,FALSE,0
