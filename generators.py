@@ -619,7 +619,14 @@ def aggregate_rt_atb(region, tech, tech_config):
         for vint in config.model_periods:
 
             metric = config.params['atb']['cost_invest_metric']
-            cost_invest, note = utils.atb_data(tech_config, core_metric_parameter=metric, core_metric_variable=int(max(tech_config['atb_min_year'],vint)))
+            cost_invest, note = utils.atb_data(
+                tech_config,
+                core_metric_parameter=metric,
+                core_metric_variable=int(max(
+                    tech_config['atb_min_year'],
+                    utils.data_year(vint)
+                ))
+            )
             cost_invest = conv_curr(float(cost_invest.iloc[0]), config.params['atb']['currency_year'], config.params['atb']['currency'])
             
             if cost_invest != 0 and not pd.isna(cost_invest):
@@ -669,7 +676,7 @@ def aggregate_rtv_atb(region, tech, vint, tech_config):
                     1, "{eff_units} dummy input so arbitrary", "{data_id}")""")
     
     else:
-        eff, note = utils.atb_data(tech_config, core_metric_parameter='Heat Rate', core_metric_variable=int(max(tech_config['atb_min_year'],vint)))
+        eff, note = utils.atb_data(tech_config, core_metric_parameter='Heat Rate', core_metric_variable=int(max(tech_config['atb_min_year'],utils.data_year(vint))))
 
         # If eff is None should be a storage tech and efficiency is already added so skip
         if eff is not None:
@@ -727,7 +734,7 @@ def aggregate_rtv_atb(region, tech, vint, tech_config):
         
 
         ## CostFixed
-        cost_fixed, note = utils.atb_data(tech_config, core_metric_parameter='Fixed O&M', core_metric_variable=int(max(tech_config['atb_min_year'],vint)))
+        cost_fixed, note = utils.atb_data(tech_config, core_metric_parameter='Fixed O&M', core_metric_variable=int(max(tech_config['atb_min_year'],utils.data_year(vint))))
         cost_fixed = config.units.loc['cost_fixed', 'atb_conv_fact'] * float(cost_fixed.iloc[0])
         cost_fixed = conv_curr(cost_fixed, config.params['atb']['currency_year'], config.params['atb']['currency'])
 
@@ -739,8 +746,8 @@ def aggregate_rtv_atb(region, tech, vint, tech_config):
 
 
         ## CostVariable
-        cost_variable, var_note = utils.atb_data(tech_config, core_metric_parameter='Variable O&M', core_metric_variable=int(max(tech_config['atb_min_year'],vint)))
-        cost_fuel, fuel_note = utils.atb_data(tech_config, core_metric_parameter='Fuel', core_metric_variable=period)
+        cost_variable, var_note = utils.atb_data(tech_config, core_metric_parameter='Variable O&M', core_metric_variable=int(max(tech_config['atb_min_year'],utils.data_year(vint))))
+        cost_fuel, fuel_note = utils.atb_data(tech_config, core_metric_parameter='Fuel', core_metric_variable=utils.data_year(period))
 
         # If asking for fuel costs and ATB doesn't have it, use CODERS for all variable cost (can't mix currencies)
         if config.params['include_tech_fuel_cost'] and tech_config['include_fuel_cost'] and cost_fuel is None:
@@ -785,7 +792,7 @@ def aggregate_rt_coders(region, tech, tech_config):
     if not utils.is_exs(tech):
         for vint in config.model_periods:
 
-            cost = config.units.loc['cost_invest', 'coders_conv_fact'] * float(cost_invest[f"{vint}_CAD_per_kW"])
+            cost = config.units.loc['cost_invest', 'coders_conv_fact'] * float(cost_invest[f"{utils.data_year(vint)}_CAD_per_kW"])
             cost = conv_curr(cost, config.params['coders']['currency_year'], config.params['coders']['currency'])
             # 'cost_invest_notes, data_cost_invest, data_cost_year, data_curr,' -> 'cost_invest_notes, data_cost_invest, data_cost_year, data_curr,'
             curs.execute(f"""REPLACE INTO
@@ -1068,7 +1075,7 @@ def aggregate_ccs_retrofits(df_rtv_all: pd.DataFrame):
 
 
                     ## Efficiency
-                    penalty, note = utils.atb_data(ccs_config, core_metric_parameter='Net Output Penalty', core_metric_variable=int(max(ccs_config['atb_min_year'],vint)))
+                    penalty, note = utils.atb_data(ccs_config, core_metric_parameter='Net Output Penalty', core_metric_variable=int(max(ccs_config['atb_min_year'],utils.data_year(vint))))
 
                     # Penalty to efficiency
                     eff = 1 + float(penalty.iloc[0])
@@ -1102,7 +1109,7 @@ def aggregate_ccs_retrofits(df_rtv_all: pd.DataFrame):
 
                     ## CostInvest
                     metric = config.params['atb']['ccs_retrofit_cost_invest_metric']
-                    cost_invest, note = utils.atb_data(ccs_config, core_metric_parameter=metric, core_metric_variable=int(max(ccs_config['atb_min_year'],vint)))
+                    cost_invest, note = utils.atb_data(ccs_config, core_metric_parameter=metric, core_metric_variable=int(max(ccs_config['atb_min_year'],utils.data_year(vint))))
                     cost_invest = config.units.loc['cost_invest', 'atb_conv_fact'] * float(cost_invest.iloc[0])
                     cost_invest = conv_curr(cost_invest, config.params['atb']['currency_year'], config.params['atb']['currency'])
 
@@ -1133,7 +1140,7 @@ def aggregate_ccs_retrofits(df_rtv_all: pd.DataFrame):
 
 
                         ## CostFixed
-                        cost_fixed, note = utils.atb_data(ccs_config, core_metric_parameter='Fixed O&M', core_metric_variable=int(max(ccs_config['atb_min_year'],vint)))
+                        cost_fixed, note = utils.atb_data(ccs_config, core_metric_parameter='Fixed O&M', core_metric_variable=int(max(ccs_config['atb_min_year'],utils.data_year(vint))))
                         cost_fixed = config.units.loc['cost_fixed', 'atb_conv_fact'] * float(cost_fixed.iloc[0])
                         cost_fixed = conv_curr(cost_fixed, config.params['atb']['currency_year'], config.params['atb']['currency'])
 
@@ -1145,7 +1152,7 @@ def aggregate_ccs_retrofits(df_rtv_all: pd.DataFrame):
 
 
                         ## CostVariable
-                        cost_variable, note = utils.atb_data(ccs_config, core_metric_parameter='Variable O&M', core_metric_variable=int(max(ccs_config['atb_min_year'],vint)))
+                        cost_variable, note = utils.atb_data(ccs_config, core_metric_parameter='Variable O&M', core_metric_variable=int(max(ccs_config['atb_min_year'],utils.data_year(vint))))
                         cost_variable = config.units.loc['cost_variable', 'atb_conv_fact'] * float(cost_variable.iloc[0])
                         cost_variable = conv_curr(cost_variable, config.params['atb']['currency_year'], config.params['atb']['currency'])
 
