@@ -939,9 +939,9 @@ CREATE TABLE IF NOT EXISTS LimitActivityShare
 CREATE TABLE IF NOT EXISTS LimitAnnualCapacityFactor
 (
     region      TEXT,
-    period      INTEGER
-        REFERENCES TimePeriod (period),
     tech        TEXT,
+    vintage  INTEGER
+        REFERENCES TimePeriod (period),
     output_comm TEXT,
     operator	TEXT  NOT NULL DEFAULT "le"
     	REFERENCES Operator (operator),
@@ -963,7 +963,7 @@ CREATE TABLE IF NOT EXISTS LimitAnnualCapacityFactor
     FOREIGN KEY (data_source, data_id) REFERENCES DataSource (source_id, data_id),
     FOREIGN KEY (tech, data_id) REFERENCES Technology (tech, data_id),
     FOREIGN KEY (output_comm, data_id) REFERENCES Commodity (name, data_id),
-    PRIMARY KEY (region, period, tech, output_comm, operator, data_id),
+    PRIMARY KEY (region, tech, vintage, output_comm, operator, data_id),
     CHECK (factor >= 0 AND factor <= 1)
 );
 CREATE TABLE IF NOT EXISTS LimitCapacity
