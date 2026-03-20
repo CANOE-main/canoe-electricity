@@ -59,8 +59,8 @@ CREATE TABLE IF NOT EXISTS CapacityCredit
         REFERENCES DataQualityTime (dq_time),
     data_id TEXT
         REFERENCES DataSet (data_id),
-    FOREIGN KEY (data_source, data_id) REFERENCES DataSource (source_id, data_id),
-    FOREIGN KEY (tech, data_id) REFERENCES Technology (tech, data_id),
+    FOREIGN KEY (data_source) REFERENCES DataSourceLabel (source_id),
+    FOREIGN KEY (tech) REFERENCES TechnologyLabel (tech),
     PRIMARY KEY (region, period, tech, vintage, data_id),
     CHECK (credit >= 0 AND credit <= 1)
 );
@@ -90,8 +90,8 @@ CREATE TABLE IF NOT EXISTS CapacityFactorProcess
         REFERENCES DataQualityTime (dq_time),
     data_id TEXT
         REFERENCES DataSet (data_id),
-    FOREIGN KEY (data_source, data_id) REFERENCES DataSource (source_id, data_id),
-    FOREIGN KEY (tech, data_id) REFERENCES Technology (tech, data_id),
+    FOREIGN KEY (data_source) REFERENCES DataSourceLabel (source_id),
+    FOREIGN KEY (tech) REFERENCES TechnologyLabel (tech),
     PRIMARY KEY (region, period, season, tod, tech, vintage, data_id),
     CHECK (factor >= 0 AND factor <= 1)
 );
@@ -120,8 +120,8 @@ CREATE TABLE IF NOT EXISTS CapacityFactorTech
         REFERENCES DataQualityTime (dq_time),
     data_id TEXT
         REFERENCES DataSet (data_id),
-    FOREIGN KEY (data_source, data_id) REFERENCES DataSource (source_id, data_id),
-    FOREIGN KEY (tech, data_id) REFERENCES Technology (tech, data_id),
+    FOREIGN KEY (data_source) REFERENCES DataSourceLabel (source_id),
+    FOREIGN KEY (tech) REFERENCES TechnologyLabel (tech),
     PRIMARY KEY (region, period, season, tod, tech, data_id),
     CHECK (factor >= 0 AND factor <= 1)
 );
@@ -144,9 +144,15 @@ CREATE TABLE IF NOT EXISTS CapacityToActivity
         REFERENCES DataQualityTime (dq_time),
     data_id TEXT
         REFERENCES DataSet (data_id),
-    FOREIGN KEY (data_source, data_id) REFERENCES DataSource (source_id, data_id),
-    FOREIGN KEY (tech, data_id) REFERENCES Technology (tech, data_id),
+    FOREIGN KEY (data_source) REFERENCES DataSourceLabel (source_id),
+    FOREIGN KEY (tech) REFERENCES TechnologyLabel (tech),
     PRIMARY KEY (region, tech, data_id)
+);
+CREATE TABLE IF NOT EXISTS CommodityLabel
+(
+    commodity TEXT
+        PRIMARY KEY,
+    notes  TEXT
 );
 CREATE TABLE IF NOT EXISTS Commodity
 (
@@ -156,6 +162,7 @@ CREATE TABLE IF NOT EXISTS Commodity
     description TEXT,
     data_id TEXT
         REFERENCES DataSet (data_id),
+    FOREIGN KEY (name) REFERENCES CommodityLabel (commodity),
     PRIMARY KEY (name, data_id)
 );
 CREATE TABLE IF NOT EXISTS CommodityType
@@ -202,9 +209,9 @@ CREATE TABLE IF NOT EXISTS ConstructionInput
         REFERENCES DataQualityTime (dq_time),
     data_id TEXT
         REFERENCES DataSet (data_id),
-    FOREIGN KEY (data_source, data_id) REFERENCES DataSource (source_id, data_id),
-    FOREIGN KEY (tech, data_id) REFERENCES Technology (tech, data_id),
-    FOREIGN KEY (input_comm, data_id) REFERENCES Commodity (name, data_id),
+    FOREIGN KEY (data_source) REFERENCES DataSourceLabel (source_id),
+    FOREIGN KEY (tech) REFERENCES TechnologyLabel (tech),
+    FOREIGN KEY (input_comm) REFERENCES CommodityLabel (commodity),
     PRIMARY KEY (region, input_comm, tech, vintage, data_id)
 );
 CREATE TABLE IF NOT EXISTS CostEmission
@@ -229,8 +236,8 @@ CREATE TABLE IF NOT EXISTS CostEmission
         REFERENCES DataQualityTime (dq_time),
     data_id TEXT
         REFERENCES DataSet (data_id),
-    FOREIGN KEY (data_source, data_id) REFERENCES DataSource (source_id, data_id),
-    FOREIGN KEY (emis_comm, data_id) REFERENCES Commodity (name, data_id),
+    FOREIGN KEY (data_source) REFERENCES DataSourceLabel (source_id),
+    FOREIGN KEY (emis_comm) REFERENCES CommodityLabel (commodity),
     PRIMARY KEY (region, period, emis_comm, data_id)
 );
 CREATE TABLE IF NOT EXISTS CostFixed
@@ -257,8 +264,8 @@ CREATE TABLE IF NOT EXISTS CostFixed
         REFERENCES DataQualityTime (dq_time),
     data_id TEXT
         REFERENCES DataSet (data_id),
-    FOREIGN KEY (data_source, data_id) REFERENCES DataSource (source_id, data_id),
-    FOREIGN KEY (tech, data_id) REFERENCES Technology (tech, data_id),
+    FOREIGN KEY (data_source) REFERENCES DataSourceLabel (source_id),
+    FOREIGN KEY (tech) REFERENCES TechnologyLabel (tech),
     PRIMARY KEY (region, period, tech, vintage, data_id)
 );
 CREATE TABLE IF NOT EXISTS CostInvest
@@ -283,8 +290,8 @@ CREATE TABLE IF NOT EXISTS CostInvest
         REFERENCES DataQualityTime (dq_time),
     data_id TEXT
         REFERENCES DataSet (data_id),
-    FOREIGN KEY (data_source, data_id) REFERENCES DataSource (source_id, data_id),
-    FOREIGN KEY (tech, data_id) REFERENCES Technology (tech, data_id),
+    FOREIGN KEY (data_source) REFERENCES DataSourceLabel (source_id),
+    FOREIGN KEY (tech) REFERENCES TechnologyLabel (tech),
     PRIMARY KEY (region, tech, vintage, data_id)
 );
 CREATE TABLE IF NOT EXISTS CostVariable
@@ -311,8 +318,8 @@ CREATE TABLE IF NOT EXISTS CostVariable
         REFERENCES DataQualityTime (dq_time),
     data_id TEXT
         REFERENCES DataSet (data_id),
-    FOREIGN KEY (data_source, data_id) REFERENCES DataSource (source_id, data_id),
-    FOREIGN KEY (tech, data_id) REFERENCES Technology (tech, data_id),
+    FOREIGN KEY (data_source) REFERENCES DataSourceLabel (source_id),
+    FOREIGN KEY (tech) REFERENCES TechnologyLabel (tech),
     PRIMARY KEY (region, period, tech, vintage, data_id)
 );
 CREATE TABLE IF NOT EXISTS Demand
@@ -337,8 +344,8 @@ CREATE TABLE IF NOT EXISTS Demand
         REFERENCES DataQualityTime (dq_time),
     data_id TEXT
         REFERENCES DataSet (data_id),
-    FOREIGN KEY (data_source, data_id) REFERENCES DataSource (source_id, data_id),
-    FOREIGN KEY (commodity, data_id) REFERENCES Commodity (name, data_id),
+    FOREIGN KEY (data_source) REFERENCES DataSourceLabel (source_id),
+    FOREIGN KEY (commodity) REFERENCES CommodityLabel (commodity),
     PRIMARY KEY (region, period, commodity, data_id)
 );
 CREATE TABLE IF NOT EXISTS DemandSpecificDistribution
@@ -366,8 +373,8 @@ CREATE TABLE IF NOT EXISTS DemandSpecificDistribution
         REFERENCES DataQualityTime (dq_time),
     data_id TEXT
         REFERENCES DataSet (data_id),
-    FOREIGN KEY (data_source, data_id) REFERENCES DataSource (source_id, data_id),
-    FOREIGN KEY (demand_name, data_id) REFERENCES Commodity (name, data_id),
+    FOREIGN KEY (data_source) REFERENCES DataSourceLabel (source_id),
+    FOREIGN KEY (demand_name) REFERENCES CommodityLabel (commodity),
     PRIMARY KEY (region, period, season, tod, demand_name, data_id),
     CHECK (dsd >= 0 AND dsd <= 1)
 );
@@ -394,9 +401,9 @@ CREATE TABLE IF NOT EXISTS EndOfLifeOutput
         REFERENCES DataQualityTime (dq_time),
     data_id TEXT
         REFERENCES DataSet (data_id),
-    FOREIGN KEY (data_source, data_id) REFERENCES DataSource (source_id, data_id),
-    FOREIGN KEY (tech, data_id) REFERENCES Technology (tech, data_id),
-    FOREIGN KEY (output_comm, data_id) REFERENCES Commodity (name, data_id),
+    FOREIGN KEY (data_source) REFERENCES DataSourceLabel (source_id),
+    FOREIGN KEY (tech) REFERENCES TechnologyLabel (tech),
+    FOREIGN KEY (output_comm) REFERENCES CommodityLabel (commodity),
     PRIMARY KEY (region, tech, vintage, output_comm, data_id)
 );
 CREATE TABLE IF NOT EXISTS Efficiency
@@ -422,10 +429,10 @@ CREATE TABLE IF NOT EXISTS Efficiency
         REFERENCES DataQualityTime (dq_time),
     data_id TEXT
         REFERENCES DataSet (data_id),
-    FOREIGN KEY (data_source, data_id) REFERENCES DataSource (source_id, data_id),
-    FOREIGN KEY (tech, data_id) REFERENCES Technology (tech, data_id),
-    FOREIGN KEY (input_comm, data_id) REFERENCES Commodity (name, data_id),
-    FOREIGN KEY (output_comm, data_id) REFERENCES Commodity (name, data_id),
+    FOREIGN KEY (data_source) REFERENCES DataSourceLabel (source_id),
+    FOREIGN KEY (tech) REFERENCES TechnologyLabel (tech),
+    FOREIGN KEY (input_comm) REFERENCES CommodityLabel (commodity),
+    FOREIGN KEY (output_comm) REFERENCES CommodityLabel (commodity),
     PRIMARY KEY (region, input_comm, tech, vintage, output_comm, data_id),
     CHECK (efficiency > 0)
 );
@@ -458,10 +465,10 @@ CREATE TABLE IF NOT EXISTS EfficiencyVariable
         REFERENCES DataQualityTime (dq_time),
     data_id TEXT
         REFERENCES DataSet (data_id),
-    FOREIGN KEY (data_source, data_id) REFERENCES DataSource (source_id, data_id),
-    FOREIGN KEY (tech, data_id) REFERENCES Technology (tech, data_id),
-    FOREIGN KEY (input_comm, data_id) REFERENCES Commodity (name, data_id),
-    FOREIGN KEY (output_comm, data_id) REFERENCES Commodity (name, data_id),
+    FOREIGN KEY (data_source) REFERENCES DataSourceLabel (source_id),
+    FOREIGN KEY (tech) REFERENCES TechnologyLabel (tech),
+    FOREIGN KEY (input_comm) REFERENCES CommodityLabel (commodity),
+    FOREIGN KEY (output_comm) REFERENCES CommodityLabel (commodity),
     PRIMARY KEY (region, period, season, tod, input_comm, tech, vintage, output_comm, data_id),
     CHECK (efficiency > 0)
 );
@@ -490,11 +497,11 @@ CREATE TABLE IF NOT EXISTS EmissionActivity
         REFERENCES DataQualityTime (dq_time),
     data_id TEXT
         REFERENCES DataSet (data_id),
-    FOREIGN KEY (data_source, data_id) REFERENCES DataSource (source_id, data_id),
-    FOREIGN KEY (tech, data_id) REFERENCES Technology (tech, data_id),
-    FOREIGN KEY (emis_comm, data_id) REFERENCES Commodity (name, data_id),
-    FOREIGN KEY (input_comm, data_id) REFERENCES Commodity (name, data_id),
-    FOREIGN KEY (output_comm, data_id) REFERENCES Commodity (name, data_id),
+    FOREIGN KEY (data_source) REFERENCES DataSourceLabel (source_id),
+    FOREIGN KEY (tech) REFERENCES TechnologyLabel (tech),
+    FOREIGN KEY (emis_comm) REFERENCES CommodityLabel (commodity),
+    FOREIGN KEY (input_comm) REFERENCES CommodityLabel (commodity),
+    FOREIGN KEY (output_comm) REFERENCES CommodityLabel (commodity),
     PRIMARY KEY (region, emis_comm, input_comm, tech, vintage, output_comm, data_id)
 );
 CREATE TABLE IF NOT EXISTS EmissionEmbodied
@@ -520,9 +527,9 @@ CREATE TABLE IF NOT EXISTS EmissionEmbodied
         REFERENCES DataQualityTime (dq_time),
     data_id TEXT
         REFERENCES DataSet (data_id),
-    FOREIGN KEY (data_source, data_id) REFERENCES DataSource (source_id, data_id),
-    FOREIGN KEY (tech, data_id) REFERENCES Technology (tech, data_id),
-    FOREIGN KEY (emis_comm, data_id) REFERENCES Commodity (name, data_id),
+    FOREIGN KEY (data_source) REFERENCES DataSourceLabel (source_id),
+    FOREIGN KEY (tech) REFERENCES TechnologyLabel (tech),
+    FOREIGN KEY (emis_comm) REFERENCES CommodityLabel (commodity),
     PRIMARY KEY (region, emis_comm,  tech, vintage, data_id)
 );
 CREATE TABLE IF NOT EXISTS EmissionEndOfLife
@@ -548,9 +555,9 @@ CREATE TABLE IF NOT EXISTS EmissionEndOfLife
         REFERENCES DataQualityTime (dq_time),
     data_id TEXT
         REFERENCES DataSet (data_id),
-    FOREIGN KEY (data_source, data_id) REFERENCES DataSource (source_id, data_id),
-    FOREIGN KEY (tech, data_id) REFERENCES Technology (tech, data_id),
-    FOREIGN KEY (emis_comm, data_id) REFERENCES Commodity (name, data_id),
+    FOREIGN KEY (data_source) REFERENCES DataSourceLabel (source_id),
+    FOREIGN KEY (tech) REFERENCES TechnologyLabel (tech),
+    FOREIGN KEY (emis_comm) REFERENCES CommodityLabel (commodity),
     PRIMARY KEY (region, emis_comm,  tech, vintage, data_id)
 );
 CREATE TABLE IF NOT EXISTS ExistingCapacity
@@ -575,8 +582,8 @@ CREATE TABLE IF NOT EXISTS ExistingCapacity
         REFERENCES DataQualityTime (dq_time),
     data_id TEXT
         REFERENCES DataSet (data_id),
-    FOREIGN KEY (data_source, data_id) REFERENCES DataSource (source_id, data_id),
-    FOREIGN KEY (tech, data_id) REFERENCES Technology (tech, data_id),
+    FOREIGN KEY (data_source) REFERENCES DataSourceLabel (source_id),
+    FOREIGN KEY (tech) REFERENCES TechnologyLabel (tech),
     PRIMARY KEY (region, tech, vintage, data_id)
 );
 CREATE TABLE IF NOT EXISTS TechGroup
@@ -608,8 +615,8 @@ CREATE TABLE IF NOT EXISTS LoanLifetimeProcess
         REFERENCES DataQualityTime (dq_time),
     data_id TEXT
         REFERENCES DataSet (data_id),
-    FOREIGN KEY (data_source, data_id) REFERENCES DataSource (source_id, data_id),
-    FOREIGN KEY (tech, data_id) REFERENCES Technology (tech, data_id),
+    FOREIGN KEY (data_source) REFERENCES DataSourceLabel (source_id),
+    FOREIGN KEY (tech) REFERENCES TechnologyLabel (tech),
     PRIMARY KEY (region, tech, vintage, data_id)
 );
 CREATE TABLE IF NOT EXISTS LoanRate
@@ -633,8 +640,8 @@ CREATE TABLE IF NOT EXISTS LoanRate
         REFERENCES DataQualityTime (dq_time),
     data_id TEXT
         REFERENCES DataSet (data_id),
-    FOREIGN KEY (data_source, data_id) REFERENCES DataSource (source_id, data_id),
-    FOREIGN KEY (tech, data_id) REFERENCES Technology (tech, data_id),
+    FOREIGN KEY (data_source) REFERENCES DataSourceLabel (source_id),
+    FOREIGN KEY (tech) REFERENCES TechnologyLabel (tech),
     PRIMARY KEY (region, tech, vintage, data_id)
 );
 CREATE TABLE IF NOT EXISTS LifetimeProcess
@@ -658,8 +665,8 @@ CREATE TABLE IF NOT EXISTS LifetimeProcess
         REFERENCES DataQualityTime (dq_time),
     data_id TEXT
         REFERENCES DataSet (data_id),
-    FOREIGN KEY (data_source, data_id) REFERENCES DataSource (source_id, data_id),
-    FOREIGN KEY (tech, data_id) REFERENCES Technology (tech, data_id),
+    FOREIGN KEY (data_source) REFERENCES DataSourceLabel (source_id),
+    FOREIGN KEY (tech) REFERENCES TechnologyLabel (tech),
     PRIMARY KEY (region, tech, vintage, data_id)
 );
 CREATE TABLE IF NOT EXISTS LifetimeTech
@@ -681,8 +688,8 @@ CREATE TABLE IF NOT EXISTS LifetimeTech
         REFERENCES DataQualityTime (dq_time),
     data_id TEXT
         REFERENCES DataSet (data_id),
-    FOREIGN KEY (data_source, data_id) REFERENCES DataSource (source_id, data_id),
-    FOREIGN KEY (tech, data_id) REFERENCES Technology (tech, data_id),
+    FOREIGN KEY (data_source) REFERENCES DataSourceLabel (source_id),
+    FOREIGN KEY (tech) REFERENCES TechnologyLabel (tech),
     PRIMARY KEY (region, tech, data_id)
 );
 CREATE TABLE IF NOT EXISTS Operator
@@ -716,7 +723,7 @@ CREATE TABLE IF NOT EXISTS LimitGrowthCapacity
         REFERENCES DataQualityTime (dq_time),
     data_id TEXT
         REFERENCES DataSet (data_id),
-    FOREIGN KEY (data_source, data_id) REFERENCES DataSource (source_id, data_id),
+    FOREIGN KEY (data_source) REFERENCES DataSourceLabel (source_id),
     PRIMARY KEY (region, tech_or_group, operator, data_id)
 );
 CREATE TABLE IF NOT EXISTS LimitDegrowthCapacity
@@ -742,7 +749,7 @@ CREATE TABLE IF NOT EXISTS LimitDegrowthCapacity
         REFERENCES DataQualityTime (dq_time),
     data_id TEXT
         REFERENCES DataSet (data_id),
-    FOREIGN KEY (data_source, data_id) REFERENCES DataSource (source_id, data_id),
+    FOREIGN KEY (data_source) REFERENCES DataSourceLabel (source_id),
     PRIMARY KEY (region, tech_or_group, operator, data_id)
 );
 CREATE TABLE IF NOT EXISTS LimitGrowthNewCapacity
@@ -768,7 +775,7 @@ CREATE TABLE IF NOT EXISTS LimitGrowthNewCapacity
         REFERENCES DataQualityTime (dq_time),
     data_id TEXT
         REFERENCES DataSet (data_id),
-    FOREIGN KEY (data_source, data_id) REFERENCES DataSource (source_id, data_id),
+    FOREIGN KEY (data_source) REFERENCES DataSourceLabel (source_id),
     PRIMARY KEY (region, tech_or_group, operator, data_id)
 );
 CREATE TABLE IF NOT EXISTS LimitDegrowthNewCapacity
@@ -794,7 +801,7 @@ CREATE TABLE IF NOT EXISTS LimitDegrowthNewCapacity
         REFERENCES DataQualityTime (dq_time),
     data_id TEXT
         REFERENCES DataSet (data_id),
-    FOREIGN KEY (data_source, data_id) REFERENCES DataSource (source_id, data_id),
+    FOREIGN KEY (data_source) REFERENCES DataSourceLabel (source_id),
     PRIMARY KEY (region, tech_or_group, operator, data_id)
 );
 CREATE TABLE IF NOT EXISTS LimitGrowthNewCapacityDelta
@@ -820,7 +827,7 @@ CREATE TABLE IF NOT EXISTS LimitGrowthNewCapacityDelta
         REFERENCES DataQualityTime (dq_time),
     data_id TEXT
         REFERENCES DataSet (data_id),
-    FOREIGN KEY (data_source, data_id) REFERENCES DataSource (source_id, data_id),
+    FOREIGN KEY (data_source) REFERENCES DataSourceLabel (source_id),
     PRIMARY KEY (region, tech_or_group, operator, data_id)
 );
 CREATE TABLE IF NOT EXISTS LimitDegrowthNewCapacityDelta
@@ -846,7 +853,7 @@ CREATE TABLE IF NOT EXISTS LimitDegrowthNewCapacityDelta
         REFERENCES DataQualityTime (dq_time),
     data_id TEXT
         REFERENCES DataSet (data_id),
-    FOREIGN KEY (data_source, data_id) REFERENCES DataSource (source_id, data_id),
+    FOREIGN KEY (data_source) REFERENCES DataSourceLabel (source_id),
     PRIMARY KEY (region, tech_or_group, operator, data_id)
 );
 CREATE TABLE IF NOT EXISTS LimitStorageLevelFraction
@@ -878,8 +885,8 @@ CREATE TABLE IF NOT EXISTS LimitStorageLevelFraction
         REFERENCES DataQualityTime (dq_time),
     data_id TEXT
         REFERENCES DataSet (data_id),
-    FOREIGN KEY (data_source, data_id) REFERENCES DataSource (source_id, data_id),
-    FOREIGN KEY (tech, data_id) REFERENCES Technology (tech, data_id),
+    FOREIGN KEY (data_source) REFERENCES DataSourceLabel (source_id),
+    FOREIGN KEY (tech) REFERENCES TechnologyLabel (tech),
     PRIMARY KEY (region, period, season, tod, tech, vintage, operator, data_id)
 );
 CREATE TABLE IF NOT EXISTS LimitActivity
@@ -906,7 +913,7 @@ CREATE TABLE IF NOT EXISTS LimitActivity
         REFERENCES DataQualityTime (dq_time),
     data_id TEXT
         REFERENCES DataSet (data_id),
-    FOREIGN KEY (data_source, data_id) REFERENCES DataSource (source_id, data_id),
+    FOREIGN KEY (data_source) REFERENCES DataSourceLabel (source_id),
     PRIMARY KEY (region, period, tech_or_group, operator, data_id)
 );
 CREATE TABLE IF NOT EXISTS LimitActivityShare
@@ -933,14 +940,14 @@ CREATE TABLE IF NOT EXISTS LimitActivityShare
         REFERENCES DataQualityTime (dq_time),
     data_id TEXT
         REFERENCES DataSet (data_id),
-    FOREIGN KEY (data_source, data_id) REFERENCES DataSource (source_id, data_id),
+    FOREIGN KEY (data_source) REFERENCES DataSourceLabel (source_id),
     PRIMARY KEY (region, period, sub_group, super_group, operator, data_id)
 );
 CREATE TABLE IF NOT EXISTS LimitAnnualCapacityFactor
 (
     region      TEXT,
     tech        TEXT,
-    vintage  INTEGER
+    vintage      INTEGER
         REFERENCES TimePeriod (period),
     output_comm TEXT,
     operator	TEXT  NOT NULL DEFAULT "le"
@@ -960,9 +967,9 @@ CREATE TABLE IF NOT EXISTS LimitAnnualCapacityFactor
         REFERENCES DataQualityTime (dq_time),
     data_id TEXT
         REFERENCES DataSet (data_id),
-    FOREIGN KEY (data_source, data_id) REFERENCES DataSource (source_id, data_id),
-    FOREIGN KEY (tech, data_id) REFERENCES Technology (tech, data_id),
-    FOREIGN KEY (output_comm, data_id) REFERENCES Commodity (name, data_id),
+    FOREIGN KEY (data_source) REFERENCES DataSourceLabel (source_id),
+    FOREIGN KEY (tech) REFERENCES TechnologyLabel (tech),
+    FOREIGN KEY (output_comm) REFERENCES CommodityLabel (commodity),
     PRIMARY KEY (region, tech, vintage, output_comm, operator, data_id),
     CHECK (factor >= 0 AND factor <= 1)
 );
@@ -990,7 +997,7 @@ CREATE TABLE IF NOT EXISTS LimitCapacity
         REFERENCES DataQualityTime (dq_time),
     data_id TEXT
         REFERENCES DataSet (data_id),
-    FOREIGN KEY (data_source, data_id) REFERENCES DataSource (source_id, data_id),
+    FOREIGN KEY (data_source) REFERENCES DataSourceLabel (source_id),
     PRIMARY KEY (region, period, tech_or_group, operator, data_id)
 );
 CREATE TABLE IF NOT EXISTS LimitCapacityShare
@@ -1017,7 +1024,7 @@ CREATE TABLE IF NOT EXISTS LimitCapacityShare
         REFERENCES DataQualityTime (dq_time),
     data_id TEXT
         REFERENCES DataSet (data_id),
-    FOREIGN KEY (data_source, data_id) REFERENCES DataSource (source_id, data_id),
+    FOREIGN KEY (data_source) REFERENCES DataSourceLabel (source_id),
     PRIMARY KEY (region, period, sub_group, super_group, operator, data_id)
 );
 CREATE TABLE IF NOT EXISTS LimitNewCapacity
@@ -1044,7 +1051,7 @@ CREATE TABLE IF NOT EXISTS LimitNewCapacity
         REFERENCES DataQualityTime (dq_time),
     data_id TEXT
         REFERENCES DataSet (data_id),
-    FOREIGN KEY (data_source, data_id) REFERENCES DataSource (source_id, data_id),
+    FOREIGN KEY (data_source) REFERENCES DataSourceLabel (source_id),
     PRIMARY KEY (region, period, tech_or_group, operator, data_id)
 );
 CREATE TABLE IF NOT EXISTS LimitNewCapacityShare
@@ -1071,7 +1078,7 @@ CREATE TABLE IF NOT EXISTS LimitNewCapacityShare
         REFERENCES DataQualityTime (dq_time),
     data_id TEXT
         REFERENCES DataSet (data_id),
-    FOREIGN KEY (data_source, data_id) REFERENCES DataSource (source_id, data_id),
+    FOREIGN KEY (data_source) REFERENCES DataSourceLabel (source_id),
     PRIMARY KEY (region, period, sub_group, super_group, operator, data_id)
 );
 CREATE TABLE IF NOT EXISTS LimitResource
@@ -1096,7 +1103,7 @@ CREATE TABLE IF NOT EXISTS LimitResource
         REFERENCES DataQualityTime (dq_time),
     data_id TEXT
         REFERENCES DataSet (data_id),
-    FOREIGN KEY (data_source, data_id) REFERENCES DataSource (source_id, data_id),
+    FOREIGN KEY (data_source) REFERENCES DataSourceLabel (source_id),
     PRIMARY KEY (region, tech_or_group, operator, data_id)
 );
 CREATE TABLE IF NOT EXISTS LimitSeasonalCapacityFactor
@@ -1124,9 +1131,9 @@ CREATE TABLE IF NOT EXISTS LimitSeasonalCapacityFactor
         REFERENCES DataQualityTime (dq_time),
     data_id TEXT
         REFERENCES DataSet (data_id),
-    FOREIGN KEY (data_source, data_id) REFERENCES DataSource (source_id, data_id),
+    FOREIGN KEY (data_source) REFERENCES DataSourceLabel (source_id),
     FOREIGN KEY (region) REFERENCES Region (region),
-    FOREIGN KEY (tech, data_id) REFERENCES Technology (tech, data_id),
+    FOREIGN KEY (tech) REFERENCES TechnologyLabel (tech),
 	PRIMARY KEY (region, period, season, tech, operator, data_id)
 );
 CREATE TABLE IF NOT EXISTS LimitTechInputSplit
@@ -1153,9 +1160,9 @@ CREATE TABLE IF NOT EXISTS LimitTechInputSplit
         REFERENCES DataQualityTime (dq_time),
     data_id TEXT
         REFERENCES DataSet (data_id),
-    FOREIGN KEY (data_source, data_id) REFERENCES DataSource (source_id, data_id),
-    FOREIGN KEY (tech, data_id) REFERENCES Technology (tech, data_id),
-    FOREIGN KEY (input_comm, data_id) REFERENCES Commodity (name, data_id),
+    FOREIGN KEY (data_source) REFERENCES DataSourceLabel (source_id),
+    FOREIGN KEY (tech) REFERENCES TechnologyLabel (tech),
+    FOREIGN KEY (input_comm) REFERENCES CommodityLabel (commodity),
     PRIMARY KEY (region, period, input_comm, tech, operator, data_id)
 );
 CREATE TABLE IF NOT EXISTS LimitTechInputSplitAnnual
@@ -1182,8 +1189,8 @@ CREATE TABLE IF NOT EXISTS LimitTechInputSplitAnnual
         REFERENCES DataQualityTime (dq_time),
     data_id TEXT
         REFERENCES DataSet (data_id),
-    FOREIGN KEY (data_source, data_id) REFERENCES DataSource (source_id, data_id),
-    FOREIGN KEY (tech, data_id) REFERENCES Technology (tech, data_id),
+    FOREIGN KEY (data_source) REFERENCES DataSourceLabel (source_id),
+    FOREIGN KEY (tech) REFERENCES TechnologyLabel (tech),
     PRIMARY KEY (region, period, input_comm, tech, operator, data_id)
 );
 CREATE TABLE IF NOT EXISTS LimitTechOutputSplit
@@ -1210,9 +1217,9 @@ CREATE TABLE IF NOT EXISTS LimitTechOutputSplit
         REFERENCES DataQualityTime (dq_time),
     data_id TEXT
         REFERENCES DataSet (data_id),
-    FOREIGN KEY (data_source, data_id) REFERENCES DataSource (source_id, data_id),
-    FOREIGN KEY (tech, data_id) REFERENCES Technology (tech, data_id),
-    FOREIGN KEY (output_comm, data_id) REFERENCES Commodity (name, data_id),
+    FOREIGN KEY (data_source) REFERENCES DataSourceLabel (source_id),
+    FOREIGN KEY (tech) REFERENCES TechnologyLabel (tech),
+    FOREIGN KEY (output_comm) REFERENCES CommodityLabel (commodity),
     PRIMARY KEY (region, period, tech, output_comm, operator, data_id)
 );
 CREATE TABLE IF NOT EXISTS LimitTechOutputSplitAnnual
@@ -1239,9 +1246,9 @@ CREATE TABLE IF NOT EXISTS LimitTechOutputSplitAnnual
         REFERENCES DataQualityTime (dq_time),
     data_id TEXT
         REFERENCES DataSet (data_id),
-    FOREIGN KEY (data_source, data_id) REFERENCES DataSource (source_id, data_id),
-    FOREIGN KEY (tech, data_id) REFERENCES Technology (tech, data_id),
-    FOREIGN KEY (output_comm, data_id) REFERENCES Commodity (name, data_id),
+    FOREIGN KEY (data_source) REFERENCES DataSourceLabel (source_id),
+    FOREIGN KEY (tech) REFERENCES TechnologyLabel (tech),
+    FOREIGN KEY (output_comm) REFERENCES CommodityLabel (commodity),
     PRIMARY KEY (region, period, tech, output_comm, operator, data_id)
 );
 CREATE TABLE IF NOT EXISTS LimitEmission
@@ -1268,8 +1275,8 @@ CREATE TABLE IF NOT EXISTS LimitEmission
         REFERENCES DataQualityTime (dq_time),
     data_id TEXT
         REFERENCES DataSet (data_id),
-    FOREIGN KEY (data_source, data_id) REFERENCES DataSource (source_id, data_id),
-    FOREIGN KEY (emis_comm, data_id) REFERENCES Commodity (name, data_id),
+    FOREIGN KEY (data_source) REFERENCES DataSourceLabel (source_id),
+    FOREIGN KEY (emis_comm) REFERENCES CommodityLabel (commodity),
     PRIMARY KEY (region, period, emis_comm, operator, data_id)
 );
 CREATE TABLE IF NOT EXISTS LinkedTech
@@ -1283,7 +1290,7 @@ CREATE TABLE IF NOT EXISTS LinkedTech
         REFERENCES DataSet (data_id),
     FOREIGN KEY (primary_tech, data_id) REFERENCES Technology (tech, data_id),
     FOREIGN KEY (driven_tech, data_id) REFERENCES Technology (tech, data_id),
-    FOREIGN KEY (emis_comm, data_id) REFERENCES Commodity (name, data_id),
+    FOREIGN KEY (emis_comm) REFERENCES CommodityLabel (commodity),
     PRIMARY KEY (primary_region, primary_tech, emis_comm, data_id)
 );
 CREATE TABLE IF NOT EXISTS PlanningReserveMargin
@@ -1304,7 +1311,7 @@ CREATE TABLE IF NOT EXISTS PlanningReserveMargin
         REFERENCES DataQualityTime (dq_time),
     data_id TEXT
         REFERENCES DataSet (data_id),
-    FOREIGN KEY (data_source, data_id) REFERENCES DataSource (source_id, data_id),
+    FOREIGN KEY (data_source) REFERENCES DataSourceLabel (source_id),
     FOREIGN KEY (region) REFERENCES Region (region),
     PRIMARY KEY (region, data_id)
 );
@@ -1327,8 +1334,8 @@ CREATE TABLE IF NOT EXISTS RampDownHourly
         REFERENCES DataQualityTime (dq_time),
     data_id TEXT
         REFERENCES DataSet (data_id),
-    FOREIGN KEY (data_source, data_id) REFERENCES DataSource (source_id, data_id),
-    FOREIGN KEY (tech, data_id) REFERENCES Technology (tech, data_id),
+    FOREIGN KEY (data_source) REFERENCES DataSourceLabel (source_id),
+    FOREIGN KEY (tech) REFERENCES TechnologyLabel (tech),
     PRIMARY KEY (region, tech, data_id)
 );
 CREATE TABLE IF NOT EXISTS RampUpHourly
@@ -1350,8 +1357,8 @@ CREATE TABLE IF NOT EXISTS RampUpHourly
         REFERENCES DataQualityTime (dq_time),
     data_id TEXT
         REFERENCES DataSet (data_id),
-    FOREIGN KEY (data_source, data_id) REFERENCES DataSource (source_id, data_id),
-    FOREIGN KEY (tech, data_id) REFERENCES Technology (tech, data_id),
+    FOREIGN KEY (data_source) REFERENCES DataSourceLabel (source_id),
+    FOREIGN KEY (tech) REFERENCES TechnologyLabel (tech),
     PRIMARY KEY (region, tech, data_id)
 );
 CREATE TABLE IF NOT EXISTS Region
@@ -1384,8 +1391,8 @@ CREATE TABLE IF NOT EXISTS ReserveCapacityDerate
         REFERENCES DataQualityTime (dq_time),
     data_id TEXT
         REFERENCES DataSet (data_id),
-    FOREIGN KEY (data_source, data_id) REFERENCES DataSource (source_id, data_id),
-    FOREIGN KEY (tech, data_id) REFERENCES Technology (tech, data_id),
+    FOREIGN KEY (data_source) REFERENCES DataSourceLabel (source_id),
+    FOREIGN KEY (tech) REFERENCES TechnologyLabel (tech),
     PRIMARY KEY (region, period, season, tech, vintage, data_id),
     CHECK (factor >= 0 AND factor <= 1)
 );
@@ -1421,7 +1428,7 @@ CREATE TABLE IF NOT EXISTS StorageDuration
         REFERENCES DataQualityTime (dq_time),
     data_id TEXT
         REFERENCES DataSet (data_id),
-    FOREIGN KEY (data_source, data_id) REFERENCES DataSource (source_id, data_id),
+    FOREIGN KEY (data_source) REFERENCES DataSourceLabel (source_id),
     PRIMARY KEY (region, tech, data_id)
 );
 CREATE TABLE IF NOT EXISTS LifetimeSurvivalCurve
@@ -1446,8 +1453,8 @@ CREATE TABLE IF NOT EXISTS LifetimeSurvivalCurve
         REFERENCES DataQualityTime (dq_time),
     data_id TEXT
         REFERENCES DataSet (data_id),
-    FOREIGN KEY (data_source, data_id) REFERENCES DataSource (source_id, data_id),
-    FOREIGN KEY (tech, data_id) REFERENCES Technology (tech, data_id),
+    FOREIGN KEY (data_source) REFERENCES DataSourceLabel (source_id),
+    FOREIGN KEY (tech) REFERENCES TechnologyLabel (tech),
     PRIMARY KEY (region, period, tech, vintage, data_id)
 );
 CREATE TABLE IF NOT EXISTS TechnologyType
@@ -1543,7 +1550,7 @@ CREATE TABLE IF NOT EXISTS RPSRequirement
     data_id TEXT
         REFERENCES DataSet (data_id),
     notes       TEXT,
-    FOREIGN KEY (data_source, data_id) REFERENCES DataSource (source_id, data_id),
+    FOREIGN KEY (data_source) REFERENCES DataSourceLabel (source_id),
     FOREIGN KEY (region) REFERENCES Region (region),
     FOREIGN KEY (tech_group, data_id) REFERENCES TechGroup (group_name, data_id),
     PRIMARY KEY (region, data_id)
@@ -1554,9 +1561,21 @@ CREATE TABLE IF NOT EXISTS TechGroupMember
     tech       TEXT,
     data_id TEXT
         REFERENCES DataSet (data_id),
-    FOREIGN KEY (tech, data_id) REFERENCES Technology (tech, data_id),
+    FOREIGN KEY (tech) REFERENCES TechnologyLabel (tech),
     FOREIGN KEY (group_name, data_id) REFERENCES TechGroup (group_name, data_id),
     PRIMARY KEY (group_name, tech, data_id)
+);
+CREATE TABLE IF NOT EXISTS SeasonLabel
+(
+    tech TEXT
+        PRIMARY KEY,
+    notes  TEXT
+);
+CREATE TABLE IF NOT EXISTS TechnologyLabel
+(
+    tech TEXT
+        PRIMARY KEY,
+    notes  TEXT
 );
 CREATE TABLE IF NOT EXISTS Technology
 (
@@ -1577,7 +1596,14 @@ CREATE TABLE IF NOT EXISTS Technology
     data_id TEXT
         REFERENCES DataSet (data_id),
     FOREIGN KEY (flag) REFERENCES TechnologyType (label),
+    FOREIGN KEY (tech) REFERENCES TechnologyLabel (tech),
     PRIMARY KEY (tech, data_id)
+);
+CREATE TABLE IF NOT EXISTS DataSourceLabel
+(
+    source_id TEXT
+        PRIMARY KEY,
+    notes  TEXT
 );
 CREATE TABLE IF NOT EXISTS DataSource
 (
@@ -1586,6 +1612,7 @@ CREATE TABLE IF NOT EXISTS DataSource
     notes TEXT,
     data_id TEXT
         REFERENCES DataSet (data_id),
+    FOREIGN KEY (source_id) REFERENCES DataSourceLabel (source_id),
     PRIMARY KEY (source_id, data_id)
 );
 CREATE TABLE IF NOT EXISTS DataQualityCredibility
