@@ -1,0 +1,2108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CANOE Electricity Sector Documentation</title>
+<style>
+:root {
+    --bg: #ffffff;
+    --fg: #1a1a2e;
+    --accent: #0f3460;
+    --accent-light: #e8eef6;
+    --border: #d0d7de;
+    --code-bg: #f6f8fa;
+    --link: #0969da;
+    --toc-bg: #f8f9fb;
+    --sidebar-width: 280px;
+    --max-content: 920px;
+    --table-header-bg: #f0f3f6;
+    --table-stripe: #f8f9fb;
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+
+html { scroll-behavior: smooth; }
+
+body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    font-size: 16px;
+    line-height: 1.65;
+    color: var(--fg);
+    background: var(--bg);
+}
+
+/* ---- Sidebar navigation ---- */
+#sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: var(--sidebar-width);
+    height: 100vh;
+    overflow-y: auto;
+    background: var(--toc-bg);
+    border-right: 1px solid var(--border);
+    padding: 1.2rem 1rem;
+    z-index: 100;
+}
+
+#sidebar h2 {
+    margin: 0 0 0.8rem 0;
+    font-size: 0.95rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--accent);
+}
+
+#sidebar ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+#sidebar li {
+    margin: 0.15rem 0;
+}
+
+#sidebar a {
+    display: block;
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    color: var(--fg);
+    text-decoration: none;
+    font-size: 0.85rem;
+    line-height: 1.35;
+    transition: background 0.15s;
+}
+
+#sidebar a:hover, #sidebar a.active {
+    background: var(--accent-light);
+    color: var(--accent);
+}
+
+#sidebar .toc-section {
+    margin-top: 1.2rem;
+    padding-top: 0.8rem;
+    border-top: 1px solid var(--border);
+}
+
+#sidebar .toc-section-label {
+    font-weight: 600;
+    font-size: 0.8rem;
+    color: var(--accent);
+    margin-bottom: 0.4rem;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+}
+
+/* ---- Main content ---- */
+#content {
+    margin-left: var(--sidebar-width);
+    max-width: var(--max-content);
+    padding: 2rem 2.5rem 4rem 2.5rem;
+}
+
+/* ---- Typography ---- */
+h1 {
+    font-size: 2rem;
+    margin: 2rem 0 0.6rem;
+    padding-bottom: 0.4rem;
+    border-bottom: 2px solid var(--accent);
+    color: var(--accent);
+}
+
+h2 {
+    font-size: 1.5rem;
+    margin: 2.4rem 0 0.5rem;
+    padding-bottom: 0.3rem;
+    border-bottom: 1px solid var(--border);
+    color: var(--accent);
+}
+
+h3 {
+    font-size: 1.2rem;
+    margin: 1.8rem 0 0.4rem;
+    color: var(--accent);
+}
+
+h4 {
+    font-size: 1.05rem;
+    margin: 1.4rem 0 0.3rem;
+}
+
+p { margin: 0.6rem 0; }
+
+a { color: var(--link); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+/* ---- Code ---- */
+code {
+    font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+    font-size: 0.88em;
+    background: var(--code-bg);
+    padding: 0.15em 0.35em;
+    border-radius: 4px;
+}
+
+pre {
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 1rem 1.2rem;
+    overflow-x: auto;
+    font-size: 0.88rem;
+    line-height: 1.5;
+}
+
+pre code {
+    background: none;
+    padding: 0;
+    border-radius: 0;
+}
+
+/* ---- Tables ---- */
+table {
+    border-collapse: collapse;
+    width: 100%;
+    margin: 1rem 0;
+    font-size: 0.92rem;
+}
+
+th, td {
+    padding: 0.55rem 0.75rem;
+    border: 1px solid var(--border);
+    text-align: left;
+    vertical-align: top;
+}
+
+th {
+    background: var(--table-header-bg);
+    font-weight: 600;
+}
+
+tr:nth-child(even) td { background: var(--table-stripe); }
+
+/* ---- Lists ---- */
+ul, ol { padding-left: 1.6rem; }
+li { margin: 0.25rem 0; }
+li > ul, li > ol { margin-top: 0.15rem; }
+
+/* ---- Blockquotes (used for notes) ---- */
+blockquote {
+    margin: 1rem 0;
+    padding: 0.8rem 1.2rem;
+    background: var(--accent-light);
+    border-left: 4px solid var(--accent);
+    border-radius: 0 6px 6px 0;
+}
+
+blockquote p { margin: 0.2rem 0; }
+
+/* ---- Horizontal rule ---- */
+hr {
+    border: none;
+    border-top: 1px solid var(--border);
+    margin: 2rem 0;
+}
+
+/* ---- Checklist ---- */
+li input[type="checkbox"] { margin-right: 0.4rem; }
+
+/* ---- Section divider ---- */
+.section-divider {
+    margin: 3rem 0;
+    padding: 1.5rem 0 0;
+    border-top: 3px solid var(--accent);
+}
+
+.section-divider h1 {
+    border-bottom: none;
+    margin-top: 0;
+}
+
+/* ---- Print styles ---- */
+@media print {
+    #sidebar { display: none; }
+    #content { margin-left: 0; max-width: 100%; }
+    h1, h2, h3 { break-after: avoid; }
+    table { break-inside: avoid; }
+    pre { white-space: pre-wrap; word-wrap: break-word; }
+}
+
+/* ---- Responsive ---- */
+@media (max-width: 900px) {
+    #sidebar { display: none; }
+    #content { margin-left: 0; padding: 1.5rem; }
+}
+</style>
+</head>
+<body>
+
+<nav id="sidebar">
+  <h2>CANOE Documentation</h2>
+  <div class="toc-section">
+    <div class="toc-section-label">Data Processing</div>
+    <ul>
+        <li><a href="#canoe-electricity-sector-data-processing-documentation">CANOE Electricity Sector — Data Processing Documentation</a></li>
+      <li><a href="#table-of-contents">Table of Contents</a></li>
+      <li><a href="#1-overview">1. Overview</a></li>
+      <li><a href="#2-pipeline-architecture">2. Pipeline Architecture</a></li>
+      <li><a href="#3-configuration-and-setup">3. Configuration and Setup</a></li>
+      <li><a href="#4-pre-processing">4. Pre-Processing</a></li>
+      <li><a href="#5-provincial-grid-infrastructure">5. Provincial Grid Infrastructure</a></li>
+      <li><a href="#6-generator-aggregation">6. Generator Aggregation</a></li>
+      <li><a href="#7-capacity-factors">7. Capacity Factors</a></li>
+      <li><a href="#8-capacity-credits-and-reserve-margin">8. Capacity Credits and Reserve Margin</a></li>
+      <li><a href="#9-new-wind-and-solar-characterisation">9. New Wind and Solar Characterisation</a></li>
+      <li><a href="#10-energy-storage">10. Energy Storage</a></li>
+      <li><a href="#11-ccs-retrofits">11. CCS Retrofits</a></li>
+      <li><a href="#12-interfaces-and-interties">12. Interfaces and Interties</a></li>
+      <li><a href="#13-constraints">13. Constraints</a></li>
+      <li><a href="#14-currency-conversion">14. Currency Conversion</a></li>
+      <li><a href="#15-post-processing">15. Post-Processing</a></li>
+      <li><a href="#16-unit-conventions">16. Unit Conventions</a></li>
+      <li><a href="#17-known-assumptions-and-limitations">17. Known Assumptions and Limitations</a></li>
+    </ul>
+  </div>
+  <div class="toc-section">
+    <div class="toc-section-label">Data Sources</div>
+    <ul>
+        <li><a href="#canoe-electricity-sector-data-sources-catalog">CANOE Electricity Sector — Data Sources Catalog</a></li>
+      <li><a href="#table-of-contents">Table of Contents</a></li>
+      <li><a href="#1-data-source-summary">1. Data Source Summary</a></li>
+      <li><a href="#2-coders">2. CODERS</a></li>
+      <li><a href="#3-nrel-annual-technology-baseline-atb">3. NREL Annual Technology Baseline (ATB)</a></li>
+      <li><a href="#4-ieso-public-data-ontario">4. IESO Public Data (Ontario)</a></li>
+      <li><a href="#5-statistics-canada">5. Statistics Canada</a></li>
+      <li><a href="#6-renewables-ninja-api">6. Renewables Ninja API</a></li>
+      <li><a href="#7-us-eia-annual-energy-outlook-aeo">7. U.S. EIA Annual Energy Outlook (AEO)</a></li>
+      <li><a href="#8-sutubra-vre-resource-characterisation">8. Sutubra VRE Resource Characterisation</a></li>
+      <li><a href="#9-academic-and-reference-data">9. Academic and Reference Data</a></li>
+      <li><a href="#10-update-procedures">10. Update Procedures</a></li>
+    </ul>
+  </div>
+</nav>
+
+<main id="content">
+
+<h1 id="canoe-electricity-sector-data-processing-documentation">CANOE Electricity Sector — Data Processing Documentation</h1>
+<p><em>Comprehensive documentation of the data pipeline that converts upstream data sources into a Temoa-ready SQLite database for the Canadian Open-source National Optimised Electricity (CANOE) model.</em></p>
+<hr>
+<h2 id="table-of-contents">Table of Contents</h2>
+<ol>
+<li><a href="#1-overview">Overview</a></li>
+<li><a href="#2-pipeline-architecture">Pipeline Architecture</a></li>
+<li><a href="#3-configuration-and-setup">Configuration and Setup</a></li>
+<li><a href="#4-pre-processing">Pre-Processing</a></li>
+<li><a href="#5-provincial-grid-infrastructure">Provincial Grid Infrastructure</a></li>
+<li><a href="#6-generator-aggregation">Generator Aggregation</a></li>
+<li><a href="#7-capacity-factors">Capacity Factors</a></li>
+<li><a href="#8-capacity-credits-and-reserve-margin">Capacity Credits and Reserve Margin</a></li>
+<li><a href="#9-new-wind-and-solar-characterisation">New Wind and Solar Characterisation</a></li>
+<li><a href="#10-energy-storage">Energy Storage</a></li>
+<li><a href="#11-ccs-retrofits">CCS Retrofits</a></li>
+<li><a href="#12-interfaces-and-interties">Interfaces and Interties</a></li>
+<li><a href="#13-constraints">Constraints</a></li>
+<li><a href="#14-currency-conversion">Currency Conversion</a></li>
+<li><a href="#15-post-processing">Post-Processing</a></li>
+<li><a href="#16-unit-conventions">Unit Conventions</a></li>
+<li><a href="#17-known-assumptions-and-limitations">Known Assumptions and Limitations</a></li>
+</ol>
+<hr>
+<h2 id="1-overview">1. Overview</h2>
+<h3 id="purpose">Purpose</h3>
+<p>The CANOE electricity sector aggregation tool automatically constructs a Temoa-compatible SQLite database representing the Canadian electricity system. It downloads data from several upstream databases — primarily the Canadian Open-Source Database for Energy Research and Systems-Modelling (CODERS) and the U.S. National Renewable Energy Laboratory (NREL) Annual Technology Baseline (ATB) — processes and harmonises that data, and writes it into a structured SQLite database suitable for long-term capacity expansion modelling.</p>
+<h3 id="what-the-tool-produces">What the Tool Produces</h3>
+<ul>
+<li>A <strong>Temoa-schema SQLite database</strong> containing all technology, cost, capacity, demand, emissions, and time-series data required to run an electricity sector capacity expansion model.</li>
+<li>Optionally, an <strong>Excel workbook</strong> clone of the database for inspection and review.</li>
+<li><strong>Diagnostic plots</strong> (PDF) showing demand profiles, capacity factors, capacity credits, and intertie flows for visual verification.</li>
+</ul>
+<h3 id="scope">Scope</h3>
+<p>The model covers:</p>
+<ul>
+<li><strong>Regions</strong>: Canadian provinces (configurable; defaults to all ten provinces).</li>
+<li><strong>Technologies</strong>: Existing and new generators (thermal, nuclear, hydro, wind, solar), energy storage (batteries, pumped hydro), CCS retrofits, and transmission/distribution dummy technologies.</li>
+<li><strong>Time resolution</strong>: Hourly (8,760 time-slices per year), with representative-day or full-year options.</li>
+<li><strong>Planning horizon</strong>: Configurable five-year periods (default: 2025–2045).</li>
+</ul>
+<hr>
+<h2 id="2-pipeline-architecture">2. Pipeline Architecture</h2>
+<p>The aggregation runs in a fixed order, orchestrated by <code>electricity_sector.py</code>:</p>
+<div class="codehilite"><pre><span></span><code><span class="mf">1.</span><span class="w"> </span><span class="n">setup</span><span class="o">.</span><span class="n">py</span><span class="w">            </span><span class="err">→</span><span class="w"> </span><span class="n">Load</span><span class="w"> </span><span class="n">configuration</span><span class="p">,</span><span class="w"> </span><span class="n">download</span><span class="w"> </span><span class="n">ATB</span><span class="w"> </span><span class="n">workbook</span><span class="p">,</span><span class="w"> </span><span class="n">build</span><span class="w"> </span><span class="n">mappings</span>
+<span class="mf">2.</span><span class="w"> </span><span class="n">instantiate_database</span><span class="w"> </span><span class="err">→</span><span class="w"> </span><span class="n">Create</span><span class="w"> </span><span class="ow">or</span><span class="w"> </span><span class="n">wipe</span><span class="w"> </span><span class="n">SQLite</span><span class="w"> </span><span class="n">database</span><span class="w"> </span><span class="n">from</span><span class="w"> </span><span class="n">schema</span>
+<span class="mf">3.</span><span class="w"> </span><span class="n">pre_processing</span><span class="o">.</span><span class="n">py</span><span class="w">   </span><span class="err">→</span><span class="w"> </span><span class="n">Write</span><span class="w"> </span><span class="n">time</span><span class="w"> </span><span class="n">periods</span><span class="p">,</span><span class="w"> </span><span class="n">regions</span><span class="p">,</span><span class="w"> </span><span class="n">seasons</span><span class="p">,</span><span class="w"> </span><span class="n">times</span><span class="o">-</span><span class="n">of</span><span class="o">-</span><span class="n">day</span>
+<span class="mf">4.</span><span class="w"> </span><span class="n">provincial_grids</span><span class="o">.</span><span class="n">py</span><span class="w"> </span><span class="err">→</span><span class="w"> </span><span class="n">Reserve</span><span class="w"> </span><span class="n">margin</span><span class="p">,</span><span class="w"> </span><span class="n">demand</span><span class="p">,</span><span class="w"> </span><span class="n">transmission</span><span class="o">/</span><span class="n">distribution</span>
+<span class="mf">5.</span><span class="w"> </span><span class="n">generators</span><span class="o">.</span><span class="n">py</span><span class="w">       </span><span class="err">→</span><span class="w"> </span><span class="n">Existing</span><span class="w"> </span><span class="o">&amp;</span><span class="w"> </span><span class="n">new</span><span class="w"> </span><span class="n">generators</span><span class="p">,</span><span class="w"> </span><span class="n">storage</span><span class="p">,</span><span class="w"> </span><span class="n">CCS</span><span class="w"> </span><span class="n">retrofits</span>
+<span class="mf">6.</span><span class="w"> </span><span class="n">interfaces</span><span class="o">.</span><span class="n">py</span><span class="w">       </span><span class="err">→</span><span class="w"> </span><span class="n">Interprovincial</span><span class="w"> </span><span class="ow">and</span><span class="w"> </span><span class="n">international</span><span class="w"> </span><span class="n">interties</span>
+<span class="mf">7.</span><span class="w"> </span><span class="n">post_processing</span><span class="o">.</span><span class="n">py</span><span class="w">  </span><span class="err">→</span><span class="w"> </span><span class="n">Imports</span><span class="p">,</span><span class="w"> </span><span class="n">commodity</span><span class="w"> </span><span class="n">table</span><span class="p">,</span><span class="w"> </span><span class="n">unused</span><span class="w"> </span><span class="n">tech</span><span class="w"> </span><span class="n">cleanup</span><span class="p">,</span><span class="w"> </span><span class="n">references</span>
+</code></pre></div>
+
+<p>Each step opens its own SQLite connection, writes data, commits, and closes. The database grows incrementally as each module runs.</p>
+<h3 id="data-flow-diagram">Data Flow Diagram</h3>
+<div class="codehilite"><pre><span></span><code>                    ┌──────────────┐
+                    │  CODERS API  │
+                    └──────┬───────┘
+                           │
+     ┌─────────────────────┼──────────────────────┐
+     │                     │                      │
+     ▼                     ▼                      ▼
+┌─────────┐        ┌──────────────┐       ┌──────────────┐
+│Generators│        │ Provincial   │       │  Interface   │
+│ Table    │        │ Demand (hrly)│       │  Flows (hrly)│
+└────┬─────┘        └──────┬───────┘       └──────┬───────┘
+     │                     │                      │
+     ▼                     ▼                      ▼
+┌─────────────────────────────────────────────────────────┐
+│                 generators.py                           │
+│  ┌──────────┐  ┌──────────┐  ┌──────────┐              │
+│  │ Existing │  │   New    │  │   CCS    │              │
+│  │Generators│  │Generators│  │Retrofits │              │
+│  └────┬─────┘  └────┬─────┘  └────┬─────┘              │
+│       │              │              │                    │
+│       ▼              ▼              ▼                    │
+│  ┌──────────────────────────────────────┐               │
+│  │ Generic Data (costs, efficiency,     │               │
+│  │ emissions, lifetime, ramp rates)     │               │
+│  │ Source: ATB preferred, CODERS backup │               │
+│  └──────────────────────────────────────┘               │
+└──────────────────────────┬──────────────────────────────┘
+                           │
+     ┌─────────────────────┼──────────────────────┐
+     │                     │                      │
+     ▼                     ▼                      ▼
+┌──────────┐       ┌──────────────┐       ┌──────────────┐
+│ NREL ATB │       │ IESO Public  │       │ Renewables   │
+│ CSV + WB │       │ Data (ON)    │       │ Ninja API    │
+└────┬─────┘       └──────┬───────┘       └──────┬───────┘
+     │                    │                      │
+     ▼                    ▼                      ▼
+┌─────────────────────────────────────────────────────────┐
+│   Capacity Factors, Capacity Credits, Costs             │
+│   → Written to Temoa SQLite database tables             │
+└─────────────────────────────────────────────────────────┘
+</code></pre></div>
+
+<hr>
+<h2 id="3-configuration-and-setup">3. Configuration and Setup</h2>
+<h3 id="31-configuration-file-paramsyaml">3.1 Configuration File (<code>params.yaml</code>)</h3>
+<p>The primary configuration file controls all aspects of aggregation. Key parameters include:</p>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">Parameter</th>
+<th style="text-align: left;">Default</th>
+<th style="text-align: left;">Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;"><code>period_step</code></td>
+<td style="text-align: left;">5</td>
+<td style="text-align: left;">Years between model periods</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>model_periods</code></td>
+<td style="text-align: left;">[2025, 2030, 2035, 2040, 2045]</td>
+<td style="text-align: left;">Planning horizon periods</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>base_year</code></td>
+<td style="text-align: left;">2020</td>
+<td style="text-align: left;">Default year for pulling non-timeseries data</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>weather_year</code></td>
+<td style="text-align: left;">2018</td>
+<td style="text-align: left;">Year for all 8,760-hour time-series data</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>timezone</code></td>
+<td style="text-align: left;">EST</td>
+<td style="text-align: left;">Final model timezone; time-series data is realigned to this</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>final_currency</code></td>
+<td style="text-align: left;">CAD</td>
+<td style="text-align: left;">Currency for all cost data in the database</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>final_currency_year</code></td>
+<td style="text-align: left;">2020</td>
+<td style="text-align: left;">Currency year for all cost data</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>global_discount_rate</code></td>
+<td style="text-align: left;">0.03</td>
+<td style="text-align: left;">For internal LCOE calculations (e.g., VRE bin sorting)</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>c2a</code></td>
+<td style="text-align: left;">31.536</td>
+<td style="text-align: left;">Capacity-to-activity ratio (PJ/GW·yr)</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>existing_capacity_threshold</code></td>
+<td style="text-align: left;">0.001 GW</td>
+<td style="text-align: left;">Minimum capacity to include</td>
+</tr>
+</tbody>
+</table>
+<h4 id="aggregation-switches">Aggregation Switches</h4>
+<p>Boolean switches enable/disable major pipeline components:</p>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">Switch</th>
+<th style="text-align: left;">Default</th>
+<th style="text-align: left;">Effect</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;"><code>force_download</code></td>
+<td style="text-align: left;">false</td>
+<td style="text-align: left;">Re-download all data instead of using cache</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>force_wipe_database</code></td>
+<td style="text-align: left;">true</td>
+<td style="text-align: left;">Wipe database before aggregation</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>full_dataset</code></td>
+<td style="text-align: left;">true</td>
+<td style="text-align: left;">Produce complete dataset for later filtering</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>include_boundary_interfaces</code></td>
+<td style="text-align: left;">true</td>
+<td style="text-align: left;">Interties crossing model boundary</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>include_endogenous_interfaces</code></td>
+<td style="text-align: left;">true</td>
+<td style="text-align: left;">Interties between modelled regions</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>include_existing_capacity</code></td>
+<td style="text-align: left;">true</td>
+<td style="text-align: left;">Existing generator fleet</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>include_reserve_margin</code></td>
+<td style="text-align: left;">true</td>
+<td style="text-align: left;">Planning reserve margin and capacity credits</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>include_storage</code></td>
+<td style="text-align: left;">true</td>
+<td style="text-align: left;">Battery and pumped-hydro storage</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>include_provincial_demand</code></td>
+<td style="text-align: left;">true</td>
+<td style="text-align: left;">Electricity demand by province</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>include_ccs_retrofits</code></td>
+<td style="text-align: left;">true</td>
+<td style="text-align: left;">CCS retrofit options for fossil generators</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>include_tech_fuel_cost</code></td>
+<td style="text-align: left;">false</td>
+<td style="text-align: left;">Include fuel costs in technology variable cost</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>include_new_wind_solar</code></td>
+<td style="text-align: left;">true</td>
+<td style="text-align: left;">New wind/solar characterisation (time-consuming)</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>include_emissions</code></td>
+<td style="text-align: left;">false</td>
+<td style="text-align: left;">Direct emissions accounting (vs. upstream)</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>show_plots</code></td>
+<td style="text-align: left;">true</td>
+<td style="text-align: left;">Generate diagnostic plots</td>
+</tr>
+</tbody>
+</table>
+<h3 id="32-technology-configuration-csvs">3.2 Technology Configuration CSVs</h3>
+<p>Technologies are defined through several CSV files in <code>input_files/</code>:</p>
+<ul>
+<li><strong><code>generator_technologies.csv</code></strong>: Maps generator types to CODERS/ATB equivalents, technology flags, I/O commodities, number of new-capacity bins, and whether to use ATB or CODERS data.</li>
+<li><strong><code>storage_technologies.csv</code></strong>: Similar configuration for storage technologies (batteries, pumped hydro).</li>
+<li><strong><code>transmission_technologies.csv</code></strong>: Defines dummy technologies for transmission (TX→DX), distribution (DX→DEM), demand, and interties.</li>
+<li><strong><code>ccs_retrofit_technologies.csv</code></strong>: Defines CCS retrofit options with capture rates and ATB mappings.</li>
+<li><strong><code>import_technologies.csv</code></strong>: Defines fuel import dummy technologies.</li>
+<li><strong><code>commodities.csv</code></strong>: Maps commodity codes to names, flags (source/physical/demand/emissions), units, and descriptions.</li>
+<li><strong><code>regions.csv</code></strong>: Defines provinces, their CODERS equivalents, and whether they are endogenous to the model.</li>
+<li><strong><code>time.csv</code></strong>: Maps 8,760 hours to seasons (days) and times-of-day, defining the temporal resolution.</li>
+<li><strong><code>units.csv</code></strong>: Conversion factors for all unit transformations (e.g., MW→GW, $/kW→M$/GW).</li>
+</ul>
+<h3 id="33-the-config-singleton">3.3 The <code>config</code> Singleton</h3>
+<p>On import, <code>setup.py</code> instantiates a singleton <code>config</code> object that:</p>
+<ol>
+<li>Loads <code>params.yaml</code> and all CSV configuration files.</li>
+<li>Builds mapping dictionaries:</li>
+<li><code>gen_map</code>: CODERS generator type → CANOE tech code</li>
+<li><code>storage_map</code>: (CODERS storage type, duration) → CANOE tech code</li>
+<li><code>region_map</code>: CODERS province name → CANOE region code</li>
+<li><code>existing_map</code>: CODERS generator type → CANOE existing-tech code</li>
+<li>Downloads the NREL ATB master Excel workbook if not already cached.</li>
+<li>Initialises per-region VRE generation arrays for capacity credit calculations.</li>
+</ol>
+<h3 id="34-data-caching">3.4 Data Caching</h3>
+<p>All downloaded data is cached locally in <code>data_cache/</code>. The caching system:</p>
+<ul>
+<li>Checks if a local file exists before downloading.</li>
+<li>Stores CODERS API responses as CSV files with cleaned endpoint names.</li>
+<li>Tracks download dates in <code>dates.csv</code> for reference provenance.</li>
+<li>Converts XML and Excel downloads to CSV or pickle for faster subsequent loads.</li>
+<li>Can be forced to re-download with <code>force_download: true</code>.</li>
+</ul>
+<h3 id="35-bibliography-and-data-ids">3.5 Bibliography and Data IDs</h3>
+<p>The tool maintains a <strong>bibliography</strong> of all data sources, assigning each a unique ID (E01, E02, ...) which is stored in the <code>DataSource</code> table. Every data row in the database carries a <code>data_id</code> formed as <code>{prefix}{region}{version}</code> for traceability, and a <code>data_source</code> foreign key referencing the bibliography.</p>
+<hr>
+<h2 id="4-pre-processing">4. Pre-Processing</h2>
+<p><strong>Module</strong>: <code>pre_processing.py</code></p>
+<p>Pre-processing populates the foundational Temoa tables that other modules depend on:</p>
+<h3 id="41-time-periods">4.1 Time Periods</h3>
+<p>Future model periods from <code>params.yaml</code> are written to <code>TimePeriod</code> with flag <code>"f"</code> (future). An additional period is appended beyond the last model period (at <code>last_period + period_step</code>) to define the model horizon endpoint. Existing-capacity vintage periods are added later by <code>generators.py</code> with flag <code>"e"</code>.</p>
+<h3 id="42-regions">4.2 Regions</h3>
+<p>All endogenous model regions from <code>regions.csv</code> are written to the <code>Region</code> table with their descriptions.</p>
+<h3 id="43-temporal-structure">4.3 Temporal Structure</h3>
+<p>The <code>time.csv</code> file defines the mapping of 8,760 hours to:</p>
+<ul>
+<li><strong>Seasons</strong> (<code>SeasonLabel</code>): Each row defines a season label corresponding to a representative day or day-of-year.</li>
+<li><strong>Times of day</strong> (<code>TimeOfDay</code>): 24 hourly labels (H01–H24) within each season.</li>
+</ul>
+<p>These labels form the (season, tod) index used throughout all time-series data in the database.</p>
+<p><strong>Assumption</strong>: The temporal resolution is fixed at the hourly level within a 365-day year. Leap-year data (if present) is truncated to 8,760 hours.</p>
+<hr>
+<h2 id="5-provincial-grid-infrastructure">5. Provincial Grid Infrastructure</h2>
+<p><strong>Module</strong>: <code>provincial_grids.py</code></p>
+<p>This module handles three main tasks: demand, transmission structure, and planning reserve margin.</p>
+<h3 id="51-electricity-demand">5.1 Electricity Demand</h3>
+<h4 id="annual-demand-projections">Annual Demand Projections</h4>
+<p>Annual provincial electricity demand forecasts are pulled from the CODERS <code>forecasted_annual_demand</code> API endpoint. For each province and period:</p>
+<ul>
+<li>The demand value for the year corresponding to each period is extracted (using <code>data_year()</code>, which returns <code>period + period_step</code> for future periods).</li>
+<li>Values are converted from the CODERS native unit (GWh) to the model unit (PJ) via the conversion factor in <code>units.csv</code>.</li>
+<li>Written to the <code>Demand</code> table.</li>
+</ul>
+<h4 id="hourly-demand-profiles-demandspecificdistribution">Hourly Demand Profiles (DemandSpecificDistribution)</h4>
+<p>For each province with available data for the weather year:</p>
+<ol>
+<li>Hourly demand data (8,760 values in MWh) is downloaded from CODERS <code>provincial_demand</code> endpoint.</li>
+<li>A <strong>tolerance filter</strong> is applied: any hour with demand below <code>dsd_tolerance × mean_demand</code> is set to zero. This is done for computational efficiency in the optimisation solver.</li>
+<li>The profile is <strong>normalised</strong> by dividing each hour by the total annual sum, creating a distribution that sums to 1.0 over the year.</li>
+<li>The normalised profile is written to <code>DemandSpecificDistribution</code> for every model period (the shape is assumed constant across periods; only annual demand changes).</li>
+</ol>
+<p><strong>Assumption</strong>: The hourly demand shape from the weather year is used identically for all future periods. Only the total annual demand scales with projections. This means structural changes in demand patterns (e.g., electrification shifting load shapes) are not captured.</p>
+<p><strong>Assumption</strong>: The hourly demand data is stored for use in capacity credit calculations later, linking demand-side data to supply-side reliability metrics.</p>
+<h3 id="52-transmission-and-distribution">5.2 Transmission and Distribution</h3>
+<p>Two dummy technologies represent in-province grid infrastructure:</p>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">Technology</th>
+<th style="text-align: left;">Purpose</th>
+<th style="text-align: left;">Key Parameter</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;"><code>E_ELC_TX_to_DX</code></td>
+<td style="text-align: left;">Transmission to distribution</td>
+<td style="text-align: left;">Efficiency = 1 − line loss (from CODERS <code>ca_system_parameters</code>)</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>E_ELC_DX_to_DEM</code></td>
+<td style="text-align: left;">Distribution to demand</td>
+<td style="text-align: left;">Efficiency = 1.0 (dummy)</td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li>Both are given unlimited capacity (<code>unlim_cap = 1</code>) since transmission expansion is not modelled within provinces.</li>
+<li><strong>Variable costs</strong> for both transmission and distribution are pulled from the U.S. EIA Annual Energy Outlook (AEO) levelised cost tables. Costs are converted from US cents/kWh (USD 2024) to M$/PJ (CAD 2020) using currency conversion factors.</li>
+<li><strong>Line losses</strong> are province-specific, taken from the CODERS <code>ca_system_parameters</code> table (<code>system_line_losses_percent</code>).</li>
+</ul>
+<p><strong>Assumption</strong>: In-province transmission is not capacity-constrained. The model can move unlimited electricity within a province at the associated variable cost and line loss.</p>
+<p><strong>Assumption</strong>: Transmission and distribution variable costs are uniform across provinces and taken from U.S. data (EIA AEO), which may not perfectly reflect Canadian cost structures.</p>
+<h3 id="53-planning-reserve-margin">5.3 Planning Reserve Margin</h3>
+<p>Provincial planning reserve margins are taken from CODERS <code>ca_system_parameters</code> (<code>reserve_requirements_percent</code>). These are written directly to the <code>PlanningReserveMargin</code> table for each region.</p>
+<p><strong>Assumption</strong>: Reserve margins are province-specific but constant over the entire planning horizon.</p>
+<hr>
+<h2 id="6-generator-aggregation">6. Generator Aggregation</h2>
+<p><strong>Module</strong>: <code>generators.py</code></p>
+<p>This is the most complex module. It aggregates both existing and new generators, filling the bulk of the database tables.</p>
+<h3 id="61-existing-generators">6.1 Existing Generators</h3>
+<h4 id="data-source">Data Source</h4>
+<p>The CODERS <code>generators</code> API endpoint provides a facility-level database of all Canadian electricity generators, including:
+- Facility name and code, province, installed capacity, start year, renewal year
+- Generator type (e.g., "Natural Gas - Combined Cycle"), latitude/longitude
+- Average annual energy output, capacity factor</p>
+<h4 id="processing-steps">Processing Steps</h4>
+<ol>
+<li>
+<p><strong>Technology mapping</strong>: Each CODERS generator type is mapped to a CANOE technology code via <code>config.existing_map</code> (built from <code>generator_technologies.csv</code>'s <code>coders_existing</code> column). Generators without a mapping are skipped with a warning.</p>
+</li>
+<li>
+<p><strong>Region mapping</strong>: CODERS province names are mapped to CANOE region codes. Only generators in endogenous model regions are included.</p>
+</li>
+<li>
+<p><strong>Capacity filtering</strong>: Zero-capacity entries are removed.</p>
+</li>
+<li>
+<p><strong>Vintage determination</strong>: The vintage is set to <code>max(start_year, previous_renewal_year)</code>. This captures major refurbishments.</p>
+</li>
+<li>
+<p><strong>Vintage rounding</strong>: Vintages are rounded to the <code>period_step</code> interval and capped at <code>first_model_period - 1</code>. This reduces the number of unique vintages in the database:</p>
+</li>
+<li>
+<p>Example: with period_step=5 and first period 2025, a generator started in 2007 gets vintage 2005, one from 2013 gets vintage 2015, and one from 2023 gets vintage 2024 (capped at 2024).</p>
+</li>
+<li>
+<p><strong>No-retirement handling</strong>: Technologies flagged <code>no_retirement = true</code> (e.g., hydroelectric) have their vintage overridden to <code>first_model_period - 1</code> and lifetime set to 100 years. This ensures they persist throughout the planning horizon.</p>
+</li>
+<li>
+<p><strong>Aggregation</strong>: Capacities are summed by (region, tech_code, vintage). Facility descriptions are concatenated.</p>
+</li>
+<li>
+<p><strong>Filtering</strong>:</p>
+</li>
+<li>Generators whose vintage + lifetime does not reach the first model period are excluded.</li>
+<li>
+<p>Generators below the <code>existing_capacity_threshold</code> (0.001 GW) after aggregation are excluded.</p>
+</li>
+<li>
+<p><strong>Database writing</strong>: For each aggregated (region, tech, vintage) combination:</p>
+</li>
+<li><code>Technology</code> table entry with flag, sector, description</li>
+<li><code>ExistingCapacity</code> table entry with converted capacity (MW → GW)</li>
+<li>
+<p><code>TimePeriod</code> entries for existing vintages (flag <code>"e"</code>)</p>
+</li>
+<li>
+<p><strong>Downstream processing</strong>: The aggregated dataframe is passed to capacity factor, capacity credit, constraint, and generic-data modules.</p>
+</li>
+</ol>
+<h3 id="62-new-generators">6.2 New Generators</h3>
+<p>For each technology in <code>generator_technologies.csv</code> with <code>include_new = true</code>:</p>
+<ol>
+<li>
+<p><strong>Batching</strong>: If <code>new_cap_batches &gt; 1</code>, multiple technology variants are created (e.g., <code>E_WND_ON-NEW-1</code> through <code>E_WND_ON-NEW-13</code>). Each batch represents a bin of new capacity, typically used for variable renewables with different resource qualities.</p>
+</li>
+<li>
+<p><strong>Technology entries</strong>: Written to the <code>Technology</code> table.</p>
+</li>
+<li>
+<p><strong>Region-vintage combinations</strong>: A full cross-product of (model_regions × model_periods) is generated as the set of region-tech-vintage entries.</p>
+</li>
+<li>
+<p><strong>Wind and solar</strong> are separated from other generators and passed to <code>new_wind_solar.py</code> for specialised provincial resource characterisation. The remaining generators continue through the generic data pipeline.</p>
+</li>
+</ol>
+<h3 id="63-generic-techno-economic-data">6.3 Generic Techno-Economic Data</h3>
+<p>Two parallel paths handle generic data depending on whether an ATB equivalent is defined:</p>
+<h4 id="atb-path-preferred-when-atb_display_name-is-set">ATB Path (preferred when <code>atb_display_name</code> is set)</h4>
+<p>Data from the NREL ATB is used for:</p>
+<ul>
+<li><strong>Efficiency</strong>: Derived from ATB Heat Rate (<code>1 / (heat_rate × conversion_factor)</code>). For renewable technologies with dummy inputs (ethos), efficiency is set to 1.</li>
+<li><strong>Investment cost</strong> (<code>CostInvest</code>): ATB's OCC (Overnight Capital Cost) metric, converted from USD/kW to M$/GW and then to the final currency (CAD 2020). Projected values are taken for each vintage year.</li>
+<li><strong>Fixed O&amp;M</strong> (<code>CostFixed</code>): From ATB Fixed O&amp;M, indexed by vintage year. Converted to model units and currency.</li>
+<li><strong>Variable O&amp;M</strong> (<code>CostVariable</code>): From ATB Variable O&amp;M. If <code>include_tech_fuel_cost</code> is enabled and the technology has <code>include_fuel_cost = true</code>, fuel costs from ATB are added to the variable cost.</li>
+<li><strong>Ramp rates</strong>: From ATB technology-specific variables (TSV) workbook tables if available, otherwise from CODERS.</li>
+<li><strong>Emissions</strong> (<code>EmissionActivity</code>): From ATB TSV tables for CO2, SO2, NOx, and Hg, scaled by efficiency. CO2 values are duplicated as CO2-equivalent entries.</li>
+</ul>
+<h4 id="coders-path-fallback-when-no-atb-equivalent">CODERS Path (fallback when no ATB equivalent)</h4>
+<p>Uses CODERS <code>generation_generic</code> and <code>generation_cost_evolution</code> tables for:</p>
+<ul>
+<li>Efficiency, investment cost, fixed O&amp;M, variable O&amp;M, ramp rates, and CO2 emissions.</li>
+<li>All values are converted from CODERS native units (typically CAD/kW, % per minute, etc.) via <code>units.csv</code> conversion factors.</li>
+</ul>
+<h4 id="lifetime">Lifetime</h4>
+<p>Service lifetime is always taken from the CODERS <code>generation_generic</code> table (<code>service_life</code> column), regardless of ATB/CODERS path, except for no-retirement technologies which get 100 years.</p>
+<h4 id="capacity-to-activity">Capacity-to-Activity</h4>
+<p>A uniform <code>c2a</code> ratio of 31.536 PJ/GW·yr is written for every technology, representing the conversion from nameplate capacity to maximum annual energy output.</p>
+<h4 id="emissions-accounting">Emissions Accounting</h4>
+<p>Two emissions modes are available:</p>
+<ul>
+<li><strong><code>include_emissions = false</code></strong> (default): Emissions are assumed to be accounted for upstream (in fuel supply sectors). For technologies with CCS, <em>negative</em> emissions entries are written to offset the captured portion, calculated as <code>-emissions × capture_rate / (1 - capture_rate)</code>.</li>
+<li><strong><code>include_emissions = true</code></strong>: Direct emissions are written as positive values.</li>
+</ul>
+<p><strong>Assumption</strong>: When emissions are off, the model assumes a complementary fuel-supply sector handles emissions correctly. CCS technologies then only need to represent the <em>incremental</em> capture benefit.</p>
+<h3 id="64-technology-specific-variables-tsv">6.4 Technology-Specific Variables (TSV)</h3>
+<p>The ATB master Excel workbook contains detailed technical parameters in technology-specific variable tables. These are parsed by:</p>
+<ol>
+<li>Reading the relevant worksheet (e.g., "Natural Gas_FE", "Nuclear") using row/column ranges from <code>atb_master_tables.csv</code>.</li>
+<li>Concatenating multi-row headers into single-row headers.</li>
+<li>Translating column names using the <code>tsv_headers</code> mapping in <code>params.yaml</code>.</li>
+<li>Caching the parsed table locally as a CSV for faster subsequent loads.</li>
+</ol>
+<hr>
+<h2 id="7-capacity-factors">7. Capacity Factors</h2>
+<p><strong>Module</strong>: <code>capacity_factors.py</code> (dispatcher), with implementations in <code>provincial_data/</code></p>
+<p>Capacity factors are critical for representing the output variability of generators. The approach varies by technology type and data availability.</p>
+<h3 id="71-existing-vre-wind-and-solar-ontario">7.1 Existing VRE (Wind and Solar) — Ontario</h3>
+<p><strong>Module</strong>: <code>provincial_data/on/existing_vre_capacity_factors.py</code></p>
+<p>For Ontario, real operational data is available from the IESO:</p>
+<ol>
+<li><strong>Hourly generation by fuel</strong> is downloaded from IESO's <code>GenOutputbyFuelHourly</code> XML endpoint for the weather year.</li>
+<li>The XML data is parsed to extract hourly MWh generation for WIND and SOLAR fuel types.</li>
+<li><strong>Average annual capacity factors</strong> for each technology are computed as capacity-weighted averages from CODERS facility data (facilities ≥20 MW, matching IESO's reporting threshold).</li>
+<li><strong>Hourly capacity factors</strong> are computed by normalising the hourly generation profile to the average annual capacity factor: <code>cf(h) = hourly(h) / mean(hourly) × cf_annual</code>.</li>
+<li>Values are clipped to [0, 1] and values below <code>cf_tolerance</code> (0.01) are set to zero.</li>
+<li>Written to <code>CapacityFactorTech</code> for all valid (region, period, season, tod) combinations.</li>
+</ol>
+<p><strong>Assumption</strong>: Ontario's aggregate VRE generation profile from IESO is representative of the true hourly resource availability of its existing fleet.</p>
+<h3 id="72-existing-vre-other-provinces">7.2 Existing VRE — Other Provinces</h3>
+<p><strong>Module</strong>: <code>provincial_data/default/existing_vre_capacity_factors.py</code></p>
+<p>For provinces without real operational data, capacity factors are <em>synthesised</em> using the Renewables Ninja API:</p>
+<ol>
+<li>For each existing VRE facility in CODERS, its latitude and longitude are sent to the Renewables Ninja API to obtain simulated hourly generation for the weather year.</li>
+<li>Results are based on MERRA-2 reanalysis weather data.</li>
+<li>Facility-specific hourly profiles are aggregated using capacity-weighted averaging.</li>
+<li>The total annual energy is adjusted to match the CODERS-reported <code>unit_average_annual_energy</code>.</li>
+<li>Aggregate capacity factors are computed as <code>cf(h) = energy_adjusted_gen(h) / total_capacity</code>.</li>
+</ol>
+<p><strong>Assumption</strong>: The Renewables Ninja API provides representative profiles using the MERRA-2 weather dataset, a standard reference turbine (Vestas V112 3000 for onshore wind at 110m, Vestas V164 9500 for offshore at 150m), and a 45° tilt for solar PV.</p>
+<p><strong>Limitation</strong>: API rate limits (50 requests/hour) mean that initial data collection for all facilities can take several hours. Results are cached locally.</p>
+<h3 id="73-existing-hydroelectric-ontario">7.3 Existing Hydroelectric — Ontario</h3>
+<p><strong>Module</strong>: <code>provincial_data/on/existing_hydro_capacity_factors.py</code></p>
+<p>Ontario hydroelectric capacity factors use IESO's <code>GenOutputCapabilityMonth</code> data:</p>
+<ol>
+<li>For data before 2019: A single Excel workbook per year provides hourly output and available capacity by generator.</li>
+<li>For data from 2020 onward: Monthly CSV files provide the same data.</li>
+<li>Generators are classified as <strong>daily storage</strong> (<code>hydro_daily</code>) or <strong>run-of-river</strong> (<code>hydro_run</code>) via a manually curated mapping file (<code>hydro_types.csv</code>).</li>
+<li>Hourly capacity factors are computed as <code>output_MW / capability_MW</code> for each type.</li>
+<li><strong>Run-of-river</strong> gets hourly <code>CapacityFactorTech</code> entries.</li>
+<li><strong>Daily storage</strong> gets daily-averaged <code>LimitSeasonalCapacityFactor</code> entries (one per season/day).</li>
+</ol>
+<p><strong>Assumption</strong>: Ontario has no monthly-storage hydroelectric capacity in the IESO dataset. Monthly hydro is handled separately.</p>
+<h3 id="74-existing-hydroelectric-other-provinces">7.4 Existing Hydroelectric — Other Provinces</h3>
+<p><strong>Module</strong>: <code>provincial_data/default/existing_hydro_capacity_factors.py</code></p>
+<p>For other provinces, hydroelectric capacity factors are synthesised from Statistics Canada monthly generation data:</p>
+<ol>
+<li>StatCan table 25-10-0015-01 provides monthly hydraulic turbine generation by province in MWh.</li>
+<li>Monthly totals are spread uniformly across days within each month.</li>
+<li>The total provincial hydro generation is apportioned among hydro types (run-of-river, daily storage, monthly storage) based on each type's <code>unit_average_annual_energy</code> from CODERS.</li>
+<li>Hourly capacity factors are computed from the resulting daily generation divided by aggregated capacity.</li>
+</ol>
+<p><strong>Run-of-river</strong> hydro is assumed to have constant output within each month (flat hourly profile per month). <strong>Daily and monthly storage</strong> hydro are given seasonal capacity factor limits (<code>LimitSeasonalCapacityFactor</code>) rather than hourly factors, allowing the optimiser to dispatch them within those bounds.</p>
+<p><strong>Assumption</strong>: Monthly hydro generation data can be evenly spread over the days of that month. The breakdown between hydro types is based on average annual energy proportions from CODERS.</p>
+<p><strong>Limitation</strong>: This is a coarse approximation. Real hydro dispatch is driven by water inflows, reservoir levels, and operational decisions — none of which are captured here.</p>
+<h3 id="75-new-generators">7.5 New Generators</h3>
+<p>For new non-renewable, non-VRE generators, no capacity factors are set (the optimiser freely dispatches within their other constraints).</p>
+<p>For new hydro (daily, run-of-river), Ontario existing hydro capacity factors are currently used as a proxy for all regions. This is a known limitation flagged with a TODO.</p>
+<hr>
+<h2 id="8-capacity-credits-and-reserve-margin">8. Capacity Credits and Reserve Margin</h2>
+<p><strong>Module</strong>: <code>capacity_credits.py</code>, <code>provincial_data/on/existing_capacity_credits.py</code></p>
+<p>Capacity credits express how much firm capacity each technology contributes toward meeting the planning reserve margin.</p>
+<h3 id="81-non-vre-generators">8.1 Non-VRE Generators</h3>
+<p>Capacity credits for thermal, nuclear, and hydro generators are derived from Ontario's IESO Reliability Outlook:</p>
+<ol>
+<li>The Reliability Outlook Table 4.1 provides <strong>forecast capability at summer peak</strong> and <strong>total installed capacity</strong> by fuel type.</li>
+<li>The ratio gives a capacity credit: <code>cc = capability / installed_capacity</code>.</li>
+<li>IESO fuel types are mapped to CANOE generator codes via <code>fuel_types.csv</code>.</li>
+<li>These credits are written to both <code>CapacityCredit</code> (for static reserve margin) and <code>ReserveCapacityDerate</code> (for dynamic/seasonal reserve margin) tables.</li>
+</ol>
+<p><strong>Assumption</strong>: Ontario's IESO reliability data is used for all provinces. This is a significant simplification — provinces with different generator fleets may have different de-rating factors.</p>
+<h3 id="82-vre-capacity-credits-new-wind-and-solar">8.2 VRE Capacity Credits (New Wind and Solar)</h3>
+<p>VRE capacity credits are calculated using the <strong>NREL ReEDS top-100-hours method</strong>:</p>
+<ol>
+<li>Start with the provincial <strong>hourly load</strong> (demand profile).</li>
+<li>Subtract hourly generation from all <strong>existing VRE</strong> to get an initial net load.</li>
+<li>For each new VRE capacity bin (ordered by ascending LCOE):
+   a. Calculate the <strong>marginal net load</strong> by subtracting the bin's projected hourly generation (capacity factor × nameplate capacity) from the current net load.
+   b. Compute the <strong>load duration curve (LDC)</strong> and the <strong>net load duration curve (NLDC)</strong> (both sorted descending).
+   c. The <strong>capacity credit</strong> is the mean reduction in NLDC over the top 100 hours, divided by nameplate capacity.
+   d. Update net load for the next iteration.</li>
+<li>This produces <strong>declining marginal capacity credits</strong>: the first bins of VRE added have higher capacity value; later bins have diminishing value as their output becomes increasingly correlated with existing VRE.</li>
+</ol>
+<p><strong>Assumption</strong>: VRE capacity bins are assumed to be built sequentially in order of ascending LCOE, and only one type of renewable is evaluated at a time (cross-technology interactions are not captured).</p>
+<h3 id="83-storage-capacity-credits">8.3 Storage Capacity Credits</h3>
+<p>Storage is currently assigned a flat capacity credit of 0.9 for all regions and periods. This is a placeholder pending a more sophisticated method.</p>
+<hr>
+<h2 id="9-new-wind-and-solar-characterisation">9. New Wind and Solar Characterisation</h2>
+<p><strong>Module</strong>: <code>new_wind_solar.py</code></p>
+<p>New wind and solar use spatially explicit resource characterisation data. This is the most data-intensive part of the pipeline.</p>
+<h3 id="91-new-wind">9.1 New Wind</h3>
+<h4 id="resource-data">Resource Data</h4>
+<p>Wind resource data comes from characterisation work by Sutubra, providing:</p>
+<ul>
+<li><strong>Cluster Composition</strong>: For each geographic cluster, the fraction of three turbine technology classes (T1, T2, T3 corresponding to ATB wind classes 7, 8, 9) and maximum capacity.</li>
+<li><strong>Cluster Capacity Factors</strong>: Hourly (8,760) capacity factor profiles per cluster.</li>
+<li><strong>Cluster Spur Costs</strong>: Estimated cost to connect each cluster to the existing transmission grid.</li>
+</ul>
+<h4 id="processing-steps_1">Processing Steps</h4>
+<ol>
+<li><strong>ATB cost projections</strong> are loaded for each wind class (T1–T3): investment cost (OCC), fixed O&amp;M, and capacity factor projections over time.</li>
+<li><strong>Weighted cluster costs</strong> are computed by weighting ATB data by the capacity fraction of each turbine class in the cluster, then adding spur line costs.</li>
+<li><strong>LCOE ranking</strong>: Clusters are sorted by estimated LCOE using a simple annualised cost / annual energy calculation with the global discount rate.</li>
+<li><strong>Bin assignment</strong>: The top N clusters (N = number of capacity bins from <code>generator_technologies.csv</code>) are assigned to new capacity bins 1–N.</li>
+<li><strong>Capacity factor indexing</strong>: Hourly CFs are scaled by ATB's projected CF improvement relative to a 2030 base year for each vintage.</li>
+<li><strong>Capacity credits</strong> are calculated using the VRE top-100-hours method.</li>
+<li><strong>Database entries</strong>: For each (region, cluster, vintage):</li>
+<li><code>LimitCapacity</code>: Maximum capacity per bin (from cluster data, MW → GW)</li>
+<li><code>Efficiency</code>: 1.0 (dummy ethos input)</li>
+<li><code>CostInvest</code>: Weighted ATB + spur costs, currency-converted</li>
+<li><code>CapacityFactorProcess</code>: Hourly CFs for each vintage (indexed to ATB projections)</li>
+<li><code>CostFixed</code>: Weighted ATB fixed O&amp;M</li>
+</ol>
+<p><strong>Assumption</strong>: Currently, only Ontario wind resource data is used for all provinces. This is flagged as a TODO for future improvement.</p>
+<p><strong>Assumption</strong>: Wind turbine classes 7/8/9 from ATB represent the range of resources available. Cost and performance improvements follow ATB projections.</p>
+<h3 id="92-new-solar">9.2 New Solar</h3>
+<p>Similar to wind, but simpler (no turbine class weighting):</p>
+<ol>
+<li>Solar resource data provides per-grid-cell capacity factors, maximum capacity, interconnection costs, and LCOE.</li>
+<li>Grid cells are sorted by LCOE (or capacity factor, configurable).</li>
+<li>The top N cells are assigned to capacity bins.</li>
+<li>ATB solar PV cost and performance projections are applied, indexed to a 2022 base year.</li>
+<li><strong>Solar degradation</strong>: A per-year degradation rate (default 0.85%/year) is applied to capacity factors, reducing output linearly with age.</li>
+<li>Capacity credits and database entries are computed as for wind.</li>
+</ol>
+<p><strong>Assumption</strong>: Solar degradation follows a flat 0.85%/year rate based on Jordan et al. (2016).</p>
+<p><strong>Assumption</strong>: As with wind, only Ontario solar resource data is currently used for all provinces.</p>
+<hr>
+<h2 id="10-energy-storage">10. Energy Storage</h2>
+<h3 id="101-existing-storage">10.1 Existing Storage</h3>
+<p>From the CODERS <code>storage</code> API endpoint:</p>
+<ol>
+<li>Each storage facility is mapped to a CANOE technology based on (storage_type, duration).</li>
+<li>Duration is rounded to the nearest integer hour.</li>
+<li>Capacities are aggregated by (region, tech, vintage) following the same vintage-rounding and filtering logic as generators.</li>
+<li>Efficiency is taken from <code>storage_technologies.csv</code> (fixed, ATB-aligned).</li>
+<li><code>StorageDuration</code> is set from the facility's reported duration.</li>
+<li>Technology flag is <code>"ps"</code> (physical storage).</li>
+</ol>
+<h3 id="102-new-storage">10.2 New Storage</h3>
+<p>For new storage technologies (with <code>include_new = true</code>):</p>
+<ol>
+<li>A single technology variant is created per storage type (e.g., <code>E_BAT_2H-NEW</code>, <code>E_BAT_4H-NEW</code>).</li>
+<li>Efficiency and storage duration come from <code>storage_technologies.csv</code>.</li>
+<li>Cost data follows the ATB or CODERS path as for generators.</li>
+</ol>
+<h3 id="103-monthly-hydroelectric-storage">10.3 Monthly Hydroelectric Storage</h3>
+<p>Monthly hydro is given special treatment to model reservoir storage:</p>
+<ol>
+<li>An <strong>intermediate commodity</strong> (<code>E_hyd_mly_stor</code>) is created to represent stored water energy.</li>
+<li>An <strong>inflow technology</strong> (<code>E_HYD_MLY-EXS-IN</code>) fills the reservoir — it takes weather-dependent hydro inflow and produces the storage commodity.</li>
+<li>The <strong>existing hydro tech</strong> (<code>E_HYD_MLY-EXS</code>) is converted to a seasonal storage technology that takes from the reservoir and produces electricity.</li>
+<li><code>StorageDuration</code> is set to 730 hours (approximately one month).</li>
+<li>The <code>LimitSeasonalCapacityFactor</code> from hydro CF calculations is assigned to the inflow technology rather than the dispatch technology, constraining how much energy enters the reservoir each season while allowing flexible dispatch.</li>
+</ol>
+<p><strong>Assumption</strong>: 730 hours of storage capacity represents monthly-scale reservoir flexibility. Real reservoirs may have multi-month or multi-year storage.</p>
+<hr>
+<h2 id="11-ccs-retrofits">11. CCS Retrofits</h2>
+<p><strong>Module</strong>: Part of <code>generators.py</code></p>
+<p>CCS retrofits are modelled as <strong>add-on technologies</strong> that sit between an existing fossil generator and the transmission grid:</p>
+<h3 id="architecture">Architecture</h3>
+<div class="codehilite"><pre><span></span><code><span class="n">Generator</span><span class="w"> </span><span class="err">→</span><span class="w"> </span><span class="p">[</span><span class="n">Intermediate</span><span class="w"> </span><span class="n">Commodity</span><span class="p">]</span><span class="w"> </span><span class="err">→</span><span class="w"> </span><span class="n">CCS</span><span class="w"> </span><span class="n">Retrofit</span><span class="w"> </span><span class="err">→</span><span class="w"> </span><span class="n">Transmission</span>
+<span class="w">                                    </span><span class="err">↘</span><span class="w"> </span><span class="n">Bypass</span><span class="w"> </span><span class="n">Tech</span><span class="w">  </span><span class="err">↗</span>
+</code></pre></div>
+
+<ol>
+<li>A new <strong>intermediate commodity</strong> (e.g., <code>E_elc_tx_ng_cc</code>) is created between the generator output and the transmission grid.</li>
+<li>A <strong>bypass technology</strong> allows unabated electricity to pass through at efficiency 1.0.</li>
+<li>A <strong>retrofit technology</strong> (e.g., <code>E_NG_CCS_RFIT_95</code>) captures CO2 at a specified capture rate (e.g., 90% or 95%) with an energy penalty.</li>
+</ol>
+<h3 id="data-processing">Data Processing</h3>
+<ol>
+<li><strong>Efficiency</strong>: From ATB "Net Output Penalty" metric: <code>efficiency = 1 + penalty</code> (penalty is negative, so efficiency &lt; 1).</li>
+<li><strong>Emissions</strong>: Negative emission entries: <code>-capture_rate × generator_co2_emissions / efficiency</code>.</li>
+<li><strong>Costs</strong>: Investment, fixed O&amp;M, and variable O&amp;M from ATB CCS retrofit data.</li>
+<li><strong>Lifetime</strong>: CCS retrofit lifetime is capped to not exceed the remaining life of the retrofittable generators.</li>
+<li><strong>Activity limits</strong>: Retrofit and bypass activities are capped to zero when no generators remain alive.</li>
+</ol>
+<p><strong>Assumption</strong>: The ATB provides representative costs for CCS retrofits on natural gas combined cycle and coal plants. Costs are not region-specific.</p>
+<p><strong>Assumption</strong>: CCS retrofits are vintage-dependent — costs decrease over time following ATB projections.</p>
+<hr>
+<h2 id="12-interfaces-and-interties">12. Interfaces and Interties</h2>
+<p><strong>Module</strong>: <code>interfaces.py</code></p>
+<p>Interties (electricity interconnections) between provinces and to the U.S. are aggregated in two categories:</p>
+<h3 id="121-boundary-interfaces">12.1 Boundary Interfaces</h3>
+<p>These cross the model boundary (one region inside the model, one outside). They are represented as:</p>
+<ul>
+<li><strong>Outgoing demand</strong>: A demand commodity and demand technology force the model to export the historically observed flow pattern.</li>
+<li><strong>Incoming VRE generator</strong>: A variable generator with curtailment ability represents imports, with capacity factors derived from historical hourly flows.</li>
+</ul>
+<h4 id="processing-steps_2">Processing Steps</h4>
+<ol>
+<li>All interprovincial and international interties are loaded from CODERS.</li>
+<li>For each intertie crossing the model boundary, hourly flow data is retrieved for the weather year.</li>
+<li><strong>Flow direction</strong>: In CODERS, negative flows represent forward transfers and positive flows represent backward transfers.</li>
+<li>Flows are aggregated by regional pair.</li>
+<li><strong>Export (outgoing)</strong>:</li>
+<li>Annual demand = sum of outgoing hourly flows (MWh → PJ).</li>
+<li>Demand profile (DSD) = hourly flow / annual total.</li>
+<li>Transmission efficiency = 1 − province line loss.</li>
+<li>Variable cost from AEO transmission costs.</li>
+<li><strong>Import (incoming)</strong>:</li>
+<li>Existing capacity = peak hourly import flow (MWh/h → GW).</li>
+<li>Capacity factor = hourly flow / peak flow.</li>
+<li>Marked as curtailable.</li>
+</ol>
+<p><strong>Assumption</strong>: Historical boundary flows are projected forward as fixed demand/supply patterns for all future periods. This freezes international trade at weather-year levels.</p>
+<h3 id="122-endogenous-interfaces">12.2 Endogenous Interfaces</h3>
+<p>These connect two modelled regions and are represented as <strong>exchange technologies</strong> in Temoa:</p>
+<ol>
+<li>A single <code>E_INT</code> technology is used.</li>
+<li><strong>Capacity</strong>: Set to the maximum of seasonal transfer capabilities (summer/winter) in either direction, from CODERS <code>interface_capacities</code>.</li>
+<li><strong>Seasonal capacity factors</strong>: If transfer capabilities differ by season or direction, capacity factors constrain flows below the physical limit.</li>
+<li><strong>Efficiency</strong>: 1 − line loss of the sending province.</li>
+<li><strong>Variable cost</strong>: AEO transmission costs apply.</li>
+</ol>
+<p><strong>Assumption</strong>: Endogenous interface capacity is fixed at existing levels; no transmission expansion is modelled between provinces.</p>
+<hr>
+<h2 id="13-constraints">13. Constraints</h2>
+<p><strong>Module</strong>: <code>constraints.py</code> dispatching to <code>provincial_data/default/</code></p>
+<h3 id="131-ramp-rates">13.1 Ramp Rates</h3>
+<p><strong>Source</strong>: <code>ramp_rates.csv</code>, based on Dolter &amp; Rivers (2018).</p>
+<p>Hourly ramp-up and ramp-down rates are applied to technologies based on their CANOE tech code. Values are expressed as a fraction of capacity per hour.</p>
+<p>Not all technologies have ramp constraints — only those listed in the CSV file.</p>
+<h3 id="132-cogeneration-constraints">13.2 Cogeneration Constraints</h3>
+<p>Existing cogeneration technologies (natural gas CHP, biomass CHP) are activity-constrained:</p>
+<ul>
+<li><strong>Maximum activity</strong> = <code>unit_average_annual_energy</code> from CODERS (converted to PJ).</li>
+<li><strong>Minimum activity</strong> = 95% of maximum (computational slack).</li>
+</ul>
+<p>This ensures cogeneration output matches historical levels, since the model does not endogenously represent the heat demand served by CHP.</p>
+<p><strong>Assumption</strong>: Cogeneration heat demand is exogenous and constant. The 5% slack prevents infeasibility.</p>
+<hr>
+<h2 id="14-currency-conversion">14. Currency Conversion</h2>
+<p><strong>Module</strong>: <code>currency_conversion.py</code></p>
+<p>All costs in the database are converted to a single target currency and year (default: CAD 2020).</p>
+<h3 id="methodology">Methodology</h3>
+<p>The conversion uses two tables from <code>input_files/</code>:</p>
+<ul>
+<li><strong><code>currency_exchange.csv</code></strong>: Exchange rates for multiple currencies (USD, EUR, GBP, AUD, CAD) by year.</li>
+<li><strong><code>cad_inflation.csv</code></strong>: Inflation indices (GDP deflator, CPI variants, construction indices) by year.</li>
+</ul>
+<p>The conversion formula is:</p>
+<div class="codehilite"><pre><span></span><code>converted_cost = original_cost × exchange_rate(orig_year, orig_currency) × inflation_index(orig_year) / base_factor
+</code></pre></div>
+
+<p>where <code>base_factor = exchange_rate(base_year, base_currency) × inflation_index(base_year)</code>.</p>
+<p>The GDP deflator index is used by default. Conversion happens <strong>inline</strong> during data aggregation — each cost value is converted before being written to the database.</p>
+<hr>
+<h2 id="15-post-processing">15. Post-Processing</h2>
+<p><strong>Module</strong>: <code>post_processing.py</code></p>
+<p>After all data has been aggregated:</p>
+<h3 id="151-import-dummy-technologies">15.1 Import Dummy Technologies</h3>
+<p>If <code>include_imports</code> is enabled, dummy import technologies are created for each fuel commodity used in the model:</p>
+<ol>
+<li>For every commodity that appears as an input in the <code>Efficiency</code> table, an import technology is created.</li>
+<li>Import techs have efficiency 1.0, a single vintage at the first period, and retire when no longer needed.</li>
+<li>This bridges the gap between fuel supply sectors and the electricity sector.</li>
+</ol>
+<h3 id="152-commodity-table">15.2 Commodity Table</h3>
+<p>Commodities are added to the <code>Commodity</code> table based on actual usage:</p>
+<ul>
+<li>Only commodities appearing in <code>Efficiency</code> (as inputs or outputs) or <code>EmissionActivity</code> (as emission commodities) are added.</li>
+<li>This prevents orphaned commodities in the database.</li>
+</ul>
+<h3 id="153-unused-technology-removal">15.3 Unused Technology Removal</h3>
+<p>Technologies that appear in the <code>Technology</code> table but never in the <code>Efficiency</code> table are removed from all database tables. This cleans up technologies that were configured but never had valid data (e.g., a province might not have solar generators to aggregate).</p>
+<h3 id="154-references-and-data-ids">15.4 References and Data IDs</h3>
+<ul>
+<li>All bibliography entries are written to the <code>DataSource</code> table.</li>
+<li>All unique data IDs are written to the <code>DataSet</code> table.</li>
+<li>A consistency check warns about any database rows with NULL <code>data_id</code> values.</li>
+</ul>
+<hr>
+<h2 id="16-unit-conventions">16. Unit Conventions</h2>
+<p>All unit conversions are centralised in <code>input_files/units.csv</code>. Key conversions include:</p>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">Quantity</th>
+<th style="text-align: left;">Input Units</th>
+<th style="text-align: left;">Model Units</th>
+<th style="text-align: left;">Conversion</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;">Capacity</td>
+<td style="text-align: left;">MW</td>
+<td style="text-align: left;">GW</td>
+<td style="text-align: left;">÷ 1000</td>
+</tr>
+<tr>
+<td style="text-align: left;">Activity/Energy</td>
+<td style="text-align: left;">MWh</td>
+<td style="text-align: left;">PJ</td>
+<td style="text-align: left;">× 3.6×10⁻⁶</td>
+</tr>
+<tr>
+<td style="text-align: left;">Investment cost</td>
+<td style="text-align: left;">$/kW</td>
+<td style="text-align: left;">M$/GW</td>
+<td style="text-align: left;">× 1 (equivalent)</td>
+</tr>
+<tr>
+<td style="text-align: left;">Fixed O&amp;M</td>
+<td style="text-align: left;">$/kW-yr</td>
+<td style="text-align: left;">M$/GW-yr</td>
+<td style="text-align: left;">× 1</td>
+</tr>
+<tr>
+<td style="text-align: left;">Variable O&amp;M</td>
+<td style="text-align: left;">$/MWh</td>
+<td style="text-align: left;">M$/PJ</td>
+<td style="text-align: left;">× 1/3.6</td>
+</tr>
+<tr>
+<td style="text-align: left;">Heat rate</td>
+<td style="text-align: left;">MMBtu/MWh</td>
+<td style="text-align: left;">PJ/PJ</td>
+<td style="text-align: left;">Specific factor</td>
+</tr>
+<tr>
+<td style="text-align: left;">Emissions</td>
+<td style="text-align: left;">lbs/MMBtu</td>
+<td style="text-align: left;">kt/PJ</td>
+<td style="text-align: left;">Specific factor</td>
+</tr>
+<tr>
+<td style="text-align: left;">Ramp rate</td>
+<td style="text-align: left;">%/min</td>
+<td style="text-align: left;">fraction/hour</td>
+<td style="text-align: left;">× 0.6</td>
+</tr>
+<tr>
+<td style="text-align: left;">C2A</td>
+<td style="text-align: left;">PJ/GW·yr</td>
+<td style="text-align: left;">—</td>
+<td style="text-align: left;">31.536</td>
+</tr>
+</tbody>
+</table>
+<p>The <code>units.csv</code> file contains separate columns for CODERS and ATB conversion factors, since the two data sources use different native units.</p>
+<hr>
+<h2 id="17-known-assumptions-and-limitations">17. Known Assumptions and Limitations</h2>
+<h3 id="spatial">Spatial</h3>
+<ol>
+<li><strong>Ontario data as default</strong>: Several province-specific calculations (hydro CFs, VRE resource characterisation, capacity credits) currently use Ontario data for all provinces. This is flagged in the code with TODO comments.</li>
+<li><strong>Province-level granularity</strong>: Generators, demand, and transmission are modelled at the provincial level. Sub-provincial variation is not captured.</li>
+<li><strong>U.S. trade frozen</strong>: Boundary interties with the U.S. use weather-year historical flows for all future periods.</li>
+</ol>
+<h3 id="temporal">Temporal</h3>
+<ol>
+<li><strong>Weather year</strong>: All hourly profiles (demand, generation, interties) come from a single weather year (2018 by default). Climate variability is not represented.</li>
+<li><strong>Static demand shape</strong>: The hourly demand profile is assumed constant across all future periods.</li>
+</ol>
+<h3 id="technical">Technical</h3>
+<ol>
+<li><strong>No transmission expansion</strong>: In-province transmission and interprovincial capacities are fixed.</li>
+<li><strong>Hydro approximation</strong>: Monthly hydro uses 730-hour storage duration; real reservoir operations are more complex.</li>
+<li><strong>Cogeneration heat demand</strong>: Treated as exogenous and constant.</li>
+<li><strong>Storage capacity credits</strong>: Flat 0.9 for all storage, pending improved methodology.</li>
+</ol>
+<h3 id="economic">Economic</h3>
+<ol>
+<li><strong>U.S. cost data</strong>: Transmission/distribution costs come from EIA AEO, not Canadian sources.</li>
+<li><strong>ATB prevalence</strong>: Technology costs primarily follow U.S. ATB projections, which may not reflect Canadian market conditions.</li>
+<li><strong>Currency conversion</strong>: Uses GDP deflator for inflation adjustment; other indices are available but not default.</li>
+</ol>
+<h3 id="data-quality">Data Quality</h3>
+<ol>
+<li><strong>CODERS data completeness</strong>: Some generators may lack renewal dates, capacity factors, or average annual energy data, leading to potential inaccuracies in vintage assignment or CF calculations.</li>
+<li><strong>Renewables Ninja synthesis</strong>: Non-Ontario VRE CFs are simulated rather than observed, introducing weather model uncertainty.</li>
+</ol>
+<hr>
+<p><em>This documentation describes the CANOE electricity sector aggregation tool as of 2025. The tool is under active development and some features (marked with TODO) are planned for future improvement.</em></p>
+
+<div class="section-divider">
+<h1 id="canoe-electricity-sector-data-sources-catalog">CANOE Electricity Sector — Data Sources Catalog</h1>
+<p><em>A comprehensive catalog of all upstream data sources used by the CANOE electricity sector aggregation tool, their update schedules, and procedures for incorporating updated data.</em></p>
+<hr>
+<h2 id="table-of-contents">Table of Contents</h2>
+<ol>
+<li><a href="#1-data-source-summary">Data Source Summary</a></li>
+<li><a href="#2-coders">CODERS — Canadian Open-Source Database for Energy Research</a></li>
+<li><a href="#3-nrel-annual-technology-baseline-atb">NREL Annual Technology Baseline (ATB)</a></li>
+<li><a href="#4-ieso-public-data-ontario">IESO Public Data (Ontario)</a></li>
+<li><a href="#5-statistics-canada">Statistics Canada</a></li>
+<li><a href="#6-renewables-ninja-api">Renewables Ninja API</a></li>
+<li><a href="#7-us-eia-annual-energy-outlook-aeo">U.S. EIA Annual Energy Outlook (AEO)</a></li>
+<li><a href="#8-sutubra-vre-resource-characterisation">Sutubra VRE Resource Characterisation</a></li>
+<li><a href="#9-academic-and-reference-data">Academic and Reference Data</a></li>
+<li><a href="#10-update-procedures">Update Procedures</a></li>
+</ol>
+<hr>
+<h2 id="1-data-source-summary">1. Data Source Summary</h2>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">#</th>
+<th style="text-align: left;">Source</th>
+<th style="text-align: left;">Type</th>
+<th style="text-align: left;">Frequency</th>
+<th style="text-align: left;">Used For</th>
+<th style="text-align: left;">Critical?</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;">1</td>
+<td style="text-align: left;">CODERS API</td>
+<td style="text-align: left;">REST API / CSV cache</td>
+<td style="text-align: left;">Annual</td>
+<td style="text-align: left;">Generators, demand, interties, system parameters</td>
+<td style="text-align: left;"><strong>Yes</strong></td>
+</tr>
+<tr>
+<td style="text-align: left;">2</td>
+<td style="text-align: left;">NREL ATB CSV</td>
+<td style="text-align: left;">CSV download</td>
+<td style="text-align: left;">Annual (July)</td>
+<td style="text-align: left;">Technology costs, heat rates, efficiency, emissions</td>
+<td style="text-align: left;"><strong>Yes</strong></td>
+</tr>
+<tr>
+<td style="text-align: left;">3</td>
+<td style="text-align: left;">NREL ATB Workbook</td>
+<td style="text-align: left;">Excel download</td>
+<td style="text-align: left;">Annual (July)</td>
+<td style="text-align: left;">TSV: emissions factors, ramp rates, outage rates</td>
+<td style="text-align: left;"><strong>Yes</strong></td>
+</tr>
+<tr>
+<td style="text-align: left;">4</td>
+<td style="text-align: left;">IESO Public Data</td>
+<td style="text-align: left;">XML/CSV/Excel download</td>
+<td style="text-align: left;">Ongoing/Monthly</td>
+<td style="text-align: left;">Ontario VRE CFs, hydro CFs, capacity credits</td>
+<td style="text-align: left;"><strong>Yes</strong> (Ontario)</td>
+</tr>
+<tr>
+<td style="text-align: left;">5</td>
+<td style="text-align: left;">Statistics Canada</td>
+<td style="text-align: left;">ZIP/CSV download</td>
+<td style="text-align: left;">Monthly</td>
+<td style="text-align: left;">Hydroelectric monthly generation by province</td>
+<td style="text-align: left;">Moderate</td>
+</tr>
+<tr>
+<td style="text-align: left;">6</td>
+<td style="text-align: left;">Renewables Ninja</td>
+<td style="text-align: left;">REST API</td>
+<td style="text-align: left;">On-demand</td>
+<td style="text-align: left;">Non-Ontario VRE hourly capacity factor synthesis</td>
+<td style="text-align: left;">Moderate</td>
+</tr>
+<tr>
+<td style="text-align: left;">7</td>
+<td style="text-align: left;">EIA AEO</td>
+<td style="text-align: left;">Manual/CSV</td>
+<td style="text-align: left;">Annual (March)</td>
+<td style="text-align: left;">Transmission and distribution variable costs</td>
+<td style="text-align: left;">Low</td>
+</tr>
+<tr>
+<td style="text-align: left;">8</td>
+<td style="text-align: left;">Sutubra Resource Data</td>
+<td style="text-align: left;">Local CSV files</td>
+<td style="text-align: left;">Periodic</td>
+<td style="text-align: left;">New wind/solar cluster data (CFs, costs, spur lines)</td>
+<td style="text-align: left;"><strong>Yes</strong></td>
+</tr>
+<tr>
+<td style="text-align: left;">9</td>
+<td style="text-align: left;">Currency/Inflation tables</td>
+<td style="text-align: left;">Local CSV files</td>
+<td style="text-align: left;">Annual</td>
+<td style="text-align: left;">Currency exchange rates and inflation adjustments</td>
+<td style="text-align: left;">Low</td>
+</tr>
+<tr>
+<td style="text-align: left;">10</td>
+<td style="text-align: left;">Dolter &amp; Rivers (2018)</td>
+<td style="text-align: left;">Local CSV</td>
+<td style="text-align: left;">Static</td>
+<td style="text-align: left;">Ramp rate constraints</td>
+<td style="text-align: left;">Low</td>
+</tr>
+<tr>
+<td style="text-align: left;">11</td>
+<td style="text-align: left;">Jordan et al. (2016)</td>
+<td style="text-align: left;">Parameter in config</td>
+<td style="text-align: left;">Static</td>
+<td style="text-align: left;">Solar degradation rate</td>
+<td style="text-align: left;">Low</td>
+</tr>
+</tbody>
+</table>
+<hr>
+<h2 id="2-coders">2. CODERS</h2>
+<h3 id="description">Description</h3>
+<p>The <strong>Canadian Open-Source Database for Energy Research and Systems-Modelling (CODERS)</strong> is the primary data source providing the Canadian energy system inventory. It is maintained by the Centre for Applied Energy Research at the University of Victoria and accessible via REST API.</p>
+<p><strong>Website</strong>: <a href="https://cme-emh.ca/en/coders/">https://cme-emh.ca/en/coders/</a></p>
+<p><strong>API base URL</strong>: <code>https://api.sesit.ca/</code></p>
+<h3 id="api-key-requirement">API Key Requirement</h3>
+<p>An API key must be obtained from the CODERS website and stored in <code>input_files/coders_api_key.txt</code>. This file is git-ignored and must be created manually.</p>
+<h3 id="endpoints-used">Endpoints Used</h3>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">Endpoint</th>
+<th style="text-align: left;">Cache File</th>
+<th style="text-align: left;">Used In</th>
+<th style="text-align: left;">Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;"><code>generators</code></td>
+<td style="text-align: left;"><code>generators.csv</code></td>
+<td style="text-align: left;"><code>generators.py</code></td>
+<td style="text-align: left;">Existing generator fleet: facility name, type, capacity, vintage, location, annual energy</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>storage</code></td>
+<td style="text-align: left;"><code>storage.csv</code></td>
+<td style="text-align: left;"><code>generators.py</code></td>
+<td style="text-align: left;">Existing storage facilities: type, capacity, duration, location</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>generation_generic</code></td>
+<td style="text-align: left;"><code>generationgeneric.csv</code></td>
+<td style="text-align: left;"><code>generators.py</code></td>
+<td style="text-align: left;">Generic technology parameters: efficiency, service life, emissions, fuel prices, O&amp;M costs</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>generation_cost_evolution</code></td>
+<td style="text-align: left;"><code>generationcostevolution.csv</code></td>
+<td style="text-align: left;"><code>generators.py</code></td>
+<td style="text-align: left;">Investment cost projections by technology and year</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>CA_system_parameters</code></td>
+<td style="text-align: left;"><code>CAsystemparameters.csv</code></td>
+<td style="text-align: left;"><code>provincial_grids.py</code>, <code>interfaces.py</code></td>
+<td style="text-align: left;">Provincial system parameters: line losses, reserve requirements</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>forecasted_annual_demand</code></td>
+<td style="text-align: left;"><code>forecastedannualdemand.csv</code></td>
+<td style="text-align: left;"><code>provincial_grids.py</code></td>
+<td style="text-align: left;">Provincial annual demand projections by year</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>provincial_demand</code></td>
+<td style="text-align: left;"><code>provincialdemandyear{Y}province{P}.csv</code></td>
+<td style="text-align: left;"><code>provincial_grids.py</code></td>
+<td style="text-align: left;">Hourly provincial demand for specific year and province</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>interface_capacities</code></td>
+<td style="text-align: left;"><code>interfacecapacities.csv</code></td>
+<td style="text-align: left;"><code>interfaces.py</code></td>
+<td style="text-align: left;">Transfer capabilities between provinces/states (summer/winter)</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>interprovincial_transfers</code></td>
+<td style="text-align: left;"><code>interprovincialtransfers*.csv</code></td>
+<td style="text-align: left;"><code>interfaces.py</code></td>
+<td style="text-align: left;">Hourly interprovincial flow data and available interties</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>international_transfers</code></td>
+<td style="text-align: left;"><code>internationaltransfers*.csv</code></td>
+<td style="text-align: left;"><code>interfaces.py</code></td>
+<td style="text-align: left;">Hourly Canada–U.S. flow data and available interties</td>
+</tr>
+</tbody>
+</table>
+<h3 id="update-schedule">Update Schedule</h3>
+<p>CODERS is updated <strong>annually</strong>, typically in the first half of the calendar year. Individual tables may be updated independently. Key data points that change annually:</p>
+<ul>
+<li>Existing generator fleet additions and retirements</li>
+<li>Annual demand forecasts (extended horizon)</li>
+<li>Technology cost projections</li>
+<li>Provincial system parameters</li>
+</ul>
+<h3 id="citation-format">Citation Format</h3>
+<div class="codehilite"><pre><span></span><code><span class="nv">Hendriks</span>,<span class="w"> </span><span class="nv">R</span>.<span class="nv">M</span>.,<span class="w"> </span><span class="nv">Monroe</span>,<span class="w"> </span><span class="nv">J</span>.,<span class="w"> </span><span class="nv">Cusi</span>,<span class="w"> </span><span class="nv">T</span>.,<span class="w"> </span><span class="nv">Aldana</span>,<span class="w"> </span><span class="nv">D</span>.,<span class="w"> </span><span class="nv">Griffiths</span>,<span class="w"> </span><span class="nv">K</span>.,<span class="w"> </span><span class="nv">Dorman</span>,<span class="w"> </span><span class="nv">T</span>.,<span class="w"> </span><span class="nv">Chhina</span>,<span class="w"> </span><span class="nv">A</span>.,<span class="w"> </span>
+<span class="nv">McPherson</span>,<span class="w"> </span><span class="nv">M</span>.<span class="w"> </span><span class="ss">(</span><span class="mi">2023</span><span class="ss">)</span>.<span class="w"> </span><span class="nv">Canadian</span><span class="w"> </span><span class="nv">Open</span><span class="o">-</span><span class="nv">Source</span><span class="w"> </span><span class="nv">Database</span><span class="w"> </span><span class="k">for</span><span class="w"> </span><span class="nv">Energy</span><span class="w"> </span><span class="nv">Research</span><span class="w"> </span><span class="nv">and</span><span class="w"> </span><span class="nv">Systems</span><span class="o">-</span><span class="nv">Modelling</span><span class="w"> </span>
+<span class="ss">(</span><span class="nv">CODERS</span><span class="ss">)</span>.<span class="w"> </span><span class="nv">Available</span><span class="w"> </span><span class="nv">at</span><span class="w"> </span><span class="nv">www</span>.<span class="nv">cme</span><span class="o">-</span><span class="nv">emh</span><span class="o">/</span><span class="nv">coders</span>.<span class="w"> </span>{<span class="nv">table</span>}<span class="w"> </span><span class="nv">table</span>.<span class="w"> </span><span class="nv">Accessed</span><span class="w"> </span>{<span class="nv">date</span>}
+</code></pre></div>
+
+<hr>
+<h2 id="3-nrel-annual-technology-baseline-atb">3. NREL Annual Technology Baseline (ATB)</h2>
+<h3 id="description_1">Description</h3>
+<p>The <strong>NREL Annual Technology Baseline</strong> provides projected technology cost and performance data for electricity generation and storage technologies. Two files are used:</p>
+<ol>
+<li><strong>ATB CSV</strong> (<code>ATBe.csv</code>): The main data table with cost metrics, capacity factors, heat rates, and more, indexed by technology, scenario, year, and metric.</li>
+<li><strong>ATB Master Workbook</strong> (<code>.xlsx</code>): The full Excel calculation workbook containing technology-specific variable (TSV) tables with detailed technical parameters (emissions factors, ramp rates, outage rates).</li>
+</ol>
+<p><strong>Website</strong>: <a href="https://atb.nrel.gov/">https://atb.nrel.gov/</a></p>
+<h3 id="urls-from-paramsyaml-2024-v3-edition">URLs (from params.yaml, 2024 v3 edition)</h3>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">File</th>
+<th style="text-align: left;">URL</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;">ATB CSV</td>
+<td style="text-align: left;"><code>https://oedi-data-lake.s3.amazonaws.com/ATB/electricity/csv/2024/v3.0.0/ATBe.csv</code></td>
+</tr>
+<tr>
+<td style="text-align: left;">ATB Workbook</td>
+<td style="text-align: left;"><code>https://data.openei.org/files/6006/2024_v3_Workbook.xlsx</code></td>
+</tr>
+</tbody>
+</table>
+<h3 id="data-parameters-extracted">Data Parameters Extracted</h3>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">Parameter</th>
+<th style="text-align: left;">Source</th>
+<th style="text-align: left;">ATB Metric</th>
+<th style="text-align: left;">Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;">Investment cost</td>
+<td style="text-align: left;">ATB CSV</td>
+<td style="text-align: left;">OCC (Overnight Capital Cost)</td>
+<td style="text-align: left;">Per-vintage projections</td>
+</tr>
+<tr>
+<td style="text-align: left;">Fixed O&amp;M</td>
+<td style="text-align: left;">ATB CSV</td>
+<td style="text-align: left;">Fixed O&amp;M</td>
+<td style="text-align: left;">Per-vintage projections</td>
+</tr>
+<tr>
+<td style="text-align: left;">Variable O&amp;M</td>
+<td style="text-align: left;">ATB CSV</td>
+<td style="text-align: left;">Variable O&amp;M</td>
+<td style="text-align: left;">Per-period projections</td>
+</tr>
+<tr>
+<td style="text-align: left;">Fuel cost</td>
+<td style="text-align: left;">ATB CSV</td>
+<td style="text-align: left;">Fuel</td>
+<td style="text-align: left;">Per-period projections</td>
+</tr>
+<tr>
+<td style="text-align: left;">Heat rate (efficiency)</td>
+<td style="text-align: left;">ATB CSV</td>
+<td style="text-align: left;">Heat Rate</td>
+<td style="text-align: left;">Converted to fractional efficiency</td>
+</tr>
+<tr>
+<td style="text-align: left;">Capacity factor</td>
+<td style="text-align: left;">ATB CSV</td>
+<td style="text-align: left;">CF</td>
+<td style="text-align: left;">Used for VRE indexing</td>
+</tr>
+<tr>
+<td style="text-align: left;">CO2 emissions</td>
+<td style="text-align: left;">ATB Workbook TSV</td>
+<td style="text-align: left;">emissions_co2_lbs_MMBtu</td>
+<td style="text-align: left;">Per-technology</td>
+</tr>
+<tr>
+<td style="text-align: left;">SO2 emissions</td>
+<td style="text-align: left;">ATB Workbook TSV</td>
+<td style="text-align: left;">emissions_so2_lbs_MMBtu</td>
+<td style="text-align: left;">Per-technology</td>
+</tr>
+<tr>
+<td style="text-align: left;">NOx emissions</td>
+<td style="text-align: left;">ATB Workbook TSV</td>
+<td style="text-align: left;">emissions_nox_lbs_MMBtu</td>
+<td style="text-align: left;">Per-technology</td>
+</tr>
+<tr>
+<td style="text-align: left;">Hg emissions</td>
+<td style="text-align: left;">ATB Workbook TSV</td>
+<td style="text-align: left;">emissions_hg_lbs_MMBtu</td>
+<td style="text-align: left;">Per-technology</td>
+</tr>
+<tr>
+<td style="text-align: left;">Ramp rate</td>
+<td style="text-align: left;">ATB Workbook TSV</td>
+<td style="text-align: left;">ramp_rate_%_min</td>
+<td style="text-align: left;">Per-technology</td>
+</tr>
+<tr>
+<td style="text-align: left;">CCS Net Output Penalty</td>
+<td style="text-align: left;">ATB CSV</td>
+<td style="text-align: left;">Net Output Penalty</td>
+<td style="text-align: left;">For CCS retrofits</td>
+</tr>
+<tr>
+<td style="text-align: left;">CCS Additional OCC</td>
+<td style="text-align: left;">ATB CSV</td>
+<td style="text-align: left;">Additional OCC</td>
+<td style="text-align: left;">For CCS retrofits</td>
+</tr>
+</tbody>
+</table>
+<h3 id="configuration">Configuration</h3>
+<ul>
+<li><strong>Scenario</strong>: Configurable in <code>generator_technologies.csv</code> per technology (<code>Conservative</code>, <code>Moderate</code>, or <code>Advanced</code>). Recommended: <code>Moderate</code>.</li>
+<li><strong>Core metric case</strong>: <code>Market</code> (from params.yaml).</li>
+<li><strong>CRP years</strong>: Fixed at 20 (arbitrary unless using LCOE).</li>
+<li><strong>Currency</strong>: USD, year configurable (currently 2021).</li>
+</ul>
+<h3 id="update-schedule_1">Update Schedule</h3>
+<p>The ATB is released <strong>annually in July</strong>. The release consists of new CSV data files and an updated Excel workbook. Version numbering follows <code>YYYY/vX.Y.Z</code>.</p>
+<h3 id="how-to-update">How to Update</h3>
+<ol>
+<li>Go to <a href="https://atb.nrel.gov/electricity/data">https://atb.nrel.gov/electricity/data</a> and find the latest CSV and Workbook links.</li>
+<li>In <code>params.yaml</code>, update:</li>
+<li><code>atb.url</code> → new CSV URL</li>
+<li><code>atb.master_url</code> → new Workbook URL</li>
+<li><code>atb.year</code> → new publication year</li>
+<li><code>atb.currency_year</code> → verify the new ATB's cost year</li>
+<li>Check <code>atb.tsv_headers</code> — column names in the workbook may change between versions.</li>
+<li>Update <code>input_files/atb_master_tables.csv</code> if worksheet names, row ranges, or column ranges have changed. This is verified by manually opening the workbook and comparing.</li>
+<li>Update <code>generator_technologies.csv</code> column <code>atb_display_name</code> if technology display names have changed.</li>
+<li>Delete cached ATB files in <code>data_cache/</code> (<code>ATBe.csv</code>, <code>2024_v3_Workbook.xlsx</code>, <code>atb_technology_specific_variables_*.csv</code>).</li>
+<li>Re-run the aggregation.</li>
+</ol>
+<hr>
+<h2 id="4-ieso-public-data-ontario">4. IESO Public Data (Ontario)</h2>
+<h3 id="description_2">Description</h3>
+<p>The <strong>Independent Electricity System Operator (IESO)</strong> publishes detailed operational data for Ontario's electricity grid. Three data products are used:</p>
+<h3 id="41-generator-output-by-fuel-hourly">4.1 Generator Output by Fuel (Hourly)</h3>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">Attribute</th>
+<th style="text-align: left;">Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;">URL pattern</td>
+<td style="text-align: left;"><code>http://reports.ieso.ca/public/GenOutputbyFuelHourly/PUB_GenOutputbyFuelHourly_{YYYY}.xml</code></td>
+</tr>
+<tr>
+<td style="text-align: left;">Format</td>
+<td style="text-align: left;">XML</td>
+</tr>
+<tr>
+<td style="text-align: left;">Frequency</td>
+<td style="text-align: left;">Annual compilation</td>
+</tr>
+<tr>
+<td style="text-align: left;">Used in</td>
+<td style="text-align: left;"><code>provincial_data/on/existing_vre_capacity_factors.py</code></td>
+</tr>
+<tr>
+<td style="text-align: left;">Purpose</td>
+<td style="text-align: left;">Aggregate Ontario hourly wind and solar generation for capacity factor calculation</td>
+</tr>
+</tbody>
+</table>
+<h3 id="42-generator-output-and-capability-monthly">4.2 Generator Output and Capability (Monthly)</h3>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">Attribute</th>
+<th style="text-align: left;">Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;">URL pattern (before 2019)</td>
+<td style="text-align: left;"><code>https://www.ieso.ca/-/media/Files/IESO/Power-Data/data-directory/GOC-{YYYY}.xlsx</code></td>
+</tr>
+<tr>
+<td style="text-align: left;">URL pattern (2020+)</td>
+<td style="text-align: left;"><code>http://reports.ieso.ca/public/GenOutputCapabilityMonth/PUB_GenOutputCapabilityMonth_{YYYY}{MM}.csv</code></td>
+</tr>
+<tr>
+<td style="text-align: left;">Format</td>
+<td style="text-align: left;">Excel (pre-2019) or CSV (2020+)</td>
+</tr>
+<tr>
+<td style="text-align: left;">Frequency</td>
+<td style="text-align: left;">Monthly</td>
+</tr>
+<tr>
+<td style="text-align: left;">Used in</td>
+<td style="text-align: left;"><code>provincial_data/on/existing_hydro_capacity_factors.py</code></td>
+</tr>
+<tr>
+<td style="text-align: left;">Purpose</td>
+<td style="text-align: left;">Ontario hydroelectric hourly output and available capacity by generator</td>
+</tr>
+</tbody>
+</table>
+<h3 id="43-reliability-outlook">4.3 Reliability Outlook</h3>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">Attribute</th>
+<th style="text-align: left;">Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;">URL pattern</td>
+<td style="text-align: left;"><code>https://www.ieso.ca/-/media/Files/IESO/Document-Library/planning-forecasts/reliability-outlook/ReliabilityOutlookTables_{YYYY}{Mon}.xlsx</code></td>
+</tr>
+<tr>
+<td style="text-align: left;">Format</td>
+<td style="text-align: left;">Excel</td>
+</tr>
+<tr>
+<td style="text-align: left;">Frequency</td>
+<td style="text-align: left;">~Semi-annual</td>
+</tr>
+<tr>
+<td style="text-align: left;">Used in</td>
+<td style="text-align: left;"><code>provincial_data/on/existing_capacity_credits.py</code></td>
+</tr>
+<tr>
+<td style="text-align: left;">Purpose</td>
+<td style="text-align: left;">Capacity credits from forecast capability vs. installed capacity</td>
+</tr>
+<tr>
+<td style="text-align: left;">Table used</td>
+<td style="text-align: left;">Table 4.1: Forecast capability at summer peak</td>
+</tr>
+</tbody>
+</table>
+<h3 id="update-schedule_2">Update Schedule</h3>
+<ul>
+<li>Hourly generation data: Updated annually with each calendar year's data.</li>
+<li>Monthly capability data: Monthly releases.</li>
+<li>Reliability Outlook: Updated approximately twice per year (e.g., June and December).</li>
+</ul>
+<h3 id="how-to-update_1">How to Update</h3>
+<ol>
+<li><strong>Weather year change</strong> (if updating the weather year):</li>
+<li>Update <code>params.yaml</code>: <code>weather_year</code> to the new year.</li>
+<li>Delete provincial demand and intertie flow cache files for the old year.</li>
+<li>
+<p>Delete Ontario-specific output data in <code>provincial_data/on/output_data/</code>.</p>
+</li>
+<li>
+<p><strong>Reliability Outlook update</strong>:</p>
+</li>
+<li>In <code>params.yaml</code>, update <code>ieso_rel_yyyy_mmm</code> (e.g., <code>"2026_Jun"</code>).</li>
+<li>Verify <code>ieso_rel_peak_type</code> is still valid (<code>"Firm"</code> or <code>"Planned"</code> — IESO may change terminology).</li>
+<li>
+<p>Delete the cached reliability outlook file in <code>data_cache/</code>.</p>
+</li>
+<li>
+<p><strong>Hydro types</strong>: If IESO changes generator naming, update <code>provincial_data/on/hydro_types.csv</code>.</p>
+</li>
+<li><strong>Fuel types</strong>: If IESO changes fuel type naming in reliability outlook, update <code>provincial_data/on/fuel_types.csv</code>.</li>
+</ol>
+<h3 id="citation-format_1">Citation Format</h3>
+<div class="codehilite"><pre><span></span><code>IESO. ({year}). IESO public data. http://reports.ieso.ca/public/
+IESO. ({year}, {month}). Reliability Outlook. https://www.ieso.ca/en/Sector-Participants/Planning-and-Forecasting/Reliability-Outlook
+</code></pre></div>
+
+<hr>
+<h2 id="5-statistics-canada">5. Statistics Canada</h2>
+<h3 id="description_3">Description</h3>
+<p>Statistics Canada table <strong>25-10-0015-01</strong> provides monthly electricity generation by type of turbine and province. This is used to synthesise hydroelectric capacity factors for provinces other than Ontario.</p>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">Attribute</th>
+<th style="text-align: left;">Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;">Table</td>
+<td style="text-align: left;">25-10-0015-01</td>
+</tr>
+<tr>
+<td style="text-align: left;">URL</td>
+<td style="text-align: left;"><code>https://www150.statcan.gc.ca/t1/wds/rest/getFullTableDownloadCSV/25100015/en</code></td>
+</tr>
+<tr>
+<td style="text-align: left;">Format</td>
+<td style="text-align: left;">CSV inside ZIP</td>
+</tr>
+<tr>
+<td style="text-align: left;">Used in</td>
+<td style="text-align: left;"><code>provincial_data/default/existing_hydro_capacity_factors.py</code></td>
+</tr>
+<tr>
+<td style="text-align: left;">Purpose</td>
+<td style="text-align: left;">Monthly hydraulic turbine generation by province and year</td>
+</tr>
+</tbody>
+</table>
+<h3 id="update-schedule_3">Update Schedule</h3>
+<p>Updated <strong>monthly</strong> by Statistics Canada, typically with a 2–3 month lag.</p>
+<h3 id="how-to-update_2">How to Update</h3>
+<p>The data is downloaded automatically when the weather year changes or cache is cleared. No code changes are needed unless StatCan changes the table format or number.</p>
+<ol>
+<li>Delete <code>data_cache/monthly_hydro_gen.csv</code> to force re-download.</li>
+<li>If the table ID changes, update the <code>25100015</code> references in <code>provincial_data/default/existing_hydro_capacity_factors.py</code>.</li>
+</ol>
+<h3 id="citation">Citation</h3>
+<div class="codehilite"><pre><span></span><code><span class="nx">Government</span><span class="w"> </span><span class="nx">of</span><span class="w"> </span><span class="nx">Canada</span><span class="p">,</span><span class="w"> </span><span class="nx">Statistics</span><span class="w"> </span><span class="nx">Canada</span><span class="p">.</span><span class="w"> </span><span class="nx">Electric</span><span class="w"> </span><span class="nx">power</span><span class="w"> </span><span class="nx">generation</span><span class="p">,</span><span class="w"> </span><span class="nx">monthly</span><span class="w"> </span><span class="nx">generation</span><span class="w"> </span><span class="nx">by</span><span class="w"> </span><span class="k">type</span><span class="w"> </span><span class="nx">of</span><span class="w"> </span>
+<span class="nx">electricity</span><span class="p">.</span><span class="w"> </span><span class="nx">Table</span><span class="w"> </span><span class="mi">25</span><span class="o">-</span><span class="mi">10</span><span class="o">-</span><span class="mi">0015</span><span class="o">-</span><span class="mi">01</span><span class="p">.</span><span class="w"> </span><span class="nx">https</span><span class="p">:</span><span class="c1">//www150.statcan.gc.ca/t1/tbl1/en/tv.action?pid=2510001501</span>
+</code></pre></div>
+
+<hr>
+<h2 id="6-renewables-ninja-api">6. Renewables Ninja API</h2>
+<h3 id="description_4">Description</h3>
+<p><strong>Renewables Ninja</strong> provides simulated hourly electricity output for wind and solar PV installations at any location worldwide, using MERRA-2 reanalysis weather data. It is used to synthesise capacity factor profiles for existing VRE facilities outside Ontario.</p>
+<p><strong>Website</strong>: <a href="https://www.renewables.ninja/">https://www.renewables.ninja/</a></p>
+<p><strong>API base URL</strong>: <code>https://www.renewables.ninja/api/</code></p>
+<h3 id="api-key-requirement_1">API Key Requirement</h3>
+<p>A token must be obtained from the Renewables Ninja website and stored in either <code>input_files/rninja_api_token.txt</code> or <code>provincial_data/default/rninja_api_token.txt</code>.</p>
+<h3 id="parameters-used">Parameters Used</h3>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">Technology</th>
+<th style="text-align: left;">Parameters</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;">Solar PV</td>
+<td style="text-align: left;">lat/lon per facility, tilt=45°, system_loss=10%, tracking=0, dataset=MERRA-2</td>
+</tr>
+<tr>
+<td style="text-align: left;">Onshore Wind</td>
+<td style="text-align: left;">lat/lon per facility, height=110m, turbine=Vestas V112 3000</td>
+</tr>
+<tr>
+<td style="text-align: left;">Offshore Wind</td>
+<td style="text-align: left;">lat/lon per facility, height=150m, turbine=Vestas V164 9500</td>
+</tr>
+</tbody>
+</table>
+<h3 id="rate-limits-and-caching">Rate Limits and Caching</h3>
+<ul>
+<li><strong>50 requests per hour</strong>.</li>
+<li>Results are cached per-facility in <code>provincial_data/default/output_data/cf_solar.csv</code>, <code>cf_wind_on.csv</code>, <code>cf_wind_off.csv</code>.</li>
+<li>Initial data collection for ~200+ facilities can take several hours.</li>
+<li>Subsequent runs use cached data unless facilities are added.</li>
+</ul>
+<h3 id="update-schedule_4">Update Schedule</h3>
+<p>The API is available on-demand. Weather data (MERRA-2) is updated periodically by NASA. The API should only need to be re-queried when:</p>
+<ul>
+<li>The weather year changes.</li>
+<li>New VRE facilities are added to CODERS.</li>
+</ul>
+<h3 id="how-to-update_3">How to Update</h3>
+<ol>
+<li>Delete <code>provincial_data/default/output_data/cf_*.csv</code> to force re-collection.</li>
+<li>Ensure API token is valid.</li>
+<li>Re-run aggregation — the tool will prompt for confirmation before initiating API collection.</li>
+</ol>
+<h3 id="citation_1">Citation</h3>
+<div class="codehilite"><pre><span></span><code>Pfenninger, S., &amp; Staffell, I. (2016). Long-term patterns of European PV output using 30 years 
+of validated hourly reanalysis and satellite data. Energy, 114, 1251–1265. 
+https://doi.org/10.1016/j.energy.2016.08.060
+</code></pre></div>
+
+<hr>
+<h2 id="7-us-eia-annual-energy-outlook-aeo">7. U.S. EIA Annual Energy Outlook (AEO)</h2>
+<h3 id="description_5">Description</h3>
+<p>The <strong>Annual Energy Outlook</strong> from the U.S. Energy Information Administration provides projected levelised costs for electricity transmission and distribution.</p>
+<p><strong>Website</strong>: <a href="https://www.eia.gov/outlooks/aeo/">https://www.eia.gov/outlooks/aeo/</a></p>
+<h3 id="data-used">Data Used</h3>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">Table</th>
+<th style="text-align: left;">Data</th>
+<th style="text-align: left;">Cache File</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;">Table 8 (AEO 2025)</td>
+<td style="text-align: left;">Levelised cost of transmission (cents/kWh)</td>
+<td style="text-align: left;"><code>provincial_data/default/cost_tx_dx.csv</code></td>
+</tr>
+<tr>
+<td style="text-align: left;">Table 8 (AEO 2025)</td>
+<td style="text-align: left;">Levelised cost of distribution (cents/kWh)</td>
+<td style="text-align: left;"><code>provincial_data/default/cost_tx_dx.csv</code></td>
+</tr>
+</tbody>
+</table>
+<p>Costs are converted from USD 2024 cents/kWh to M$/PJ in CAD 2020.</p>
+<h3 id="update-schedule_5">Update Schedule</h3>
+<p>AEO is released <strong>annually in March</strong>.</p>
+<h3 id="how-to-update_4">How to Update</h3>
+<ol>
+<li>Visit the AEO data browser and extract Table 8 transmission and distribution costs.</li>
+<li>Update <code>provincial_data/default/cost_tx_dx.csv</code> with new projections.</li>
+<li>Update the currency year in <code>provincial_data/default/cost_tx_dx.py</code> if the AEO changes its cost year.</li>
+<li>Update the reference URL in <code>cost_tx_dx.py</code>.</li>
+</ol>
+<h3 id="citation_2">Citation</h3>
+<div class="codehilite"><pre><span></span><code>U.S. Energy Information Administration. Annual Energy Outlook {year}. 
+https://www.eia.gov/outlooks/aeo/data/browser/
+</code></pre></div>
+
+<hr>
+<h2 id="8-sutubra-vre-resource-characterisation">8. Sutubra VRE Resource Characterisation</h2>
+<h3 id="description_6">Description</h3>
+<p>Resource characterisation data for new wind and solar capacity comes from work by <strong>Sutubra</strong> (a research group or tool; citation placeholder in current code). This data provides spatially resolved renewable energy resource assessments for Ontario.</p>
+<h3 id="data-files">Data Files</h3>
+<p>Located in <code>provincial_data/on/new_wind/</code> and <code>provincial_data/on/new_solar/</code>:</p>
+<h4 id="wind-data">Wind Data</h4>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">File</th>
+<th style="text-align: left;">Content</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;"><code>Cluster Composition.csv</code></td>
+<td style="text-align: left;">Fraction of turbine classes (T1/T2/T3) per cluster, maximum capacity</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>Cluster Capacity Factors.csv</code></td>
+<td style="text-align: left;">8,760 hourly capacity factor profiles per cluster</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>Cluster Spur Costs.csv</code></td>
+<td style="text-align: left;">Estimated transmission interconnection cost per cluster (USD/kW)</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>Cluster Costs.csv</code></td>
+<td style="text-align: left;">Additional cost data per cluster</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>Cluster Mappings.csv</code></td>
+<td style="text-align: left;">Geographic mapping of clusters</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>Resource Summary.csv</code></td>
+<td style="text-align: left;">Summary resource statistics</td>
+</tr>
+</tbody>
+</table>
+<h4 id="solar-data">Solar Data</h4>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">File</th>
+<th style="text-align: left;">Content</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;"><code>Hourly PV Capacity Factors.csv</code></td>
+<td style="text-align: left;">8,760 hourly capacity factor profiles per grid cell</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>Solar Resource Summary.csv</code></td>
+<td style="text-align: left;">Per-cell capacity factor, max capacity, LCOE, interconnection cost, coordinates</td>
+</tr>
+</tbody>
+</table>
+<h3 id="update-schedule_6">Update Schedule</h3>
+<p>Updated <strong>periodically</strong> as new resource assessment studies are completed. Not on a fixed schedule.</p>
+<h3 id="how-to-update_5">How to Update</h3>
+<ol>
+<li>Replace the CSV files in <code>provincial_data/on/new_wind/</code> and/or <code>provincial_data/on/new_solar/</code> with updated data files from the latest resource assessment.</li>
+<li>Ensure column names match expectations in the code (check <code>new_wind_solar.py</code>).</li>
+<li>If expanding to other provinces:</li>
+<li>Create <code>provincial_data/{province_code}/new_wind/</code> and <code>new_solar/</code> directories with equivalent files.</li>
+<li>Update <code>new_wind_solar.py</code> to load province-specific data instead of hardcoded Ontario paths.</li>
+<li>Update the reference in <code>params.yaml</code> under <code>sutubra_vre.reference</code> and <code>sutubra_vre.year</code>.</li>
+</ol>
+<hr>
+<h2 id="9-academic-and-reference-data">9. Academic and Reference Data</h2>
+<h3 id="91-ramp-rate-constraints">9.1 Ramp Rate Constraints</h3>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">Attribute</th>
+<th style="text-align: left;">Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;">Source</td>
+<td style="text-align: left;">Dolter &amp; Rivers (2018)</td>
+</tr>
+<tr>
+<td style="text-align: left;">File</td>
+<td style="text-align: left;"><code>provincial_data/default/ramp_rates.csv</code></td>
+</tr>
+<tr>
+<td style="text-align: left;">Type</td>
+<td style="text-align: left;">Static lookup table</td>
+</tr>
+<tr>
+<td style="text-align: left;">Update</td>
+<td style="text-align: left;">Only if better data becomes available</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Citation</strong>:</p>
+<div class="codehilite"><pre><span></span><code>Dolter, B., &amp; Rivers, N. (2018). The cost of decarbonizing the Canadian electricity system. 
+Energy Policy, 113, 135–148. https://doi.org/10.1016/j.enpol.2017.10.040
+</code></pre></div>
+
+<h3 id="92-solar-degradation-rate">9.2 Solar Degradation Rate</h3>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">Attribute</th>
+<th style="text-align: left;">Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;">Rate</td>
+<td style="text-align: left;">0.85% per year</td>
+</tr>
+<tr>
+<td style="text-align: left;">Source</td>
+<td style="text-align: left;">Jordan et al. (2016)</td>
+</tr>
+<tr>
+<td style="text-align: left;">Used in</td>
+<td style="text-align: left;"><code>new_wind_solar.py</code> (<code>aggregate_solar</code>)</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Citation</strong>:</p>
+<div class="codehilite"><pre><span></span><code>Jordan, D. C., Kurtz, S. R., VanSant, K., &amp; Newmiller, J. (2016). Compendium of photovoltaic 
+degradation rates. Progress in Photovoltaics, 24(7), 978–989. https://doi.org/10.1002/pip.2744
+</code></pre></div>
+
+<h3 id="93-capacity-credit-methodology">9.3 Capacity Credit Methodology</h3>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">Attribute</th>
+<th style="text-align: left;">Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;">Method</td>
+<td style="text-align: left;">NREL ReEDS 8760-based top-100-hour net load method</td>
+</tr>
+<tr>
+<td style="text-align: left;">Source</td>
+<td style="text-align: left;">Frew et al. (2017)</td>
+</tr>
+<tr>
+<td style="text-align: left;">Used in</td>
+<td style="text-align: left;"><code>capacity_credits.py</code></td>
+</tr>
+</tbody>
+</table>
+<p><strong>Citation</strong>:</p>
+<div class="codehilite"><pre><span></span><code><span class="nv">Frew</span>,<span class="w"> </span><span class="nv">B</span>.,<span class="w"> </span><span class="nv">Cole</span>,<span class="w"> </span><span class="nv">W</span>.,<span class="w"> </span><span class="nv">Sun</span>,<span class="w"> </span><span class="nv">Y</span>.,<span class="w"> </span><span class="nv">Richards</span>,<span class="w"> </span><span class="nv">J</span>.,<span class="w"> </span><span class="o">&amp;</span><span class="w"> </span><span class="nv">Mai</span>,<span class="w"> </span><span class="nv">T</span>.<span class="w"> </span><span class="ss">(</span><span class="mi">2017</span><span class="ss">)</span>.<span class="w"> </span><span class="mi">8760</span><span class="o">-</span><span class="nv">Based</span><span class="w"> </span><span class="nv">Method</span><span class="w"> </span><span class="k">for</span><span class="w"> </span><span class="nv">Representing</span><span class="w"> </span>
+<span class="nv">Variable</span><span class="w"> </span><span class="nv">Generation</span><span class="w"> </span><span class="nv">Capacity</span><span class="w"> </span><span class="nv">Value</span><span class="w"> </span><span class="nv">in</span><span class="w"> </span><span class="nv">Capacity</span><span class="w"> </span><span class="nv">Expansion</span><span class="w"> </span><span class="nv">Models</span>.<span class="w"> </span><span class="nv">NREL</span>.<span class="w"> </span>
+<span class="nv">https</span>:<span class="o">//</span><span class="nv">www</span>.<span class="nv">nrel</span>.<span class="nv">gov</span><span class="o">/</span><span class="nv">docs</span><span class="o">/</span><span class="nv">fy17osti</span><span class="o">/</span><span class="mi">68869</span>.<span class="nv">pdf</span>
+</code></pre></div>
+
+<h3 id="94-currency-conversion-tables">9.4 Currency Conversion Tables</h3>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">File</th>
+<th style="text-align: left;">Content</th>
+<th style="text-align: left;">Update Frequency</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;"><code>input_files/currency_exchange.csv</code></td>
+<td style="text-align: left;">Annual exchange rates (USD, EUR, GBP, AUD, CAD)</td>
+<td style="text-align: left;">Annual</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>input_files/cad_inflation.csv</code></td>
+<td style="text-align: left;">Inflation indices (GDP deflator, CPI, etc.)</td>
+<td style="text-align: left;">Annual</td>
+</tr>
+</tbody>
+</table>
+<p>These tables must be manually extended with new year rows as data becomes available from Statistics Canada and the Bank of Canada.</p>
+<hr>
+<h2 id="10-update-procedures">10. Update Procedures</h2>
+<h3 id="101-annual-update-checklist">10.1 Annual Update Checklist</h3>
+<p>This checklist should be followed when performing a regular annual or biannual CANOE update:</p>
+<h4 id="phase-1-prepare-environment">Phase 1: Prepare Environment</h4>
+<ul>
+<li>[ ] <strong>Back up the data cache</strong>: Copy <code>data_cache/</code> to a safe location.</li>
+<li>[ ] <strong>Clear the data cache</strong>: Delete all files in <code>data_cache/</code> to ensure fresh downloads.</li>
+<li>[ ] <strong>Delete generated output data</strong>:</li>
+<li><code>provincial_data/on/output_data/*.csv</code></li>
+<li><code>provincial_data/default/output_data/*.csv</code></li>
+<li>[ ] <strong>Verify API keys</strong>: Ensure CODERS (<code>input_files/coders_api_key.txt</code>) and Renewables Ninja (<code>input_files/rninja_api_token.txt</code>) tokens are valid.</li>
+</ul>
+<h4 id="phase-2-update-data-sources">Phase 2: Update Data Sources</h4>
+<ul>
+<li>[ ] <strong>NREL ATB</strong> (if new version available, typically July):</li>
+<li>Update URLs in <code>params.yaml</code> (<code>atb.url</code>, <code>atb.master_url</code>).</li>
+<li>Check and update <code>atb.currency_year</code>, <code>atb.tsv_headers</code>, <code>atb.cost_invest_metric</code> if needed.</li>
+<li>Update <code>input_files/atb_master_tables.csv</code> row/column ranges.</li>
+<li>
+<p>Verify <code>generator_technologies.csv</code> <code>atb_display_name</code> values still match.</p>
+</li>
+<li>
+<p>[ ] <strong>IESO Reliability Outlook</strong> (if new version available):</p>
+</li>
+<li>Update <code>params.yaml</code>: <code>ieso_rel_yyyy_mmm</code>.</li>
+<li>
+<p>Verify <code>ieso_rel_peak_type</code> is still valid.</p>
+</li>
+<li>
+<p>[ ] <strong>EIA AEO</strong> (if new version available, typically March):</p>
+</li>
+<li>Update <code>provincial_data/default/cost_tx_dx.csv</code> with new projections.</li>
+<li>
+<p>Update currency year and reference in <code>cost_tx_dx.py</code>.</p>
+</li>
+<li>
+<p>[ ] <strong>Currency tables</strong>:</p>
+</li>
+<li>Extend <code>input_files/currency_exchange.csv</code> with the new year's exchange rates.</li>
+<li>
+<p>Extend <code>input_files/cad_inflation.csv</code> with the new year's inflation indices.</p>
+</li>
+<li>
+<p>[ ] <strong>Model periods</strong> (if extending horizon):</p>
+</li>
+<li>Add new periods to <code>params.yaml</code> <code>model_periods</code> list.</li>
+</ul>
+<h4 id="phase-3-run-and-validate">Phase 3: Run and Validate</h4>
+<ul>
+<li>[ ] <strong>Run the aggregation</strong>: <code>python canoe-electricity/</code></li>
+<li>[ ] <strong>Review diagnostic plots</strong> in <code>output_plots/</code> for anomalies.</li>
+<li>[ ] <strong>Check console warnings</strong> for skipped generators, missing data, or mapping failures.</li>
+<li>[ ] <strong>Spot-check database</strong>: Open the SQLite database and verify key tables have reasonable values.</li>
+</ul>
+<h4 id="phase-4-handle-issues">Phase 4: Handle Issues</h4>
+<p>Common issues after data updates:</p>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">Issue</th>
+<th style="text-align: left;">Likely Cause</th>
+<th style="text-align: left;">Resolution</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;">ATB column not found</td>
+<td style="text-align: left;">Header names changed between ATB versions</td>
+<td style="text-align: left;">Update <code>atb.tsv_headers</code> in <code>params.yaml</code></td>
+</tr>
+<tr>
+<td style="text-align: left;">ATB technology not found</td>
+<td style="text-align: left;">Display names changed</td>
+<td style="text-align: left;">Update <code>atb_display_name</code> in <code>generator_technologies.csv</code></td>
+</tr>
+<tr>
+<td style="text-align: left;">CODERS endpoint returns None</td>
+<td style="text-align: left;">API key expired or table renamed</td>
+<td style="text-align: left;">Renew API key; check CODERS documentation</td>
+</tr>
+<tr>
+<td style="text-align: left;">Missing generator facilities</td>
+<td style="text-align: left;">New facilities in CODERS not mapped</td>
+<td style="text-align: left;">Update <code>coders_existing</code> column in <code>generator_technologies.csv</code></td>
+</tr>
+<tr>
+<td style="text-align: left;">Reliability Outlook parse error</td>
+<td style="text-align: left;">Table format changed</td>
+<td style="text-align: left;">Open workbook manually and update <code>existing_capacity_credits.py</code> parsing</td>
+</tr>
+<tr>
+<td style="text-align: left;">Negative efficiency or cost</td>
+<td style="text-align: left;">Unit change in source data</td>
+<td style="text-align: left;">Verify and update conversion factors in <code>units.csv</code></td>
+</tr>
+</tbody>
+</table>
+<h3 id="102-weather-year-change">10.2 Weather Year Change</h3>
+<p>Changing the weather year affects all time-series data:</p>
+<ol>
+<li>Update <code>params.yaml</code>: <code>weather_year</code>.</li>
+<li>Clear all cached time-series data:</li>
+<li><code>data_cache/provincialdemandyear*.csv</code></li>
+<li><code>data_cache/interprovincialtransfersyear*.csv</code></li>
+<li><code>data_cache/internationaltransfersyear*.csv</code></li>
+<li><code>data_cache/PUB_GenOutputbyFuelHourly_*.pkl</code></li>
+<li><code>data_cache/on_gen_output_*.csv</code> and <code>on_gen_capacity_*.csv</code></li>
+<li>Clear synthesised capacity factors:</li>
+<li><code>provincial_data/default/output_data/cf_*.csv</code></li>
+<li><code>provincial_data/on/output_data/*.csv</code></li>
+<li>Re-run aggregation. Note: Renewables Ninja API collection may take several hours.</li>
+</ol>
+<h3 id="103-adding-a-new-province">10.3 Adding a New Province</h3>
+<p>To bring a new province from exogenous to endogenous:</p>
+<ol>
+<li>In <code>input_files/regions.csv</code>, set <code>endogenous = TRUE</code> for the province.</li>
+<li>Ensure the province has CODERS equivalents mapped in the <code>coders_equivs</code> column.</li>
+<li>Optionally create a <code>provincial_data/{code}/</code> directory with province-specific data scripts.</li>
+<li>Verify that CODERS has hourly demand data for this province for the weather year.</li>
+</ol>
+<h3 id="104-adding-a-new-technology">10.4 Adding a New Technology</h3>
+<ol>
+<li>Add a row to the appropriate technology CSV (<code>generator_technologies.csv</code>, <code>storage_technologies.csv</code>, or <code>ccs_retrofit_technologies.csv</code>).</li>
+<li>Map it to CODERS and/or ATB equivalents.</li>
+<li>Define its input/output commodities in <code>commodities.csv</code> if new commodities are needed.</li>
+<li>Re-run the aggregation.</li>
+</ol>
+<hr>
+<p><em>Last updated: 2025. This catalog should be reviewed and updated with each major CANOE update cycle.</em></p>
+</div>
+
+</main>
+
+<script>
+// Highlight the active sidebar link on scroll
+(function() {
+    const links = document.querySelectorAll('#sidebar a[href^="#"]');
+    const sections = [];
+    links.forEach(link => {
+        const id = link.getAttribute('href').slice(1);
+        const el = document.getElementById(id);
+        if (el) sections.push({ el: el, link: link });
+    });
+    function onScroll() {
+        const scrollY = window.scrollY + 120;
+        let current = null;
+        for (const s of sections) {
+            if (s.el.offsetTop <= scrollY) current = s;
+        }
+        links.forEach(l => l.classList.remove('active'));
+        if (current) current.link.classList.add('active');
+    }
+    window.addEventListener('scroll', onScroll, { passive: true });
+    onScroll();
+})();
+</script>
+
+</body>
+</html>
