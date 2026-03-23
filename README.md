@@ -4,6 +4,8 @@ This script aggregates the modular electricity sector model for CANOE. It pulls 
 
 Aggregation can be configured through files in `input_files/` (see Configuration) to include/exclude technologies, provinces, types of data/model structures.
 
+For more detailed information on the electricity sector of CANOE, please [click here](https://canoe-main.github.io/canoe-electricity/)
+
 It will download a large number of files on the first run (as of now, 141 MB) but will cache these files locally and use the local cache in subsequent runs. Parameters can be set to force downloading to get latest data (see Configuration).
 
 ## Usage
