@@ -21,4 +21,4 @@ At this point, we are focusing on gathering feedback, fixing bugs, and shaping t
 
 ## Contact
 
-For urgent issues (e.g., security concerns), please email: [CANOE Support](https://groups.google.com/u/3/g/canoe-support)
+For urgent issues (e.g., security concerns), please contact: [CANOE Support](https://groups.google.com/u/3/g/canoe-support)
