@@ -5,12 +5,12 @@ Written by Ian David Elder for the CANOE model.
 """
 
 import pandas as pd
-from setup import config
-from setup import reference
+from canoe_electricity.setup import config
+from canoe_electricity.setup import reference
 import os
 import sqlite3
 import numpy as np
-import utils
+import canoe_electricity.utils as utils
 from matplotlib import pyplot as pp
 
 this_dir = os.path.realpath(os.path.dirname(__file__)) + "/"

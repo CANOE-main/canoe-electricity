@@ -4,14 +4,14 @@ Written by Ian David Elder for the CANOE model
 """
 
 import pandas as pd
-from setup import config
+from canoe_electricity.setup import config
 from matplotlib import pyplot as pp
-import utils
+import canoe_electricity.utils as utils
 import numpy as np
 import sqlite3
 
 # Provincial scripts
-import provincial_data.on.existing_capacity_credits as on_cc_exs
+import canoe_electricity.provincial_data.on.existing_capacity_credits as on_cc_exs
 
 exs_ccs = dict()
 

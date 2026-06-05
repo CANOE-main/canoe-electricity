@@ -14,8 +14,8 @@ import os
 from datetime import datetime
 from datetime import date
 import pandas as pd
-import utils
-from setup import config
+import canoe_electricity.utils as utils
+from canoe_electricity.setup import config
 
 cache = config.cache_dir
 coders_root = "https://api.sesit.ca/"
