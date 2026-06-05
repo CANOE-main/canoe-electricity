@@ -4,18 +4,18 @@ Written by Ian David Elder for the CANOE model
 """
 
 import sqlite3
-import utils
-import pre_processing
-import post_processing
+import canoe_electricity.utils as utils
+import canoe_electricity.pre_processing as pre_processing
+import canoe_electricity.post_processing as post_processing
 import os
-import model_reduction
-import interfaces
-import setup
-import currency_conversion
-import generators
-import provincial_grids
+import canoe_electricity.model_reduction as model_reduction
+import canoe_electricity.interfaces as interfaces
+import canoe_electricity.setup as setup
+import canoe_electricity.currency_conversion as currency_conversion
+import canoe_electricity.generators as generators
+import canoe_electricity.provincial_grids as provincial_grids
 import pandas as pd
-from setup import config
+from canoe_electricity.setup import config
 from matplotlib import pyplot as pp
 
 

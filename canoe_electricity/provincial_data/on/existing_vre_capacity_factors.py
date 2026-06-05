@@ -7,12 +7,12 @@ Written by Ian David Elder for the CANOE model
 import os
 import numpy as np
 import pandas as pd
-from setup import config
-from setup import reference
+from canoe_electricity.setup import config
+from canoe_electricity.setup import reference
 from matplotlib import pyplot as pp
-import utils
+import canoe_electricity.utils as utils
 import sqlite3
-import coders_api
+import canoe_electricity.coders_api as coders_api
 
 weather_year = config.params['weather_year']
 df_existing: pd.DataFrame = None

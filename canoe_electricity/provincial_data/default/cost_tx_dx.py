@@ -1,8 +1,8 @@
-from setup import config
+from canoe_electricity.setup import config
 import pandas as pd
 import sqlite3
-import utils
-import currency_conversion
+import canoe_electricity.utils as utils
+import canoe_electricity.currency_conversion as currency_conversion
 
 df_cost: pd.DataFrame = pd.read_csv('provincial_data/default/cost_tx_dx.csv', index_col=0)
 df_cost = currency_conversion.conv_curr(df_cost, 2024, 'USD')

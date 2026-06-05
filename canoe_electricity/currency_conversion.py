@@ -5,7 +5,7 @@ Written by Ian David Elder for the CANOE model
 
 import sqlite3
 import pandas as pd
-from setup import config
+from canoe_electricity.setup import config
 
 
 # Exchange rate and inflation tables
