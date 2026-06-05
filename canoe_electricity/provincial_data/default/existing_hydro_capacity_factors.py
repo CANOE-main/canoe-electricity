@@ -5,12 +5,12 @@ Written by Ian David Elder for the CANOE model.
 """
 
 import pandas as pd
-from setup import config
+from canoe_electricity.setup import config
 import sqlite3
 import numpy as np
-import utils
+import canoe_electricity.utils as utils
 from matplotlib import pyplot as pp
-from provincial_data.on import existing_hydro_capacity_factors as on_cf
+from canoe_electricity.provincial_data.on import existing_hydro_capacity_factors as on_cf
 
 weather_year = config.params['weather_year']
 days_per_month = [31,28,31,30,31,30,31,31,30,31,30,31]

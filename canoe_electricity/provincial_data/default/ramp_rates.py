@@ -1,7 +1,7 @@
-from setup import config
+from canoe_electricity.setup import config
 import pandas as pd
 import sqlite3
-import utils
+import canoe_electricity.utils as utils
 
 df_rates: pd.Series = pd.read_csv('provincial_data/default/ramp_rates.csv', index_col=0)
 note = 'Taken from SI Table 7 - Ramping Constraints'

@@ -1,6 +1,6 @@
-import utils
-import coders_api
-from setup import config
+import canoe_electricity.utils as utils
+import canoe_electricity.coders_api as coders_api
+from canoe_electricity.setup import config
 import pandas as pd
 import os
 import time

@@ -5,13 +5,13 @@ Written by Ian David Elder for the CANOE model
 """
 
 import pandas as pd
-from setup import config
+from canoe_electricity.setup import config
 from matplotlib import pyplot as pp
-import capacity_credits
+import canoe_electricity.capacity_credits as capacity_credits
 import os
 import sqlite3
-import utils
-from currency_conversion import conv_curr
+import canoe_electricity.utils as utils
+from canoe_electricity.currency_conversion import conv_curr
 
 atb_year = config.params['atb']['year']
 atb_ref = config.refs.add('atb', config.params['atb']['reference'])

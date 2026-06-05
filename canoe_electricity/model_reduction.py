@@ -4,8 +4,8 @@ Written by Ian David Elder for the CANOE model
 """
 
 import sqlite3
-from setup import config
-import coders_api
+from canoe_electricity.setup import config
+import canoe_electricity.coders_api as coders_api
 import pandas as pd
 
 

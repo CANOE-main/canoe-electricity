@@ -4,14 +4,14 @@ Written by Ian David Elder for the CANOE model
 """
 
 import numpy as np
-import coders_api
+import canoe_electricity.coders_api as coders_api
 import sqlite3
 import os
 import pandas as pd
 from matplotlib import pyplot as pp
-from setup import config
-import utils
-from provincial_data.default import cost_tx_dx
+from canoe_electricity.setup import config
+import canoe_electricity.utils as utils
+from canoe_electricity.provincial_data.default import cost_tx_dx
 
 # Globalise so we only have one connection
 conn: sqlite3.Connection
