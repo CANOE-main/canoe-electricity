@@ -6,10 +6,10 @@ Written by Ian David Elder for the CANOE model
 import pandas as pd
 
 # Provincial scripts
-import canoe_electricity.provincial_data.on.existing_vre_capacity_factors as on_vre_exs
-import canoe_electricity.provincial_data.on.existing_hydro_capacity_factors as on_hydro_exs
-import canoe_electricity.provincial_data.default.existing_hydro_capacity_factors as def_hydro_exs
-import canoe_electricity.provincial_data.default.existing_vre_capacity_factors as def_vre_exs
+import provincial_data.on.existing_vre_capacity_factors as on_vre_exs
+import provincial_data.on.existing_hydro_capacity_factors as on_hydro_exs
+import provincial_data.default.existing_hydro_capacity_factors as def_hydro_exs
+import provincial_data.default.existing_vre_capacity_factors as def_vre_exs
 
 
 

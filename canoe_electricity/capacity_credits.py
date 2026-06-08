@@ -11,7 +11,7 @@ import numpy as np
 import sqlite3
 
 # Provincial scripts
-import canoe_electricity.provincial_data.on.existing_capacity_credits as on_cc_exs
+import provincial_data.on.existing_capacity_credits as on_cc_exs
 
 exs_ccs = dict()
 

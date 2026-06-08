@@ -11,7 +11,7 @@ from matplotlib import pyplot as pp
 import pandas as pd
 import canoe_electricity.utils as utils
 
-from canoe_electricity.provincial_data.default import cost_tx_dx
+from provincial_data.default import cost_tx_dx
 
 # Provincial parameters
 df_sys: pd.DataFrame

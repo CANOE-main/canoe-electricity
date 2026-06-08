@@ -90,7 +90,7 @@ class config:
     """A singleton-pattern class to contain general configuration data"""
 
     # File locations
-    _this_dir = os.path.realpath(os.path.dirname(__file__)) + "/"
+    _this_dir = "./"
     input_files = _this_dir + 'input_files/'
     cache_dir = _this_dir + "data_cache/"
 

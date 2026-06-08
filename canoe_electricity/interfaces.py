@@ -11,7 +11,7 @@ import pandas as pd
 from matplotlib import pyplot as pp
 from canoe_electricity.setup import config
 import canoe_electricity.utils as utils
-from canoe_electricity.provincial_data.default import cost_tx_dx
+from provincial_data.default import cost_tx_dx
 
 # Globalise so we only have one connection
 conn: sqlite3.Connection
