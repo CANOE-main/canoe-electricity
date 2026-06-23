@@ -6,3 +6,5 @@ electricity.sqlite
 electricity*.xlsx
 *coders_api_key.txt
 *rninja_api_token.txt
+*settings.json
+output_plots/*

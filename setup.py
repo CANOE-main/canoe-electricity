@@ -145,7 +145,6 @@ class config:
         config.ccs_techs = config.ccs_techs.loc[config.ccs_techs['include']]
 
         # Fill in missing columns versus gen_techs
-        config.storage_techs['tech_sets'] = pd.NA # what sets would you add them to?
         config.storage_techs['include_fuel_cost'] = False # no fuel for storage techs
 
         # Included regions and future periods
