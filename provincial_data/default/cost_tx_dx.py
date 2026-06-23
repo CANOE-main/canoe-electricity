@@ -24,7 +24,7 @@ def aggregate(
     Apply default levelised transmission and distribution costs from AEO
     """
     
-    cost = df_cost[str(period)]
+    cost = df_cost[str(utils.data_year(period))]
 
     match dx_tx:
         case 'dx':

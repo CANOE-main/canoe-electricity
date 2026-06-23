@@ -71,6 +71,17 @@ def _initialise_atb():
 
 
 
+def data_year(period_or_vintage: int) -> int:
+    """Returns the year to take data from for a given period/vintage"""
+    if period_or_vintage < config.model_periods[0]:
+        # Existing vintages use same-year data
+        return period_or_vintage
+    else:
+        # New vintages take period-end data
+        return period_or_vintage + config.params['period_step']
+
+
+
 # Just a shorthand way to get ATB data
 atb_tables = dict() # local store of reduced ATB tables by tech - saves lots of time
 def atb_data(tech_config: pd.Series, **kwargs) -> tuple[pd.DataFrame, str]:
