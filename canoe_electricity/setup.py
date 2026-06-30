@@ -8,7 +8,7 @@ import pandas as pd
 import yaml
 import sqlite3
 import numpy as np
-import urllib.request 
+import canoe_electricity.atb_api as atb_api
 
 
 
@@ -216,11 +216,11 @@ class config:
 
     def _download_atb_master(cls):
 
-        config.atb_master_file = config.cache_dir + config.params['atb']['master_url'].split('/')[-1]
-
-        if not os.path.isfile(config.atb_master_file):
-            print("Downloading ATB master workbook...")
-            urllib.request.urlretrieve(config.params['atb']['master_url'], config.atb_master_file)
+        config.atb_master_file = atb_api.download_master(
+            url=config.params['atb']['master_url'],
+            cache_dir=config.cache_dir,
+            force_download=config.params.get('force_download', False),
+        )
         
 
 

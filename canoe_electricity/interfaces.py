@@ -35,14 +35,21 @@ def aggregate():
     conn = sqlite3.connect(config.database_file)
     curs = conn.cursor()
 
+    _coders_kwargs = dict(
+        cache_dir=config.cache_dir,
+        force_download=config.params.get('force_download', False),
+        api_key_file=config.input_files + config.params['coders_api_key_file'],
+        debug=config.debug,
+    )
+
     # Provincial systems parameters for average provincial line loss
-    df_sys, date_accessed = coders_api.get_data(end_point='CA_system_parameters')
+    df_sys, date_accessed = coders_api.get_data(end_point='CA_system_parameters', **_coders_kwargs)
     df_sys['region'] = [config.region_map[p.lower()] for p in df_sys['province'].values]
     df_sys.set_index('region', inplace=True)
     config.refs.add('ca_system_parameters', config.params['coders']['reference'].replace('<table>', 'ca_system_parameters').replace('<date>', date_accessed))
 
     # Get interfaces data for seasonal capacity limits and associated interties
-    df_interfaces, date_accessed = coders_api.get_data(end_point='interface_capacities')
+    df_interfaces, date_accessed = coders_api.get_data(end_point='interface_capacities', **_coders_kwargs)
     config.refs.add('interface_capacities', config.params['coders']['reference'].replace("<date>", date_accessed).replace("<table>","interface_capacities"))
 
     # Want to group by region set (order agnostic) so get canoe regions but do not sort horizontally
@@ -80,8 +87,14 @@ def aggregate_boundary_interfaces(df_interfaces):
     # Get all interties that cross model boundary and group by in-model region
     # This is done by sorting regions left-right then grouping as pairs
     #df_interties = pd.read_csv(config.input_files + 'interties.csv')
-    df_prov, _date = coders_api.get_data('interprovincial_transfers')
-    df_int, _date = coders_api.get_data('international_transfers')
+    _coders_kwargs = dict(
+        cache_dir=config.cache_dir,
+        force_download=config.params.get('force_download', False),
+        api_key_file=config.input_files + config.params['coders_api_key_file'],
+        debug=config.debug,
+    )
+    df_prov, _date = coders_api.get_data('interprovincial_transfers', **_coders_kwargs)
+    df_int, _date = coders_api.get_data('international_transfers', **_coders_kwargs)
 
     df_prov['type'] = 'interprovincial'
     df_int['type'] = 'international'
@@ -423,10 +436,16 @@ def get_transfered_mwh(region_1, region_2, intertie_type) -> tuple[np.ndarray, n
 
     data_year = config.params['weather_year']
 
+    _coders_kwargs = dict(
+        cache_dir=config.cache_dir,
+        force_download=config.params.get('force_download', False),
+        api_key_file=config.input_files + config.params['coders_api_key_file'],
+        debug=config.debug,
+    )
     if intertie_type == 'international':
-        df_transfers, date_accessed = coders_api.get_data(end_point="international_transfers", year=data_year, province=region_1, us_state=region_2)
+        df_transfers, date_accessed = coders_api.get_data(end_point="international_transfers", year=data_year, province=region_1, us_state=region_2, **_coders_kwargs)
     elif intertie_type == 'interprovincial':
-        df_transfers, date_accessed = coders_api.get_data(end_point="interprovincial_transfers", year=data_year, province1=region_1, province2=region_2)
+        df_transfers, date_accessed = coders_api.get_data(end_point="interprovincial_transfers", year=data_year, province1=region_1, province2=region_2, **_coders_kwargs)
 
     if df_transfers is None or (len(df_transfers) < 8760):
         print(f"Insufficient {intertie_type} transfer data on {region_1}-{region_2}.")
