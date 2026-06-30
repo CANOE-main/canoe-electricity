@@ -8,12 +8,12 @@ import sqlite3
 import canoe_electricity.utils as utils
 import canoe_electricity.post_processing as post_processing
 import os
-import canoe_electricity.model_reduction as model_reduction
 import canoe_electricity.interfaces as interfaces
 import canoe_electricity.setup as setup
 import canoe_electricity.currency_conversion as currency_conversion
 import canoe_electricity.generators as generators
 import canoe_electricity.provincial_grids as provincial_grids
+import canoe_electricity.validation as validation
 import pandas as pd
 from canoe_electricity.setup import config
 from matplotlib import pyplot as pp
@@ -26,12 +26,16 @@ def build_database():
 
     setup.open_database()
 
+    conn = sqlite3.connect(config.database_file)
+    validation.validate_db_against_config(config, conn)
+    conn.close()
+
     provincial_grids.aggregate() # Must go before generators to get provincial demand for capacity credits
     generators.aggregate()
     interfaces.aggregate()
 
     # currency_conversion.convert_currencies() # no longer used
-    if config.params['simplify_model']: model_reduction.simplify_model()
+    # if config.params['simplify_model']: model_reduction.simplify_model()
     
     post_processing.process()
     
