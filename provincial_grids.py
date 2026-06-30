@@ -181,7 +181,7 @@ def aggregate_demand():
             print(f"Insufficient hourly demand data available for {region} so DemandSpecificDistribution was skipped.")
             continue
 
-        hourly_dem = df_hourly['demand_MWh'].iloc[0:8760].astype(float).ffill().to_numpy()
+        hourly_dem = df_hourly['demand_MWh'].iloc[0:8760].astype(float).ffill().to_numpy().copy()
 
         # Store hourly demand to calculate capacity credits for VREs
         # Can't turn back before this point or wont be able to calculate CCs
