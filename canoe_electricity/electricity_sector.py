@@ -5,7 +5,6 @@ Written by Ian David Elder for the CANOE model
 
 import sqlite3
 import canoe_electricity.utils as utils
-import canoe_electricity.pre_processing as pre_processing
 import canoe_electricity.post_processing as post_processing
 import os
 import canoe_electricity.model_reduction as model_reduction
@@ -24,9 +23,7 @@ def build_database():
 
     print(f"Aggregating electricity sector into {os.path.basename(config.database_file)}...\n")
 
-    setup.instantiate_database()
-
-    pre_processing.process()
+    setup.open_database()
 
     provincial_grids.aggregate() # Must go before generators to get provincial demand for capacity credits
     generators.aggregate()
