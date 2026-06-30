@@ -6,6 +6,7 @@ Written by Ian David Elder for the CANOE model
 import sqlite3
 from canoe_electricity.setup import config
 import canoe_electricity.coders_api as coders_api
+import canoe_electricity.atb_api as atb_api
 import canoe_electricity.utils as utils
 import pandas as pd
 import os
@@ -52,14 +53,21 @@ def initialise_data():
 
     global df_generic, df_cost
 
+    _coders_kwargs = dict(
+        cache_dir=config.cache_dir,
+        force_download=config.params.get('force_download', False),
+        api_key_file=config.input_files + config.params['coders_api_key_file'],
+        debug=config.debug,
+    )
+
     # CODERS capital cost evolution
-    df_cost, date_accessed = coders_api.get_data(end_point='generation_cost_evolution')
+    df_cost, date_accessed = coders_api.get_data(end_point='generation_cost_evolution', **_coders_kwargs)
     config.refs.add('generation_cost_evolution', config.params['coders']['reference'].replace("<date>", date_accessed).replace("<table>","generation_cost_evolution"))
     df_cost['gen_type'] = df_cost['gen_type'].str.lower()
     df_cost = df_cost.set_index('gen_type')
 
     # CODERS generic generator data
-    df_generic, date_accessed = coders_api.get_data(end_point='generation_generic')
+    df_generic, date_accessed = coders_api.get_data(end_point='generation_generic', **_coders_kwargs)
     config.refs.add('generation_generic', config.params['coders']['reference'].replace("<date>", date_accessed).replace("<table>","generation_generic"))
     df_generic['gen_type'] = df_generic['gen_type'].str.lower()
     df_generic = df_generic.set_index('gen_type')
@@ -208,7 +216,13 @@ def aggregate_existing_generators() -> pd.DataFrame:
     ##############################################################
     """
 
-    df_existing, date_accessed = coders_api.get_data(end_point='generators')
+    df_existing, date_accessed = coders_api.get_data(
+        end_point='generators',
+        cache_dir=config.cache_dir,
+        force_download=config.params.get('force_download', False),
+        api_key_file=config.input_files + config.params['coders_api_key_file'],
+        debug=config.debug,
+    )
     config.refs.add('generators', config.params['coders']['reference'].replace("<date>", date_accessed).replace("<table>","generators"))
 
     # Get CANOE technologies
@@ -330,7 +344,13 @@ def aggregate_existing_storage():
     ##############################################################
     """
 
-    df_existing, date_accessed = coders_api.get_data(end_point='storage')
+    df_existing, date_accessed = coders_api.get_data(
+        end_point='storage',
+        cache_dir=config.cache_dir,
+        force_download=config.params.get('force_download', False),
+        api_key_file=config.input_files + config.params['coders_api_key_file'],
+        debug=config.debug,
+    )
     citation = config.params['coders']['reference'].replace("<date>", date_accessed).replace("<table>","storage")
     config.refs.add('storage', citation)
 
@@ -587,10 +607,19 @@ def aggregate_rt_atb(region, tech, tech_config):
     """
 
     # CODERS data as a backup where not available in ATB
-    tsv = atb_tsv(tech_config['atb_master_sheet'], tech_config['atb_tsv_row'])
-    tsv_note = f"{tech_config['atb_master_sheet']} - {tech_config['atb_tsv_row']}"
-    
-    
+    tsv, tsv_note = atb_api.load_tsv(
+        sheet=tech_config['atb_master_sheet'],
+        row=tech_config['atb_tsv_row'],
+        master_file=config.atb_master_file,
+        master_tables=config.atb_master_tables,
+        cache_dir=config.cache_dir,
+        headers_map=config.params['atb']['tsv_headers'],
+        force_download=config.params.get('force_download', False),
+    )
+    if tsv is not None:
+        config.refs.add(tsv_note, config.params['atb']['master_reference'].replace('<sheet>', tsv_note))
+
+
     ## RampUp and RampDown
     # TODO need some actual hourly values for this
     # Take from ATB tsv table if available, otherwise use CODERS
@@ -649,8 +678,17 @@ def aggregate_rtv_atb(region, tech, vint, tech_config):
 
     # CODERS data as a backup where not available in ATB
     coders_gen = df_generic.loc[tech_config['coders_equiv']]
-    tsv = atb_tsv(tech_config['atb_master_sheet'], tech_config['atb_tsv_row'])
-    tsv_note = f"{tech_config['atb_master_sheet']} - {tech_config['atb_tsv_row']}"
+    tsv, tsv_note = atb_api.load_tsv(
+        sheet=tech_config['atb_master_sheet'],
+        row=tech_config['atb_tsv_row'],
+        master_file=config.atb_master_file,
+        master_tables=config.atb_master_tables,
+        cache_dir=config.cache_dir,
+        headers_map=config.params['atb']['tsv_headers'],
+        force_download=config.params.get('force_download', False),
+    )
+    if tsv is not None:
+        config.refs.add(tsv_note, config.params['atb']['master_reference'].replace('<sheet>', tsv_note))
     
     # Commodity data
     input_comm = config.commodities.loc[tech_config['in_comm']]
@@ -977,7 +1015,17 @@ def aggregate_ccs_retrofits(df_rtv_all: pd.DataFrame):
         if len(df_rtv_gen) == 0: continue
 
         try:
-            tsv = atb_tsv(gen_config['atb_master_sheet'], gen_config['atb_tsv_row'])
+            tsv, tsv_note = atb_api.load_tsv(
+                sheet=gen_config['atb_master_sheet'],
+                row=gen_config['atb_tsv_row'],
+                master_file=config.atb_master_file,
+                master_tables=config.atb_master_tables,
+                cache_dir=config.cache_dir,
+                headers_map=config.params['atb']['tsv_headers'],
+                force_download=config.params.get('force_download', False),
+            )
+            if tsv is not None:
+                config.refs.add(tsv_note, config.params['atb']['master_reference'].replace('<sheet>', tsv_note))
             gen_emis = config.units.loc[f"co2_emissions", 'atb_conv_fact'] * float(tsv["emissions_co2_lbs_MMBtu"]) \
                 * float(tsv["heat_rate_MMBtu_MWh"]) * config.units.loc[f"heat_rate", 'atb_conv_fact']
         except Exception as e:
@@ -1267,58 +1315,6 @@ def setup_monthly_hydro(df_rtv: pd.DataFrame):
 
 
 
-"""
-##############################################################
-    Technology specific variables data
-    Misc. data like emissions from ATB underlying workbook
-##############################################################
-"""
-
-tsv_tables = dict() # store after loading as each takes ~0.3s - saves lots of time
-# Gets a technology specific variables table from ATB master workbook
-def atb_tsv(sheet, row) -> pd.DataFrame:
-
-    if pd.isna(sheet): return # not specified
-
-    cache_file = config.cache_dir + f"atb_technology_specific_variables_{sheet}.csv"
-
-    config.refs.add(f"{sheet} - {row}", config.params['atb']['master_reference'].replace('<sheet>', f"{sheet} - {row}"))
-
-    # If TSV already loaded, return it
-    if sheet in tsv_tables.keys(): return tsv_tables[sheet].loc[row]
-
-    # Otherwise, if TSV has been cached as a csv, load it and return it
-    if os.path.isfile(cache_file) and not config.params['force_download']:
-        df = pd.read_csv(cache_file, index_col=0)
-        tsv_tables[sheet] = df # store loaded tsv
-        return df.loc[row]
-
-    table = config.atb_master_tables.loc[config.atb_master_tables['table']=='tsv'].loc[sheet]
-
-    df = pd.read_excel(config.atb_master_file, dtype='unicode', sheet_name=sheet, usecols=table['columns'],
-                       skiprows=int(table['first_row'])-1, nrows=int(table['last_row'])-int(table['first_row']), index_col=0)
-
-    # Just to concatenate annoyingly split-up headers
-    none_if_unnamed = lambda string: string.replace(' ','') if 'Unnamed' not in string else ''
-    none_if_na = lambda val: str(val).replace(' ','') if not pd.isna(val) else ''
-    df.columns = [none_if_unnamed(df.columns[i]) + none_if_na(df.iloc[0,i]) + none_if_na(df.iloc[1,i]) for i in range(len(df.columns))]
-
-    # Translate concatenated ATB headers into useful headers
-    df = df[[col for col in config.params['atb']['tsv_headers'].keys() if col in df.columns]] # remove irrelevant columns
-    df.columns = [config.params['atb']['tsv_headers'][col] for col in df.columns] # translate headers
-
-    # Add NaN columns for data we wanted but wasnt there so we can do if pd.isna(datum)
-    for col in config.params['atb']['tsv_headers'].values():
-        if col not in df.columns: df[col] = pd.NA
-
-    # Drop leading two useless rows
-    df = df.iloc[2:]
-
-    # Cache tsv locally to speed things up next time
-    df.to_csv(cache_file)
-    tsv_tables[sheet] = df # store tsv
-
-    return df.loc[row]
 
 
 

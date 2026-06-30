@@ -24,8 +24,15 @@ def aggregate():
 
     global df_sys
 
+    _coders_kwargs = dict(
+        cache_dir=config.cache_dir,
+        force_download=config.params.get('force_download', False),
+        api_key_file=config.input_files + config.params['coders_api_key_file'],
+        debug=config.debug,
+    )
+
     # Provincial system parameters
-    df_sys, date_accessed = coders_api.get_data(end_point='CA_system_parameters')
+    df_sys, date_accessed = coders_api.get_data(end_point='CA_system_parameters', **_coders_kwargs)
     df_sys['region'] = [config.region_map[p.lower()] for p in df_sys['province'].values]
     df_sys = df_sys.loc[df_sys['region'].isin(config.model_regions)]
     df_sys.set_index('region', inplace=True)
@@ -139,8 +146,15 @@ def aggregate_demand():
     conn = sqlite3.connect(config.database_file)
     curs = conn.cursor()
 
+    _coders_kwargs = dict(
+        cache_dir=config.cache_dir,
+        force_download=config.params.get('force_download', False),
+        api_key_file=config.input_files + config.params['coders_api_key_file'],
+        debug=config.debug,
+    )
+
     # Annual demand projections
-    df_annual, date_accessed = coders_api.get_data(end_point="forecasted_annual_demand")
+    df_annual, date_accessed = coders_api.get_data(end_point="forecasted_annual_demand", **_coders_kwargs)
     citation = config.params['coders']['reference'].replace("<date>", date_accessed).replace("<table>", "forecasted_annual_demand")
     config.refs.add('forecasted_annual_demand', citation)
     df_annual['region'] = [config.region_map[p.lower()] for p in df_annual['province']]
@@ -153,7 +167,7 @@ def aggregate_demand():
     output_comm = config.commodities.loc[tech_config['out_comm']]
 
     # Get available data provinces and years from coders
-    df_avail, _date = coders_api.get_data(end_point="provincial_demand")
+    df_avail, _date = coders_api.get_data(end_point="provincial_demand", **_coders_kwargs)
 
     for _idx, prov in df_avail.iterrows():
 
@@ -173,7 +187,7 @@ def aggregate_demand():
             print(f"Provincial hourly demand data not available for {region} for year {weather_year} so DemandSpecificDistribution was skipped.")
             continue
 
-        df_hourly, date_accessed = coders_api.get_data(end_point="provincial_demand", year=weather_year, province=prov['province'])
+        df_hourly, date_accessed = coders_api.get_data(end_point="provincial_demand", year=weather_year, province=prov['province'], **_coders_kwargs)
         dsd_reference = config.params['coders']['reference'].replace("<date>", date_accessed).replace("<table>", "provincial_demand")
         ref = config.refs.add(f"provincial_demand", dsd_reference)
 
