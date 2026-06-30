@@ -12,30 +12,43 @@ import urllib.request
 
 
 
-def instantiate_database():
-    
-    # Check if database exists or needs to be built
-    build_db = not os.path.exists(config.database_file)
+def open_database():
+    """Open the shared database created by canoe-base.
 
-    # Connect to the new database file
+    The electricity module no longer creates or seeds the database — it only
+    appends module-specific rows.  Run canoe-base first to produce the DB.
+
+    If params['force_wipe_database'] is True, only rows belonging to this
+    module (identified by data_id prefix) are deleted before the run, leaving
+    canoe-base and other modules' data intact.
+    """
+    if not os.path.exists(config.database_file):
+        raise FileNotFoundError(
+            f"Expected shared database at {config.database_file!r}. "
+            "Run canoe-base first to create and seed the database."
+        )
+
     conn = sqlite3.connect(config.database_file)
-    curs = conn.cursor() # Cursor object interacts with the sqlite db
 
-    # Build the database if it doesn't exist. Otherwise clear all data if forced
-    if build_db: curs.executescript(open(config.schema_file, 'r').read())
-    elif config.params['force_wipe_database']:
-        tables = [t[0] for t in curs.execute("""SELECT name FROM sqlite_master WHERE type='table';""").fetchall()]
-        for table in tables: curs.execute(f"DELETE FROM '{table}'")
-        curs.executescript(open(config.schema_file, 'r').read())
-        print("Database wiped prior to aggregation. See params.\n")
-
-    conn.commit()
-
-    # VACUUM operation to clean up any empty rows
-    conn.execute("VACUUM;")
-    conn.commit()
+    if config.params.get('force_wipe_database', False):
+        _wipe_module_data(conn)
 
     conn.close()
+
+
+def _wipe_module_data(conn: sqlite3.Connection):
+    """Delete only this module's rows (data_id prefix match) from the shared DB."""
+    prefix = config.params.get('data_id_prefix', 'E')
+    curs = conn.cursor()
+    tables = [t[0] for t in curs.execute(
+        "SELECT name FROM sqlite_master WHERE type='table';"
+    ).fetchall()]
+    for table in tables:
+        cols = [row[1] for row in curs.execute(f"PRAGMA table_info('{table}')").fetchall()]
+        if 'data_id' in cols:
+            curs.execute(f"DELETE FROM '{table}' WHERE data_id LIKE '{prefix}%'")
+    conn.commit()
+    print(f"Cleared electricity module data (prefix='{prefix}') from database.\n")
 
 
 
