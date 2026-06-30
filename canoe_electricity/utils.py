@@ -11,7 +11,7 @@ import sqlite3
 import pandas as pd
 import requests
 import xmltodict
-from setup import config
+from canoe_electricity.setup import config
 import urllib.request
 import zipfile
 import datetime

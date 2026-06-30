@@ -4,12 +4,12 @@ Written by Ian David Elder for the CANOE model
 """
 
 import sqlite3
-from setup import config
-import coders_api
+from canoe_electricity.setup import config
+import canoe_electricity.coders_api as coders_api
 import os
 from matplotlib import pyplot as pp
 import pandas as pd
-import utils
+import canoe_electricity.utils as utils
 
 from provincial_data.default import cost_tx_dx
 

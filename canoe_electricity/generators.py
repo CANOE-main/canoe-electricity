@@ -4,17 +4,17 @@ Written by Ian David Elder for the CANOE model
 """
 
 import sqlite3
-from setup import config
-import coders_api
-import utils
+from canoe_electricity.setup import config
+import canoe_electricity.coders_api as coders_api
+import canoe_electricity.utils as utils
 import pandas as pd
 import os
 import traceback
-import capacity_credits
-import capacity_factors
-import new_wind_solar
-import constraints
-from currency_conversion import conv_curr
+import canoe_electricity.capacity_credits as capacity_credits
+import canoe_electricity.capacity_factors as capacity_factors
+import canoe_electricity.new_wind_solar as new_wind_solar
+import canoe_electricity.constraints as constraints
+from canoe_electricity.currency_conversion import conv_curr
 
 df_generic: pd.DataFrame
 df_cost: pd.DataFrame

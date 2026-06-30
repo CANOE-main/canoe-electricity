@@ -8,3 +8,5 @@ electricity*.xlsx
 *rninja_api_token.txt
 *settings.json
 output_plots/*
+
+uv.lock

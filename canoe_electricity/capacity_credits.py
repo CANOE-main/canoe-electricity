@@ -4,9 +4,9 @@ Written by Ian David Elder for the CANOE model
 """
 
 import pandas as pd
-from setup import config
+from canoe_electricity.setup import config
 from matplotlib import pyplot as pp
-import utils
+import canoe_electricity.utils as utils
 import numpy as np
 import sqlite3
 
