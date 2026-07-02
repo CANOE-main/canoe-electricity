@@ -11,6 +11,7 @@ import numpy as np
 import canoe_electricity.utils as utils
 from matplotlib import pyplot as pp
 from provincial_data.on import existing_hydro_capacity_factors as on_cf
+from canoe_schema.v4_0.models import CapacityFactorTech, LimitSeasonalCapacityFactor
 
 weather_year = config.params['weather_year']
 days_per_month = [31,28,31,30,31,30,31,31,30,31,30,31]
@@ -66,13 +67,13 @@ def get_daily_outputs():
 def aggregate_cfs(df_rtv: pd.DataFrame):
 
     print("Aggregating capacity factors for existing hydroelectric capacity...")
-    
+
     df_daily = get_daily_outputs()
 
     conn = sqlite3.connect(config.database_file)
     curs = conn.cursor()
 
-    # CapacityFactorTech has no vintage index but still need to validate vintages by period
+    # CapacityFactorTech has no vintage or period index in v4
     df_rtv['end'] = df_rtv['vint'] + df_rtv['life']
     df_end = df_rtv.groupby(['region','tech','tech_code'])['end'].max()
     df_rt = df_rtv.groupby(['region','tech','tech_code']).sum(numeric_only=True).reset_index()
@@ -84,7 +85,7 @@ def aggregate_cfs(df_rtv: pd.DataFrame):
     # Run of river hydro
     _note = note + ' Available energy assumed constant for each hour within each month.'
     for _idx, rt in df_rt.iterrows():
-        
+
         # Hourly generation to get net load for capacity credit calculations (MWh/h, i.e., MW)
         hourly = np.array([(df_daily.loc[row['season']][rt['region']])/24.0 for (_idx, row) in config.time.iterrows()])
         hourly *= rt['unit_average_annual_energy'] / df_total_energy.loc[rt['region']] # apportion to average annual energy
@@ -99,53 +100,82 @@ def aggregate_cfs(df_rtv: pd.DataFrame):
         # Add to VRE outputs to calculate capacity credits of new wind and solar
         config.exs_vre_gen[rt['region']] += hourly
 
+        # Skip if tech has no vintages active in any model period
+        if df_end.loc[(rt['region'], rt['tech'], rt['tech_code'])] <= config.model_periods[0]: continue
+
         data = []
-        for period in config.model_periods:
+        for h, time in config.time.iterrows():
 
-            # Check that there exists an existing vintage that will exist in this period
-            if df_end.loc[(rt['region'], rt['tech'], rt['tech_code'])] <= period: continue
-            
-            for h, time in config.time.iterrows():
+            if time['tod'] == config.time.iloc[0]['tod']:
+                data.append(CapacityFactorTech(
+                    region=rt['region'],
+                    season=time['season'],
+                    tod=time['tod'],
+                    tech=rt['tech'],
+                    factor=cf[h],
+                    notes=_note,
+                    data_source=ref.id,
+                    dq_cred=1,
+                    dq_geog=1,
+                    dq_struc=1,
+                    dq_tech=1,
+                    dq_time=3,
+                    data_id=utils.data_id(rt['region']),
+                ))
+            else:
+                data.append(CapacityFactorTech(
+                    region=rt['region'],
+                    season=time['season'],
+                    tod=time['tod'],
+                    tech=rt['tech'],
+                    factor=cf[h],
+                    data_id=utils.data_id(rt['region']),
+                ))
 
-                if time['tod'] == config.time.iloc[0]['tod']:
-                    data.append([rt['region'], period, time['season'], time['tod'], rt['tech'], cf[h], _note,
-                            ref.id, 1, 1, 1, 1, 3, utils.data_id(rt['region'])])
-                else:
-                    data.append([rt['region'], period, time['season'], time['tod'], rt['tech'], cf[h],
-                                 None, None, None, None, None, None, None, utils.data_id(rt['region'])])
-                 
-        curs.executemany(f"""REPLACE INTO
-                        CapacityFactorTech(region, period, season, tod, tech, factor, notes,
-                        data_source, dq_cred, dq_geog, dq_struc, dq_tech, dq_time, data_id)
-                        VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)""", data)
-            
-    # Daily and monthly storage hydro
+        if data:
+            curs.executemany(*CapacityFactorTech.bulk_insert_or_ignore_sql(data))
+
+    # Daily and monthly storage hydro — LimitSeasonalCapacityFactor has no period in v4
     # This will break if hydro isn't aggregated to a single vintage
     _note = note + ' Available energy assumed constant for each day within each month.'
     for _idx, rt in df_rt.loc[df_rt['tech_code'].isin(('hydro_daily','hydro_monthly'))].iterrows():
-        for period in config.model_periods:
-            for seas in config.time['season'].unique():
 
-                hourly = df_daily.loc[seas, rt['region']] / 24.0
-                hourly *= rt['unit_average_annual_energy'] / df_total_energy.loc[rt['region']]
-                hourly /= 1000
-                cf_seas = hourly / rt['capacity'] # GW / GW
-                if cf_seas < config.params['cf_tolerance']:
-                    cf_seas = 0
+        lscf_rows = []
+        for seas in config.time['season'].unique():
 
-                curs.execute(f"""REPLACE INTO
-                            LimitSeasonalCapacityFactor(region, period, season, tech, operator, factor, notes,
-                            data_source, dq_cred, dq_geog, dq_struc, dq_tech, dq_time, data_id)
-                            VALUES('{rt['region']}', {period}, '{seas}', '{rt['tech']}', "le", {cf_seas}, '{_note}',
-                            '{ref.id}', 1, 1, 1, 1, 3, "{utils.data_id(rt['region'])}")""")
-    
+            hourly = df_daily.loc[seas, rt['region']] / 24.0
+            hourly *= rt['unit_average_annual_energy'] / df_total_energy.loc[rt['region']]
+            hourly /= 1000
+            cf_seas = hourly / rt['capacity'] # GW / GW
+            if cf_seas < config.params['cf_tolerance']:
+                cf_seas = 0
+
+            lscf_rows.append(LimitSeasonalCapacityFactor(
+                region=rt['region'],
+                season=seas,
+                tech_or_group=rt['tech'],
+                operator='le',
+                factor=cf_seas,
+                notes=_note,
+                data_source=ref.id,
+                dq_cred=1,
+                dq_geog=1,
+                dq_struc=1,
+                dq_tech=1,
+                dq_time=3,
+                data_id=utils.data_id(rt['region']),
+            ))
+
+        if lscf_rows:
+            curs.executemany(*LimitSeasonalCapacityFactor.bulk_insert_or_ignore_sql(lscf_rows))
+
     conn.commit()
     conn.close()
 
     # Plotting if set to show
     if config.params['show_plots']:
         for region in df_rt['region'].unique():
-            
+
             figure, axis = pp.subplots(3, 1, constrained_layout=True)
             figure.suptitle(
                 f"{region} {config.params['weather_year']} synthesized hourly capacity factors\n"
@@ -157,7 +187,7 @@ def aggregate_cfs(df_rtv: pd.DataFrame):
                 on_cfs, _, _ = on_cf.get_capacity_factors(config.params['weather_year'])
                 axis[0].plot(range(8760), on_cfs['hydro_run'], 'r')
                 axis[1].plot(range(8760), on_cfs['hydro_daily'], 'r')
-            
+
             axis[0].plot(range(8760), cfs[region]['hydro_run'])
             axis[0].set_title('Run of river')
             axis[0].set_ylim(0,1)
