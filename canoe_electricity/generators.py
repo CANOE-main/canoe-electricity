@@ -16,6 +16,12 @@ import canoe_electricity.capacity_factors as capacity_factors
 import canoe_electricity.new_wind_solar as new_wind_solar
 import canoe_electricity.constraints as constraints
 from canoe_electricity.currency_conversion import conv_curr
+from canoe_schema.v4_0.models import (
+    Technology, Efficiency, LifetimeTech, ExistingCapacity, TimePeriod,
+    StorageDuration, CapacityToActivity, CostInvest, EmissionActivity,
+    CostFixed, CostVariable, LifetimeProcess, LimitActivity, Commodity,
+    RampUpHourly, RampDownHourly,
+)
 
 df_generic: pd.DataFrame
 df_cost: pd.DataFrame
@@ -104,9 +110,10 @@ def aggregate_new_generators():
         for n in range(len(new_techs)):
 
             ## Technologies
-            curs.execute(f"""REPLACE INTO
-                        Technology(tech, flag, sector, description, data_id)
-                        VALUES("{new_techs[n]}", "{tech_config['flag']}", "electricity", "{tech_config['description']} - new", "{utils.data_id()}")""")
+            curs.executemany(*Technology.bulk_insert_or_ignore_sql([Technology(
+                tech=new_techs[n], flag=tech_config['flag'], sector='electricity',
+                description=f"{tech_config['description']} - new", data_id=utils.data_id(),
+            )]))
             
             for region in config.model_regions:
                 for period in config.model_periods:
@@ -171,25 +178,30 @@ def aggregate_new_storage():
         tech = f"{storage_config['base_tech']}-NEW"
 
         ## Technologies
-        curs.execute(f"""REPLACE INTO
-                    Technology(tech, flag, sector, description, data_id)
-                    VALUES("{tech}", "ps", "electricity", "{storage_config['description']} - new", "{utils.data_id()}")""")
-        
+        curs.executemany(*Technology.bulk_insert_or_ignore_sql([Technology(
+            tech=tech, flag='ps', sector='electricity',
+            description=f"{storage_config['description']} - new", data_id=utils.data_id(),
+        )]))
+
         for region in config.model_regions:
 
             ## StorageDuration
-            curs.execute(f"""REPLACE INTO
-                        StorageDuration(region, tech, duration, notes, data_id)
-                        VALUES("{region}", "{tech}", {storage_config['duration']}, "(hours of storage)", "{utils.data_id(region)}")""")
-        
+            curs.executemany(*StorageDuration.bulk_insert_or_ignore_sql([StorageDuration(
+                region=region, tech=tech, duration=storage_config['duration'],
+                notes="(hours of storage)", data_id=utils.data_id(region),
+            )]))
+
+            eff_rows = []
             for vint in config.model_periods:
                 rtv.append({'region': region, 'tech_code': code, 'tech': tech, 'vint': vint})
-
-                ## Efficiency
-                curs.execute(f"""REPLACE INTO
-                            Efficiency(region, input_comm, tech, vintage, output_comm, efficiency, notes, data_source, dq_cred, data_id)
-                            VALUES("{region}", "{input_comm['commodity']}", "{tech}", {vint}, "{output_comm['commodity']}", {storage_config['efficiency']},
-                            "{eff_units} Following assumptions in NREL ATB", "{ref.id}", 1, "{utils.data_id(region)}")""")
+                eff_rows.append(Efficiency(
+                    region=region, input_comm=input_comm['commodity'],
+                    tech=tech, vintage=vint, output_comm=output_comm['commodity'],
+                    efficiency=storage_config['efficiency'],
+                    notes=f"{eff_units} Following assumptions in NREL ATB",
+                    data_source=ref.id, dq_cred=1, data_id=utils.data_id(region),
+                ))
+            curs.executemany(*Efficiency.bulk_insert_or_ignore_sql(eff_rows))
 
     conn.commit()
     conn.close()
@@ -291,35 +303,36 @@ def aggregate_existing_generators() -> pd.DataFrame:
     curs = conn.cursor()
 
     # Add technologies
+    tech_rows = []
     for _idx, row in df_rtv[['tech_code','tech','description']].drop_duplicates().iterrows():
-    
         tech_config = config.gen_techs.loc[row['tech_code']]
-
-        ## Technologies
-        curs.execute(f"""REPLACE INTO
-                    Technology(tech, flag, sector, description, data_id)
-                    VALUES("{row['tech']}", "{tech_config['flag']}", "electricity", "{tech_config['description']} - {row['description']} - existing", "{utils.data_id()}")""")
+        tech_rows.append(Technology(
+            tech=row['tech'], flag=tech_config['flag'], sector='electricity',
+            description=f"{tech_config['description']} - {row['description']} - existing",
+            data_id=utils.data_id(),
+        ))
+    if tech_rows:
+        curs.executemany(*Technology.bulk_insert_or_ignore_sql(tech_rows))
 
     # Iterate over aggregated existing capacity
+    ec_rows = []
     for _idx, row in df_rtv.iterrows():
-
         tech_config = config.gen_techs.loc[row['tech_code']]
-
-        ## ExistingCapacity
         if tech_config['no_retirement']: note = f"no retirement so aggregated to last existing vintage - {utils.string_cleaner(row['description'])}"
         else: note = f"aggregated to {step}-yearly vintages - {utils.string_cleaner(row['description'])}"
-        
-        curs.execute(f"""REPLACE INTO
-                    ExistingCapacity(region, tech, vintage, capacity, units, notes, data_source, dq_cred, data_id)
-                    VALUES("{row['region']}", "{row['tech']}", "{row['vint']}", "{row['capacity']}", "({config.units.loc['capacity', 'units']})",
-                    "{note}", "{config.refs.get('generators').id}", 2, "{utils.data_id(row['region'])}")""")
-    
+        ec_rows.append(ExistingCapacity(
+            region=row['region'], tech=row['tech'], vintage=row['vint'],
+            capacity=row['capacity'], units=f"({config.units.loc['capacity', 'units']})",
+            notes=note, data_source=config.refs.get('generators').id, dq_cred=2,
+            data_id=utils.data_id(row['region']),
+        ))
+    if ec_rows:
+        curs.executemany(*ExistingCapacity.bulk_insert_or_ignore_sql(ec_rows))
 
     ## time_periods
-    for vint in df_rtv['vint'].unique():
-        curs.execute(f"""REPLACE INTO
-                    TimePeriod(period, flag)
-                    VALUES({vint}, 'e')""")
+    tp_rows = [TimePeriod(period=int(vint), flag='e') for vint in df_rtv['vint'].unique()]
+    if tp_rows:
+        curs.executemany(*TimePeriod.bulk_insert_or_ignore_sql(tp_rows))
         
     conn.commit()
     conn.close()
@@ -420,11 +433,14 @@ def aggregate_existing_storage():
     curs = conn.cursor()
 
     # Iterate over aggregated existing capacity
+    tech_rows = []
+    eff_rows = []
+    ec_rows = []
+    sd_rows = []
     for _idx, row in df_rtdv.iterrows():
 
         # Tech configuration data
         storage_config = config.storage_techs.loc[row['tech_code']]
-
         ref = config.refs.add(f"atb_storage_{storage_config['atb_scenario']}", config.params['atb']['reference'].replace('<scenario>', storage_config['atb_scenario']))
 
         # Commodity data
@@ -432,41 +448,42 @@ def aggregate_existing_storage():
         output_comm = config.commodities.loc[storage_config['out_comm']]
         eff_units = f"({input_comm['units']}/{output_comm['units']})"
 
-
-        ## Technologies
-        curs.execute(f"""REPLACE INTO
-                    Technology(tech, flag, sector, description, data_id)
-                    VALUES("{row['tech']}", "ps", "electricity", "{storage_config['description']} - {row['description']} - existing", "{utils.data_id()}")""")
-        
-
-        ## Efficiency
-        curs.execute(f"""REPLACE INTO
-                    Efficiency(region, input_comm, tech, vintage, output_comm, efficiency, notes, data_source, dq_cred, data_id)
-                    VALUES("{row['region']}", "{input_comm['commodity']}", "{row['tech']}", {row['vint']}, "{output_comm['commodity']}", {storage_config['efficiency']},
-                    "{eff_units} Following assumptions in NREL ATB", "{ref.id}", 1, "{utils.data_id(row['region'])}")""")
-
-        ## ExistingCapacity
         if storage_config['no_retirement']: note = f"no retirement so aggregated to last existing vintage - {utils.string_cleaner(row['description'])}"
         else: note = f"aggregated to {step}-yearly vintages - {utils.string_cleaner(row['description'])}"
 
-        curs.execute(f"""REPLACE INTO
-                    ExistingCapacity(region, tech, vintage, capacity, units, notes, data_source, dq_cred, data_id)
-                    VALUES("{row['region']}", "{row['tech']}", "{row['vint']}", "{row['capacity']}", "({config.units.loc['capacity', 'units']})",
-                    "{note}", "{config.refs.get('storage').id}", 2, "{utils.data_id(row['region'])}")""")
+        tech_rows.append(Technology(
+            tech=row['tech'], flag='ps', sector='electricity',
+            description=f"{storage_config['description']} - {row['description']} - existing",
+            data_id=utils.data_id(),
+        ))
+        eff_rows.append(Efficiency(
+            region=row['region'], input_comm=input_comm['commodity'],
+            tech=row['tech'], vintage=row['vint'], output_comm=output_comm['commodity'],
+            efficiency=storage_config['efficiency'],
+            notes=f"{eff_units} Following assumptions in NREL ATB",
+            data_source=ref.id, dq_cred=1, data_id=utils.data_id(row['region']),
+        ))
+        ec_rows.append(ExistingCapacity(
+            region=row['region'], tech=row['tech'], vintage=row['vint'],
+            capacity=row['capacity'], units=f"({config.units.loc['capacity', 'units']})",
+            notes=note, data_source=config.refs.get('storage').id, dq_cred=2,
+            data_id=utils.data_id(row['region']),
+        ))
+        sd_rows.append(StorageDuration(
+            region=row['region'], tech=row['tech'], duration=row['storage_duration'],
+            notes="(hours of storage)", data_source=config.refs.get('storage').id,
+            data_id=utils.data_id(row['region']),
+        ))
 
+    if tech_rows: curs.executemany(*Technology.bulk_insert_or_ignore_sql(tech_rows))
+    if eff_rows: curs.executemany(*Efficiency.bulk_insert_or_ignore_sql(eff_rows))
+    if ec_rows: curs.executemany(*ExistingCapacity.bulk_insert_or_ignore_sql(ec_rows))
+    if sd_rows: curs.executemany(*StorageDuration.bulk_insert_or_ignore_sql(sd_rows))
 
-        ## StorageDuration
-        curs.execute(f"""REPLACE INTO
-                    StorageDuration(region, tech, duration, notes, data_source, data_id)
-                    VALUES("{row['region']}", "{row['tech']}", {row['storage_duration']}, "(hours of storage)",
-                    "{config.refs.get('storage').id}", "{utils.data_id(row['region'])}")""")
-    
-    
     ## time_periods
-    for vint in df_rtdv['vint'].unique():
-        curs.execute(f"""REPLACE INTO
-                    TimePeriod(period, flag)
-                    VALUES({vint}, 'e')""")
+    tp_rows = [TimePeriod(period=int(vint), flag='e') for vint in df_rtdv['vint'].unique()]
+    if tp_rows:
+        curs.executemany(*TimePeriod.bulk_insert_or_ignore_sql(tp_rows))
         
 
     conn.commit()
@@ -576,25 +593,26 @@ def aggregate_rt_all(region, tech, tech_config):
     # Add to specified sets
     if not pd.isna(tech_config['tech_sets']):
         for tech_set in tech_config['tech_sets'].split(','):
-            curs.execute(f"""UPDATE Technology SET {tech_set}=1 WHERE tech == '{tech}'""")
+            curs.execute(f"""UPDATE technology SET {tech_set}=1 WHERE tech == '{tech}'""")
 
 
     ## LifetimeTech
     if tech_config['no_retirement']:
-        curs.execute(f"""REPLACE INTO
-                    LifetimeTech(region, tech, lifetime, notes, data_id)
-                    VALUES("{region}", "{tech}", 100, "(y) no retirement", "{utils.data_id(region)}")""")
+        lt_row = LifetimeTech(region=region, tech=tech, lifetime=100, notes="(y) no retirement", data_id=utils.data_id(region))
     else:
-        curs.execute(f"""REPLACE INTO
-                    LifetimeTech(region, tech, lifetime, notes, data_source, dq_cred, data_id)
-                    VALUES("{region}", "{tech}", "{coders_gen['service_life']}", "(y) {tech_config['coders_equiv']} service life years",
-                    "{config.refs.get('generation_generic').id}", 2, "{utils.data_id(region)}")""")
-
+        lt_row = LifetimeTech(
+            region=region, tech=tech, lifetime=coders_gen['service_life'],
+            notes=f"(y) {tech_config['coders_equiv']} service life years",
+            data_source=config.refs.get('generation_generic').id, dq_cred=2,
+            data_id=utils.data_id(region),
+        )
+    curs.executemany(*LifetimeTech.bulk_insert_or_ignore_sql([lt_row]))
 
     ## CapacityToActivity
-    curs.execute(f"""REPLACE INTO
-                CapacityToActivity(region, tech, c2a, notes, data_id)
-                VALUES("{region}", "{tech}", "{config.params['c2a']}", "({config.params['c2a_unit']})", "{utils.data_id(region)}")""")
+    curs.executemany(*CapacityToActivity.bulk_insert_or_ignore_sql([CapacityToActivity(
+        region=region, tech=tech, c2a=config.params['c2a'],
+        notes=f"({config.params['c2a_unit']})", data_id=utils.data_id(region),
+    )]))
     
 
 
@@ -635,12 +653,9 @@ def aggregate_rt_atb(region, tech, tech_config):
 
                 note = f"({config.units.loc['ramp_rate', 'units']}) {tsv_note} ramp_rate_%_min times {config.units.loc['ramp_rate', 'coders_conv_fact']}"
 
-                curs.execute(f"""REPLACE INTO
-                            RampUpHourly(region, tech, rate, data_source, notes, data_id)
-                            VALUES("{region}", "{tech}", "{ramp_rate}", "{config.refs.get(tsv_note).id}", 1, "{note}", "{utils.data_id(region)}")""")
-                curs.execute(f"""REPLACE INTO
-                            RampDownHourly(region, tech, rate, data_source, notes, data_id)
-                            VALUES("{region}", "{tech}", "{ramp_rate}", "{config.refs.get(tsv_note).id}", 1, "{note}", "{utils.data_id(region)}")""")
+                _kwargs = dict(region=region, tech=tech, rate=ramp_rate, notes=note, data_source=config.refs.get(tsv_note).id, dq_cred=1, data_id=utils.data_id(region))
+                curs.executemany(*RampUpHourly.bulk_insert_or_ignore_sql([RampUpHourly(**_kwargs)]))
+                curs.executemany(*RampDownHourly.bulk_insert_or_ignore_sql([RampDownHourly(**_kwargs)]))
     
 
     ## CostInvest
@@ -659,10 +674,12 @@ def aggregate_rt_atb(region, tech, tech_config):
             cost_invest = conv_curr(float(cost_invest.iloc[0]), config.params['atb']['currency_year'], config.params['atb']['currency'])
             
             if cost_invest != 0 and not pd.isna(cost_invest):
-                curs.execute(f"""REPLACE INTO
-                            CostInvest(region, tech, vintage, cost, units, notes, data_source, dq_cred, data_id)
-                            VALUES("{region}", "{tech}", {vint}, {cost_invest}, "({config.units.loc['cost_invest', 'units']})",
-                            "{note}", "{config.refs.get('atb').id}", 1, "{utils.data_id(region)}")""")
+                curs.executemany(*CostInvest.bulk_insert_or_ignore_sql([CostInvest(
+                    region=region, tech=tech, vintage=vint, cost=cost_invest,
+                    units=f"({config.units.loc['cost_invest', 'units']})",
+                    notes=note, data_source=config.refs.get('atb').id, dq_cred=1,
+                    data_id=utils.data_id(region),
+                )]))
 
 
 
@@ -702,17 +719,19 @@ def aggregate_rtv_atb(region, tech, vint, tech_config):
         output_comm['commodity'] += f"_{tech_config.name}"
 
 
-    ## Efficiency    
+    ## Efficiency
     # Efficiency is arbitrary for ethos (e.g. renewables)
     if "ethos" in input_comm['commodity']:
 
         eff = 1
-        
-        curs.execute(f"""REPLACE INTO
-                    Efficiency(region, input_comm, tech, vintage, output_comm, efficiency, notes, data_id)
-                    VALUES("{region}", "{input_comm['commodity']}", "{tech}", {vint}, "{output_comm['commodity']}",
-                    1, "{eff_units} dummy input so arbitrary", "{data_id}")""")
-    
+
+        curs.executemany(*Efficiency.bulk_insert_or_ignore_sql([Efficiency(
+            region=region, input_comm=input_comm['commodity'],
+            tech=tech, vintage=vint, output_comm=output_comm['commodity'],
+            efficiency=1, notes=f"{eff_units} dummy input so arbitrary",
+            data_id=data_id,
+        )]))
+
     else:
         eff, note = utils.atb_data(tech_config, core_metric_parameter='Heat Rate', core_metric_variable=int(max(tech_config['atb_min_year'],utils.data_year(vint))))
 
@@ -721,11 +740,14 @@ def aggregate_rtv_atb(region, tech, vint, tech_config):
 
             # Heat rate to % efficiency
             eff = 1 / (config.units.loc['heat_rate', 'atb_conv_fact'] * float(eff.iloc[0]))
-            
-            curs.execute(f"""REPLACE INTO
-                    Efficiency(region, input_comm, tech, vintage, output_comm, efficiency, notes, data_source, dq_cred, data_id)
-                    VALUES("{region}", "{input_comm['commodity']}", "{tech}", {vint}, "{output_comm['commodity']}", {eff}, "{eff_units} {note}",
-                    "{config.refs.get('atb').id}", 1, "{data_id}")""")
+
+            curs.executemany(*Efficiency.bulk_insert_or_ignore_sql([Efficiency(
+                region=region, input_comm=input_comm['commodity'],
+                tech=tech, vintage=vint, output_comm=output_comm['commodity'],
+                efficiency=eff, notes=f"{eff_units} {note}",
+                data_source=config.refs.get('atb').id, dq_cred=1,
+                data_id=data_id,
+            )]))
 
 
     ## EmissionActivity
@@ -747,22 +769,24 @@ def aggregate_rtv_atb(region, tech, vint, tech_config):
                     emis_act = -emis_act * (tech_config['ccs']) / (1 - tech_config['ccs'])
 
                 if emis_act != 0 and not pd.isna(emis_act):
-                    curs.execute(
-                        f"""REPLACE INTO
-                        EmissionActivity(region, emis_comm, input_comm, tech, vintage, output_comm, activity, units, notes, data_source, dq_cred, data_id)
-                        VALUES("{region}", "{emis_comm['commodity']}", "{input_comm['commodity']}", "{tech}", {vint}, "{output_comm['commodity']}",
-                        {emis_act}, "{emis_units}", "{tsv_note} - emissions_{emis}_lbs_MMBtu", "{config.refs.get(tsv_note).id}", 1, "{data_id}")"""
-                    )
+                    curs.executemany(*EmissionActivity.bulk_insert_or_ignore_sql([EmissionActivity(
+                        region=region, emis_comm=emis_comm['commodity'], input_comm=input_comm['commodity'],
+                        tech=tech, vintage=vint, output_comm=output_comm['commodity'],
+                        activity=emis_act, units=emis_units,
+                        notes=f"{tsv_note} - emissions_{emis}_lbs_MMBtu",
+                        data_source=config.refs.get(tsv_note).id, dq_cred=1, data_id=data_id,
+                    )]))
                     # Duplicate co2 for co2e
                     if emis == 'co2':
                         emis_comm = config.commodities.loc['co2e']
                         emis_units = f"({emis_comm['units']}/{output_comm['units']})"
-                        curs.execute(
-                            f"""REPLACE INTO
-                            EmissionActivity(region, emis_comm, input_comm, tech, vintage, output_comm, activity, units, notes, data_source, dq_cred, data_id)
-                            VALUES("{region}", "{emis_comm['commodity']}", "{input_comm['commodity']}", "{tech}", {vint}, "{output_comm['commodity']}",
-                            {emis_act}, "{emis_units}", "{tsv_note} - emissions_{emis}_lbs_MMBtu", "{config.refs.get(tsv_note).id}", 1, "{data_id}")"""
-                        )
+                        curs.executemany(*EmissionActivity.bulk_insert_or_ignore_sql([EmissionActivity(
+                            region=region, emis_comm=emis_comm['commodity'], input_comm=input_comm['commodity'],
+                            tech=tech, vintage=vint, output_comm=output_comm['commodity'],
+                            activity=emis_act, units=emis_units,
+                            notes=f"{tsv_note} - emissions_{emis}_lbs_MMBtu",
+                            data_source=config.refs.get(tsv_note).id, dq_cred=1, data_id=data_id,
+                        )]))
 
 
     # Indexed by period and vintage
@@ -777,10 +801,12 @@ def aggregate_rtv_atb(region, tech, vint, tech_config):
         cost_fixed = conv_curr(cost_fixed, config.params['atb']['currency_year'], config.params['atb']['currency'])
 
         if cost_fixed != 0 and not pd.isna(cost_fixed):
-            curs.execute(f"""REPLACE INTO
-                        CostFixed(region, period, tech, vintage, cost, units, notes, data_source, dq_cred, data_id)
-                        VALUES("{region}", {period}, "{tech}", {vint}, {cost_fixed}, "({config.units.loc['cost_fixed', 'units']})",
-                        "{note}", "{config.refs.get('atb').id}", 1, "{utils.data_id(region)}")""")
+            curs.executemany(*CostFixed.bulk_insert_or_ignore_sql([CostFixed(
+                region=region, period=period, tech=tech, vintage=vint,
+                cost=cost_fixed, units=f"({config.units.loc['cost_fixed', 'units']})",
+                notes=note, data_source=config.refs.get('atb').id, dq_cred=1,
+                data_id=utils.data_id(region),
+            )]))
 
 
         ## CostVariable
@@ -804,10 +830,12 @@ def aggregate_rtv_atb(region, tech, vint, tech_config):
             cost_variable = conv_curr(cost_variable, config.params['atb']['currency_year'], config.params['atb']['currency'])
 
             if cost_variable != 0 and not pd.isna(cost_variable):
-                curs.execute(f"""REPLACE INTO
-                            CostVariable(region, period, tech, vintage, cost, units, notes, data_source, dq_cred, data_id)
-                            VALUES("{region}", {period}, "{tech}", {vint}, {cost_variable}, "({config.units.loc['cost_variable', 'units']})",
-                            "{note}", "{config.refs.get('atb').id}", 1, "{utils.data_id(region)}")""")
+                curs.executemany(*CostVariable.bulk_insert_or_ignore_sql([CostVariable(
+                    region=region, period=period, tech=tech, vintage=vint,
+                    cost=cost_variable, units=f"({config.units.loc['cost_variable', 'units']})",
+                    notes=note, data_source=config.refs.get('atb').id, dq_cred=1,
+                    data_id=utils.data_id(region),
+                )]))
 
 
 
@@ -833,10 +861,13 @@ def aggregate_rt_coders(region, tech, tech_config):
             cost = config.units.loc['cost_invest', 'coders_conv_fact'] * float(cost_invest[f"{utils.data_year(vint)}_CAD_per_kW"])
             cost = conv_curr(cost, config.params['coders']['currency_year'], config.params['coders']['currency'])
             # 'cost_invest_notes, data_cost_invest, data_cost_year, data_curr,' -> 'cost_invest_notes, data_cost_invest, data_cost_year, data_curr,'
-            curs.execute(f"""REPLACE INTO
-                        CostInvest(region, tech, vintage, cost, units, notes, data_source, dq_cred, data_id)
-                        VALUES("{region}", "{tech}", {vint}, {cost}, "({config.units.loc['cost_invest', 'units']})",
-                        "{tech_config['coders_equiv']} CAD_per_kW by vintage", "{config.refs.get('generation_cost_evolution').id}", 2, "{utils.data_id(region)}")""")
+            curs.executemany(*CostInvest.bulk_insert_or_ignore_sql([CostInvest(
+                region=region, tech=tech, vintage=vint, cost=cost,
+                units=f"({config.units.loc['cost_invest', 'units']})",
+                notes=f"{tech_config['coders_equiv']} CAD_per_kW by vintage",
+                data_source=config.refs.get('generation_cost_evolution').id, dq_cred=2,
+                data_id=utils.data_id(region),
+            )]))
 
 
 
@@ -853,12 +884,9 @@ def aggregate_ramp_rt_coders(region, tech, tech_config):
 
             note = f"({config.units.loc['ramp_rate', 'units']}) {tech_config['coders_equiv']} ramp_rate_percent_per_min times {config.units.loc['ramp_rate', 'coders_conv_fact']}"
 
-            curs.execute(f"""REPLACE INTO
-                        RampUpHourly(region, tech, rate, notes data_source, dq_cred, data_id)
-                        VALUES("{region}", "{tech}", "{ramp_rate}", "{note}", "{config.refs.get('generation_generic').id}", 2, "{utils.data_id(region)}")""")
-            curs.execute(f"""REPLACE INTO
-                        RampDownHourly(region, tech, rate, notes, data_source, dq_cred, data_id)
-                        VALUES("{region}", "{tech}", "{ramp_rate}", "{note}", "{config.refs.get('generation_generic').id}", 2, "{utils.data_id(region)}")""")
+            _kwargs = dict(region=region, tech=tech, rate=ramp_rate, notes=note, data_source=config.refs.get('generation_generic').id, dq_cred=2, data_id=utils.data_id(region))
+            curs.executemany(*RampUpHourly.bulk_insert_or_ignore_sql([RampUpHourly(**_kwargs)]))
+            curs.executemany(*RampDownHourly.bulk_insert_or_ignore_sql([RampDownHourly(**_kwargs)]))
 
 
 
@@ -890,18 +918,24 @@ def aggregate_rtv_coders(region, tech, vint, tech_config):
     # Efficiency is arbitrary for ethos (e.g. renewables)
     if "ethos" in input_comm['commodity']:
 
-        curs.execute(f"""REPLACE INTO
-                    Efficiency(region, input_comm, tech, vintage, output_comm, efficiency, notes, data_id)
-                    VALUES("{region}", "{input_comm['commodity']}", "{tech}", {vint}, "{output_comm['commodity']}",
-                    1, "{eff_units} dummy input so arbitrary", "{data_id}")""")
-    
+        curs.executemany(*Efficiency.bulk_insert_or_ignore_sql([Efficiency(
+            region=region, input_comm=input_comm['commodity'],
+            tech=tech, vintage=vint, output_comm=output_comm['commodity'],
+            efficiency=1, notes=f"{eff_units} dummy input so arbitrary",
+            data_id=data_id,
+        )]))
+
     # CODERS database provides an efficiency
     elif not pd.isna(coders_gen['efficiency']):
 
-        curs.execute(f"""REPLACE INTO
-                    Efficiency(region, input_comm, tech, vintage, output_comm, efficiency, notes, data_source, dq_cred, data_id)
-                    VALUES("{region}", "{input_comm['commodity']}", "{tech}", {vint}, "{output_comm['commodity']}", "{coders_gen['efficiency']}",
-                    "{eff_units} {tech_config['coders_equiv']} efficiency", "{config.refs.get('generation_generic').id}", 2, "{data_id}")""")
+        curs.executemany(*Efficiency.bulk_insert_or_ignore_sql([Efficiency(
+            region=region, input_comm=input_comm['commodity'],
+            tech=tech, vintage=vint, output_comm=output_comm['commodity'],
+            efficiency=coders_gen['efficiency'],
+            notes=f"{eff_units} {tech_config['coders_equiv']} efficiency",
+            data_source=config.refs.get('generation_generic').id, dq_cred=2,
+            data_id=data_id,
+        )]))
     
 
     ## EmissionActivity
@@ -920,11 +954,13 @@ def aggregate_rtv_coders(region, tech, vint, tech_config):
         cost_fixed = conv_curr(cost_fixed, config.params['coders']['currency_year'], config.params['coders']['currency'])
 
         if cost_fixed != 0 and not pd.isna(cost_fixed):
-            curs.execute(f"""REPLACE INTO
-                        CostFixed(region, period, tech, vintage, cost, units, notes, data_source, dq_cred, data_id)
-                        VALUES("{region}", {period}, "{tech}", {vint}, {cost_fixed}, "({config.units.loc['cost_fixed', 'units']})",
-                        "{tech_config['coders_equiv']} fixed_om_costs", "{config.refs.get('generation_cost_evolution').id}",
-                        2, "{utils.data_id(region)}")""")
+            curs.executemany(*CostFixed.bulk_insert_or_ignore_sql([CostFixed(
+                region=region, period=period, tech=tech, vintage=vint,
+                cost=cost_fixed, units=f"({config.units.loc['cost_fixed', 'units']})",
+                notes=f"{tech_config['coders_equiv']} fixed_om_costs",
+                data_source=config.refs.get('generation_cost_evolution').id, dq_cred=2,
+                data_id=utils.data_id(region),
+            )]))
         
         ## CostVariable
         aggregate_cost_var_rtvp_coders(region, tech, vint, period, coders_gen, tech_config)
@@ -942,10 +978,14 @@ def aggregate_emissions_rtv_coders(region, tech, vint, input_comm, output_comm, 
         emis_act = -emis_act * (tech_config['ccs']) / (1 - tech_config['ccs'])
 
     if emis_act != 0 and not pd.isna(emis_act):
-        curs.execute(f"""REPLACE INTO
-                    EmissionActivity(region, emis_comm, input_comm, tech, vintage, output_comm, activity, units, notes, data_source, dq_cred, data_id)
-                    VALUES("{region}", "{emis_comm['commodity']}", "{input_comm['commodity']}", "{tech}", {vint}, "{output_comm['commodity']}",
-                    {emis_act}, "{emis_units}", "{tech_config['coders_equiv']} carbon_emissions", "{config.refs.get('generation_generic').id}", 2, "{utils.data_id(region)}")""")
+        curs.executemany(*EmissionActivity.bulk_insert_or_ignore_sql([EmissionActivity(
+            region=region, emis_comm=emis_comm['commodity'], input_comm=input_comm['commodity'],
+            tech=tech, vintage=vint, output_comm=output_comm['commodity'],
+            activity=emis_act, units=emis_units,
+            notes=f"{tech_config['coders_equiv']} carbon_emissions",
+            data_source=config.refs.get('generation_generic').id, dq_cred=2,
+            data_id=utils.data_id(region),
+        )]))
 
 
 
@@ -966,10 +1006,12 @@ def aggregate_cost_var_rtvp_coders(region, tech, vint, period, coders_gen, tech_
 
         cost_variable = conv_curr(cost_variable, config.params['coders']['currency_year'], config.params['coders']['currency'])
 
-        curs.execute(f"""REPLACE INTO
-                    CostVariable(region, period, tech, vintage, cost, units, notes, data_source, dq_cred, data_id)
-                    VALUES("{region}", {period}, "{tech}", {vint}, {cost_variable}, "({config.units.loc['cost_variable', 'units']})",
-                    "{description}", "{config.refs.get('generation_generic').id}", 2, "{utils.data_id(region)}")""")
+        curs.executemany(*CostVariable.bulk_insert_or_ignore_sql([CostVariable(
+            region=region, period=period, tech=tech, vintage=vint,
+            cost=cost_variable, units=f"({config.units.loc['cost_variable', 'units']})",
+            notes=description, data_source=config.refs.get('generation_generic').id,
+            dq_cred=2, data_id=utils.data_id(region),
+        )]))
 
 
 
@@ -1052,22 +1094,25 @@ def aggregate_ccs_retrofits(df_rtv_all: pd.DataFrame):
         bypass_tech = f"{gen_config['base_tech']}_RFIT_BYPASS"
 
         ## Commodities
-        curs.execute(f"""REPLACE INTO
-                    Commodity(name, flag, description, data_id)
-                    VALUES('{input_comm['commodity']}', 'p',
-                    '({input_comm['units']}) intermediate commodity going either to {ccs_config['tech']} or straight to {output_comm['commodity']}', "{utils.data_id()}")""")
+        curs.executemany(*Commodity.bulk_insert_or_ignore_sql([Commodity(
+            name=input_comm['commodity'], flag='p',
+            description=f"({input_comm['units']}) intermediate commodity going either to {ccs_config['tech']} or straight to {output_comm['commodity']}",
+            data_id=utils.data_id(),
+        )]))
 
 
         ## Technologies
         # Bypass tech
-        curs.execute(f"""REPLACE INTO
-                    Technology(tech, flag, sector, unlim_cap, description, data_id)
-                    VALUES("{bypass_tech}", "p", "electricity", 1, "dummy bypass for ccs retrofit", "{utils.data_id()}")""")
-        
+        curs.executemany(*Technology.bulk_insert_or_ignore_sql([Technology(
+            tech=bypass_tech, flag='p', sector='electricity', unlim_cap=1,
+            description="dummy bypass for ccs retrofit", data_id=utils.data_id(),
+        )]))
+
         # Retrofit tech
-        curs.execute(f"""REPLACE INTO
-                    Technology(tech, flag, sector, description, data_id)
-                    VALUES("{ccs_config['tech']}", "p", "electricity", "{ccs_config['description']}", "{utils.data_id()}")""")
+        curs.executemany(*Technology.bulk_insert_or_ignore_sql([Technology(
+            tech=ccs_config['tech'], flag='p', sector='electricity',
+            description=ccs_config['description'], data_id=utils.data_id(),
+        )]))
 
 
         for region in config.model_regions:
@@ -1078,31 +1123,27 @@ def aggregate_ccs_retrofits(df_rtv_all: pd.DataFrame):
 
 
                 ## CapacityToActivity
-                # Bypass tech
-                curs.execute(f"""REPLACE INTO
-                            CapacityToActivity(region, tech, c2a, notes, data_id)
-                            VALUES("{region}", "{bypass_tech}", "{config.params['c2a']}", "({config.params['c2a_unit']})", "{utils.data_id(region)}")""")
-                
-                # Retrofit tech
-                curs.execute(f"""REPLACE INTO
-                            CapacityToActivity(region, tech, c2a, notes, data_id)
-                            VALUES("{region}", "{ccs_config['tech']}", "{config.params['c2a']}", "({config.params['c2a_unit']})", "{utils.data_id(region)}")""")
+                curs.executemany(*CapacityToActivity.bulk_insert_or_ignore_sql([
+                    CapacityToActivity(region=region, tech=bypass_tech, c2a=config.params['c2a'], notes=f"({config.params['c2a_unit']})", data_id=utils.data_id(region)),
+                    CapacityToActivity(region=region, tech=ccs_config['tech'], c2a=config.params['c2a'], notes=f"({config.params['c2a_unit']})", data_id=utils.data_id(region)),
+                ]))
                 
             
                 # Efficiency dummy retrofit bypass
-                curs.execute(f"""REPLACE INTO
-                            Efficiency(region, input_comm, tech, vintage, output_comm, efficiency, notes, data_id)
-                            VALUES("{region}", "{input_comm['commodity']}", "{bypass_tech}", {config.model_periods[0]}, "{output_comm['commodity']}", 1,
-                            "{eff_units} dummy bypass", "{utils.data_id(region)}")""")
+                curs.executemany(*Efficiency.bulk_insert_or_ignore_sql([Efficiency(
+                    region=region, input_comm=input_comm['commodity'],
+                    tech=bypass_tech, vintage=config.model_periods[0],
+                    output_comm=output_comm['commodity'], efficiency=1,
+                    notes=f"{eff_units} dummy bypass", data_id=utils.data_id(region),
+                )]))
                 
                 # Dummy processes have to retire when their generators reach end of life or they'll be orphaned
                 life = max(exs_vints + coders_gen['service_life']) - config.model_periods[0]
-                curs.execute(
-                    f"""REPLACE INTO
-                    LifetimeTech(region, tech, lifetime, notes, data_id)
-                    VALUES("{region}", "{bypass_tech}", {life},
-                    "(y) matched to end of life of retrofittable generators", "{utils.data_id(region)}")"""
-                )
+                curs.executemany(*LifetimeTech.bulk_insert_or_ignore_sql([LifetimeTech(
+                    region=region, tech=bypass_tech, lifetime=life,
+                    notes="(y) matched to end of life of retrofittable generators",
+                    data_id=utils.data_id(region),
+                )]))
                 
                 
                 # This is the vintage of the CCS retrofit, not the attached generator
@@ -1115,11 +1156,12 @@ def aggregate_ccs_retrofits(df_rtv_all: pd.DataFrame):
                     ## LifetimeTech
                     # To avoid network orphans, the CCS retrofits must die when their upstream generators do
                     life = min(coders_gen['service_life'], max(exs_vints + coders_gen['service_life']) - vint)
-                    curs.execute(f"""REPLACE INTO
-                                LifetimeProcess(region, tech, vintage, lifetime, notes, data_source, dq_cred, data_id)
-                                VALUES("{region}", "{ccs_config['tech']}", {vint}, {life},
-                                "(y) {gen_config['coders_equiv']} service life years - capped at end of life of retrofittable generators",
-                                "{config.refs.get('generation_generic').id}", 2, "{utils.data_id(region)}")""")
+                    curs.executemany(*LifetimeProcess.bulk_insert_or_ignore_sql([LifetimeProcess(
+                        region=region, tech=ccs_config['tech'], vintage=vint, lifetime=life,
+                        notes=f"(y) {gen_config['coders_equiv']} service life years - capped at end of life of retrofittable generators",
+                        data_source=config.refs.get('generation_generic').id, dq_cred=2,
+                        data_id=utils.data_id(region),
+                    )]))
 
 
                     ## Efficiency
@@ -1127,10 +1169,14 @@ def aggregate_ccs_retrofits(df_rtv_all: pd.DataFrame):
 
                     # Penalty to efficiency
                     eff = 1 + float(penalty.iloc[0])
-                    curs.execute(f"""REPLACE INTO
-                                Efficiency(region, input_comm, tech, vintage, output_comm, efficiency, notes, data_source, dq_cred, data_id)
-                                VALUES("{region}", "{input_comm['commodity']}", "{ccs_config['tech']}", {vint}, "{output_comm['commodity']}",
-                                "{eff}", "{eff_units} {note}", "{config.refs.get('atb').id}", 1, "{utils.data_id(region)}")""")
+                    curs.executemany(*Efficiency.bulk_insert_or_ignore_sql([Efficiency(
+                        region=region, input_comm=input_comm['commodity'],
+                        tech=ccs_config['tech'], vintage=vint,
+                        output_comm=output_comm['commodity'], efficiency=eff,
+                        notes=f"{eff_units} {note}",
+                        data_source=config.refs.get('atb').id, dq_cred=1,
+                        data_id=utils.data_id(region),
+                    )]))
                     
 
                     ## EmissionActivity
@@ -1139,20 +1185,18 @@ def aggregate_ccs_retrofits(df_rtv_all: pd.DataFrame):
                     # Add as both negative CO2 and negative that same number CO2e (1:1)
                     # CANOE currently tracks both separate GHGs and an aggregate CO2e (double counting)
                     for e in ('co2', 'co2e'):
-                        
                         emis_comm = config.commodities.loc[e]
                         units = f"({emis_comm['units']}/{output_comm['units']})"
-
-                        curs.execute(f"""REPLACE INTO
-                                    EmissionActivity(region, emis_comm, input_comm, tech, vintage, output_comm, activity, units, notes, data_source, dq_cred, data_id)
-                                    VALUES("{region}", "{emis_comm['commodity']}", "{input_comm['commodity']}", "{ccs_config['tech']}", {vint}, "{output_comm['commodity']}",
-                                    {emis_act}, "{units}", "Minus capture rate times {gen_config.name} co2 emissions divided by {ccs_code} efficiency",
-                                    "{config.refs.get('atb').id}", 1, "{utils.data_id(region)}")""")
-                        curs.execute(f"""REPLACE INTO
-                                    EmissionActivity(region, emis_comm, input_comm, tech, vintage, output_comm, activity, units, notes, data_source, dq_cred, data_id)
-                                    VALUES("{region}", "{emis_comm['commodity']}", "{input_comm['commodity']}", "{ccs_config['tech']}", {vint}, "{output_comm['commodity']}",
-                                    {emis_act}, "{units}", "Minus capture rate times {gen_config.name} co2 emissions divided by {ccs_code} efficiency",
-                                    "{config.refs.get('atb').id}", 1, "{utils.data_id(region)}")""")
+                        curs.executemany(*EmissionActivity.bulk_insert_or_ignore_sql([EmissionActivity(
+                            region=region, emis_comm=emis_comm['commodity'],
+                            input_comm=input_comm['commodity'],
+                            tech=ccs_config['tech'], vintage=vint,
+                            output_comm=output_comm['commodity'],
+                            activity=emis_act, units=units,
+                            notes=f"Minus capture rate times {gen_config.name} co2 emissions divided by {ccs_code} efficiency",
+                            data_source=config.refs.get('atb').id, dq_cred=1,
+                            data_id=utils.data_id(region),
+                        )]))
                     
 
                     ## CostInvest
@@ -1162,10 +1206,12 @@ def aggregate_ccs_retrofits(df_rtv_all: pd.DataFrame):
                     cost_invest = conv_curr(cost_invest, config.params['atb']['currency_year'], config.params['atb']['currency'])
 
                     if cost_invest != 0 and not pd.isna(cost_invest):
-                        curs.execute(f"""REPLACE INTO
-                                    CostInvest(region, tech, vintage, cost, units, notes, data_source, dq_cred, data_id)
-                                    VALUES("{region}", "{ccs_config['tech']}", {vint}, {cost_invest}, "({config.units.loc['cost_invest', 'units']})",
-                                    "{note}", "{config.refs.get('atb').id}", 1, "{utils.data_id(region)}")""")
+                        curs.executemany(*CostInvest.bulk_insert_or_ignore_sql([CostInvest(
+                            region=region, tech=ccs_config['tech'], vintage=vint,
+                            cost=cost_invest, units=f"({config.units.loc['cost_invest', 'units']})",
+                            notes=note, data_source=config.refs.get('atb').id, dq_cred=1,
+                            data_id=utils.data_id(region),
+                        )]))
                     
 
                     # Add CCS retrofit options for all future model periods
@@ -1177,14 +1223,12 @@ def aggregate_ccs_retrofits(df_rtv_all: pd.DataFrame):
                         ## MaxActivity
                         # This period is beyond end-of-life of all retrofittable generators
                         if period >= max(exs_vints + coders_gen['service_life']):
-                            curs.execute(f"""REPLACE INTO
-                                        LimitActivity(region, period, tech_or_group, operator, activity, units, notes, data_id)
-                                        VALUES("{region}", {period}, "{ccs_config['tech']}", "le", 0, "({output_comm['units']})",
-                                        "beyond end-of-life of all retrofittable generators", "{utils.data_id(region)}")""")
-                            curs.execute(f"""REPLACE INTO
-                                        LimitActivity(region, period, tech_or_group, operator, activity, units, notes, data_id)
-                                        VALUES("{region}", {period}, "{bypass_tech}", "le", 0, "({output_comm['units']})",
-                                        "beyond end-of-life of all retrofittable generators", "{utils.data_id(region)}")""")
+                            _la_note = "beyond end-of-life of all retrofittable generators"
+                            _la_units = f"({output_comm['units']})"
+                            curs.executemany(*LimitActivity.bulk_insert_or_ignore_sql([
+                                LimitActivity(region=region, period=period, tech_or_group=ccs_config['tech'], operator='le', activity=0, units=_la_units, notes=_la_note, data_id=utils.data_id(region)),
+                                LimitActivity(region=region, period=period, tech_or_group=bypass_tech, operator='le', activity=0, units=_la_units, notes=_la_note, data_id=utils.data_id(region)),
+                            ]))
 
 
                         ## CostFixed
@@ -1193,10 +1237,12 @@ def aggregate_ccs_retrofits(df_rtv_all: pd.DataFrame):
                         cost_fixed = conv_curr(cost_fixed, config.params['atb']['currency_year'], config.params['atb']['currency'])
 
                         if cost_fixed != 0 and not pd.isna(cost_fixed):
-                            curs.execute(f"""REPLACE INTO
-                                        CostFixed(region, period, tech, vintage, cost, units, notes, data_source, dq_cred, data_id)
-                                        VALUES("{region}", {period}, "{ccs_config['tech']}", {vint}, {cost_fixed}, "({config.units.loc['cost_fixed', 'units']})",
-                                        "{note}", "{config.refs.get('atb').id}", 1, "{utils.data_id(region)}")""")
+                            curs.executemany(*CostFixed.bulk_insert_or_ignore_sql([CostFixed(
+                                region=region, period=period, tech=ccs_config['tech'], vintage=vint,
+                                cost=cost_fixed, units=f"({config.units.loc['cost_fixed', 'units']})",
+                                notes=note, data_source=config.refs.get('atb').id, dq_cred=1,
+                                data_id=utils.data_id(region),
+                            )]))
 
 
                         ## CostVariable
@@ -1205,10 +1251,12 @@ def aggregate_ccs_retrofits(df_rtv_all: pd.DataFrame):
                         cost_variable = conv_curr(cost_variable, config.params['atb']['currency_year'], config.params['atb']['currency'])
 
                         if cost_variable != 0 and not pd.isna(cost_variable):
-                            curs.execute(f"""REPLACE INTO
-                                        CostVariable(region, period, tech, vintage, cost, units, notes, data_source, dq_cred, data_id)
-                                        VALUES("{region}", {period}, "{ccs_config['tech']}", {vint}, {cost_variable}, "({config.units.loc['cost_variable', 'units']})",
-                                        "{note}", "{config.refs.get('atb').id}", 1, "{utils.data_id(region)}")""")
+                            curs.executemany(*CostVariable.bulk_insert_or_ignore_sql([CostVariable(
+                                region=region, period=period, tech=ccs_config['tech'], vintage=vint,
+                                cost=cost_variable, units=f"({config.units.loc['cost_variable', 'units']})",
+                                notes=note, data_source=config.refs.get('atb').id, dq_cred=1,
+                                data_id=utils.data_id(region),
+                            )]))
 
     conn.commit()
     conn.close()
@@ -1250,9 +1298,9 @@ def setup_monthly_hydro(df_rtv: pd.DataFrame):
         ## ExistingCapacity
         curs.execute(
             "REPLACE INTO "
-            "ExistingCapacity(region, tech, vintage, capacity, units, notes, data_source, dq_cred, data_id) " 
+            "existing_capacity(region, tech, vintage, capacity, units, notes, data_source, dq_cred, data_id) "
             f"SELECT region, '{in_tech}' as tech, vintage, capacity, units, notes, data_source, dq_cred, data_id "
-            "FROM ExistingCapacity "
+            "FROM existing_capacity "
             f"WHERE tech == '{base_tech}' "
         )
 
@@ -1260,13 +1308,13 @@ def setup_monthly_hydro(df_rtv: pd.DataFrame):
         note = f"({out_comm['units']}/{storage_comm['units']}) storage units are available generation"
         curs.execute(
             "REPLACE INTO "
-            "Efficiency(region, input_comm, tech, vintage, output_comm, efficiency, notes, data_source, dq_cred, data_id) " 
+            "efficiency(region, input_comm, tech, vintage, output_comm, efficiency, notes, data_source, dq_cred, data_id) "
             f"SELECT region, input_comm, '{in_tech}' as tech, vintage, '{storage_comm['commodity']}' as output_comm, efficiency, '{note}' as notes, data_source, dq_cred, data_id "
-            "FROM Efficiency "
+            "FROM efficiency "
             f"WHERE tech == '{base_tech}' "
         )
         curs.execute(
-            "UPDATE Efficiency "
+            "UPDATE efficiency "
             f"SET input_comm = '{storage_comm['commodity']}', "
             f"notes = '{note}' "
             f"WHERE tech == '{base_tech}'"
@@ -1276,13 +1324,13 @@ def setup_monthly_hydro(df_rtv: pd.DataFrame):
         desc = 'inflow to reservoir for monthly hydroelectric generation'
         curs.execute(
             "REPLACE INTO "
-            "Technology(tech, flag, sector, description, data_id) " 
+            "technology(tech, flag, sector, description, data_id) "
             f"SELECT '{in_tech}' as tech, 'pb' as flag, sector, '{desc}' as description, data_id "
-            "FROM Technology "
+            "FROM technology "
             f"WHERE tech == '{base_tech}' "
         )
         curs.execute(
-            "UPDATE Technology "
+            "UPDATE technology "
             f"SET "
             "flag = 'ps', "
             "seas_stor = 1 "
@@ -1292,23 +1340,25 @@ def setup_monthly_hydro(df_rtv: pd.DataFrame):
         ## CapacityToActivity
         curs.execute(
             "REPLACE INTO "
-            "CapacityToActivity(region, tech, c2a, notes, data_id) " 
+            "capacity_to_activity(region, tech, c2a, notes, data_id) "
             f"SELECT region, '{in_tech}' as tech, c2a, notes, data_id "
-            "FROM CapacityToActivity "
+            "FROM capacity_to_activity "
             f"WHERE tech == '{base_tech}' "
         )
 
         ## LimitSeasonalCapacityFactor
-        curs.execute(f"UPDATE LimitSeasonalCapacityFactor SET tech = '{in_tech}' WHERE tech == '{base_tech}'")
+        curs.execute(f"UPDATE limit_seasonal_capacity_factor SET tech_or_group = '{in_tech}' WHERE tech_or_group == '{base_tech}'")
         
         ## StorageDuration
-        for region in df_rtv.loc[df_rtv['tech'] == base_tech]['region'].unique():
-            curs.execute(
-                f"""REPLACE INTO
-                StorageDuration(region, tech, duration, notes, data_id)
-                VALUES("{region}", "{base_tech}", 730,
-                "(hours of storage) one month", "{utils.data_id(region)}")"""
+        sd_rows = [
+            StorageDuration(
+                region=region, tech=base_tech, duration=730,
+                notes="(hours of storage) one month", data_id=utils.data_id(region),
             )
+            for region in df_rtv.loc[df_rtv['tech'] == base_tech]['region'].unique()
+        ]
+        if sd_rows:
+            curs.executemany(*StorageDuration.bulk_insert_or_ignore_sql(sd_rows))
 
     conn.commit()
     conn.close()

@@ -10,6 +10,9 @@ import os
 from matplotlib import pyplot as pp
 import pandas as pd
 import canoe_electricity.utils as utils
+from canoe_schema.v4_0.models import (
+    PlanningReserveMargin, Technology, Efficiency, DemandSpecificDistribution, Demand
+)
 
 from provincial_data.default import cost_tx_dx
 
@@ -50,21 +53,19 @@ def aggregate_reserve_margin():
     conn = sqlite3.connect(config.database_file)
     curs = conn.cursor()
 
-
-    """
-    ##############################################################
-        Planning reserve margin
-    ##############################################################
-    """
-
-    for region, row in df_sys.iterrows():
-
-        ## PlanningReserveMargin
-        reserve_margin = row['reserve_requirements_percent']
-        ref = config.refs.get('ca_system_parameters')
-        curs.execute(f"""REPLACE INTO
-                    PlanningReserveMargin(region, margin, notes, data_source, dq_cred, data_id)
-                    VALUES("{region}", "{reserve_margin}", "CODERS - ca_system_parameters - reserve_requirements_percent", "{ref.id}", 2, "{utils.data_id(region)}")""")
+    rows = [
+        PlanningReserveMargin(
+            region=region,
+            margin=row['reserve_requirements_percent'],
+            notes="CODERS - ca_system_parameters - reserve_requirements_percent",
+            data_source=config.refs.get('ca_system_parameters').id,
+            dq_cred=2,
+            data_id=utils.data_id(region),
+        )
+        for region, row in df_sys.iterrows()
+    ]
+    if rows:
+        curs.executemany(*PlanningReserveMargin.bulk_insert_or_ignore_sql(rows))
 
     print(f"Planning reserve margin aggregated into {os.path.basename(config.database_file)}\n")
 
@@ -79,7 +80,6 @@ def aggregate_transmission():
     conn = sqlite3.connect(config.database_file)
     curs = conn.cursor()
 
-
     """
     ##############################################################
         Transmission techs
@@ -87,15 +87,18 @@ def aggregate_transmission():
     """
 
     # Transmission techs ELC_TX <--> ELC_DX --> D_ELC
-    for code in ['tx_to_dx', 'dx_to_dem']:
-
-        tech_config = config.trans_techs.loc[code]
-
-        ## Technology
-        curs.execute(f"""REPLACE INTO
-                    Technology(tech, flag, sector, unlim_cap, description, data_id)
-                    VALUES("{tech_config['tech']}", "p", "electricity", 1, "{tech_config['description']}", "{utils.data_id()}")""")
-        
+    tech_rows = [
+        Technology(
+            tech=config.trans_techs.loc[code, 'tech'],
+            flag='p',
+            sector='electricity',
+            unlim_cap=1,
+            description=config.trans_techs.loc[code, 'description'],
+            data_id=utils.data_id(),
+        )
+        for code in ['tx_to_dx', 'dx_to_dem']
+    ]
+    curs.executemany(*Technology.bulk_insert_or_ignore_sql(tech_rows))
 
     ## CostVariable
     for region, row in df_sys.iterrows():
@@ -103,34 +106,48 @@ def aggregate_transmission():
             cost_tx_dx.aggregate(region, period, config.trans_techs.loc['tx_to_dx']['tech'], config.model_periods[0], curs, utils.data_id(region), 'tx')
             cost_tx_dx.aggregate(region, period, config.trans_techs.loc['dx_to_dem']['tech'], config.model_periods[0], curs, utils.data_id(region), 'dx')
 
-
     ## Efficiency
+    eff_rows = []
+
     # TX to DX includes line loss
     for region, row in df_sys.iterrows():
-        
-        tech_config = config.trans_techs.loc['tx_to_dx']
 
+        tech_config = config.trans_techs.loc['tx_to_dx']
         input_comm = config.commodities.loc[tech_config['in_comm']]
         output_comm = config.commodities.loc[tech_config['out_comm']]
-
         note = f"({output_comm['units']}/{input_comm['units']}) coders {region} system_line_losses_percent"
-        curs.execute(f"""REPLACE INTO
-                    Efficiency(region, input_comm, tech, vintage, output_comm, efficiency, notes, data_source, data_id)
-                    VALUES("{region}", "{input_comm['commodity']}", "{tech_config['tech']}", {config.model_periods[0]}, "{output_comm['commodity']}",
-                    {1.0 - float(row["system_line_losses_percent"])}, "{note}", "{config.refs.get('ca_system_parameters').id}", "{utils.data_id(region)}")""")
-    
+
+        eff_rows.append(Efficiency(
+            region=region,
+            input_comm=input_comm['commodity'],
+            tech=tech_config['tech'],
+            vintage=config.model_periods[0],
+            output_comm=output_comm['commodity'],
+            efficiency=1.0 - float(row["system_line_losses_percent"]),
+            notes=note,
+            data_source=config.refs.get('ca_system_parameters').id,
+            data_id=utils.data_id(region),
+        ))
+
     # DX to DEM just a dummy for distribution costs
     for region in config.model_regions:
-        
-        tech_config = config.trans_techs.loc['dx_to_dem']
 
+        tech_config = config.trans_techs.loc['dx_to_dem']
         input_comm = config.commodities.loc[tech_config['in_comm']]
         output_comm = config.commodities.loc[tech_config['out_comm']]
 
-        curs.execute(f"""REPLACE INTO
-                    Efficiency(region, input_comm, tech, vintage, output_comm, efficiency, notes, data_id)
-                    VALUES("{region}", "{input_comm['commodity']}", "{tech_config['tech']}", {config.model_periods[0]}, "{output_comm['commodity']}",
-                    1, "dummy tech for distribution costs", "{utils.data_id(region)}")""")
+        eff_rows.append(Efficiency(
+            region=region,
+            input_comm=input_comm['commodity'],
+            tech=tech_config['tech'],
+            vintage=config.model_periods[0],
+            output_comm=output_comm['commodity'],
+            efficiency=1,
+            notes="dummy tech for distribution costs",
+            data_id=utils.data_id(region),
+        ))
+
+    curs.executemany(*Efficiency.bulk_insert_or_ignore_sql(eff_rows))
 
     print(f"Transmission aggregated into {os.path.basename(config.database_file)}\n")
 
@@ -203,21 +220,34 @@ def aggregate_demand():
 
 
         ## Technology
-        curs.execute(f"""REPLACE INTO
-                    Technology(tech, flag, sector, unlim_cap, annual, description, data_id)
-                    VALUES("{tech_config['tech']}", "p", "electricity", 1, 1, "{tech_config['description']}", "{utils.data_id()}")""")
-
+        tech_row = Technology(
+            tech=tech_config['tech'],
+            flag='p',
+            sector='electricity',
+            unlim_cap=1,
+            annual=1,
+            description=tech_config['description'],
+            data_id=utils.data_id(),
+        )
+        curs.executemany(*Technology.bulk_insert_or_ignore_sql([tech_row]))
 
         ## Efficiency
-        curs.execute(f"""REPLACE INTO
-                    Efficiency(region, input_comm, tech, vintage, output_comm, efficiency, notes, data_id)
-                    VALUES("{region}", "{input_comm['commodity']}", "{tech_config['tech']}",
-                    {config.model_periods[0]}, "{output_comm['commodity']}", 1, "dummy tech", "{data_id}")""")
+        eff_row = Efficiency(
+            region=region,
+            input_comm=input_comm['commodity'],
+            tech=tech_config['tech'],
+            vintage=config.model_periods[0],
+            output_comm=output_comm['commodity'],
+            efficiency=1,
+            notes="dummy tech",
+            data_id=data_id,
+        )
+        curs.executemany(*Efficiency.bulk_insert_or_ignore_sql([eff_row]))
 
 
         # If not including demand, don't go any further
         if not config.params['include_provincial_demand'] or not config.regions.loc[region, 'include_demand']: continue
-        
+
 
         # Apply tolerance and normalise
         hourly_dem[hourly_dem < hourly_dem.mean() * config.params['dsd_tolerance']] = 0
@@ -232,21 +262,39 @@ def aggregate_demand():
 
 
         ## DemandSpecificDistribution
-        note = f"{weather_year} hourly demand divided by sum of hourly demand for that year"
+        dsd_note = f"{weather_year} hourly demand divided by sum of hourly demand for that year"
 
-        data = []
+        dsd_rows = []
         for period in config.model_periods:
             for h, time in config.time.iterrows():
 
                 if time['tod'] == config.time.iloc[0]['tod']:
-                    data.append([region, period, time['season'], time['tod'], dem_comm['commodity'], dsd[h], note, ref.id, 2, data_id])
+                    dsd_rows.append(DemandSpecificDistribution(
+                        region=region,
+                        period=period,
+                        season=time['season'],
+                        tod=time['tod'],
+                        demand_name=dem_comm['commodity'],
+                        dsd=dsd[h],
+                        notes=dsd_note,
+                        data_source=ref.id,
+                        dq_cred=2,
+                        data_id=data_id,
+                    ))
                 else:
-                    data.append([region, period, time['season'], time['tod'], dem_comm['commodity'], dsd[h], None, None, None, data_id])
+                    dsd_rows.append(DemandSpecificDistribution(
+                        region=region,
+                        period=period,
+                        season=time['season'],
+                        tod=time['tod'],
+                        demand_name=dem_comm['commodity'],
+                        dsd=dsd[h],
+                        data_id=data_id,
+                    ))
 
-        curs.executemany(f"""REPLACE INTO
-                    DemandSpecificDistribution(region, period, season, tod, demand_name, dsd, notes, data_source, dq_cred, data_id)
-                    VALUES(?,?,?,?,?,?,?,?,?,?)""", data)
-        
+        if dsd_rows:
+            curs.executemany(*DemandSpecificDistribution.bulk_insert_or_ignore_sql(dsd_rows))
+
 
         """
         ##############################################################
@@ -255,18 +303,28 @@ def aggregate_demand():
         """
 
         ## Demand
+        demand_rows = []
         for period in config.model_periods:
-            
+
             demand_year = str(utils.data_year(period))
             ann_dem = config.units.loc['demand', 'coders_conv_fact'] * df_annual.loc[region, demand_year]
 
-            curs.execute(f"""REPLACE INTO
-                        Demand(region, period, commodity, demand, units, notes, data_source, dq_cred, data_id)
-                        VALUES("{region}", {period}, "{dem_comm['commodity']}", {ann_dem}, "({dem_comm['units']})",
-                        "provincial electricity demand projection {df_annual.loc[region, 'province']} {demand_year}",
-                        "{config.refs.get("forecasted_annual_demand").id}", 2, "{data_id}")""")
-            
-    
+            demand_rows.append(Demand(
+                region=region,
+                period=period,
+                commodity=dem_comm['commodity'],
+                demand=ann_dem,
+                units=f"({dem_comm['units']})",
+                notes=f"provincial electricity demand projection {df_annual.loc[region, 'province']} {demand_year}",
+                data_source=config.refs.get("forecasted_annual_demand").id,
+                dq_cred=2,
+                data_id=data_id,
+            ))
+
+        if demand_rows:
+            curs.executemany(*Demand.bulk_insert_or_ignore_sql(demand_rows))
+
+
     conn.commit()
     conn.close()
 

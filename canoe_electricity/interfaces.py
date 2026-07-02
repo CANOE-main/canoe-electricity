@@ -12,6 +12,10 @@ from matplotlib import pyplot as pp
 from canoe_electricity.setup import config
 import canoe_electricity.utils as utils
 from provincial_data.default import cost_tx_dx
+from canoe_schema.v4_0.models import (
+    Technology, Efficiency, CapacityToActivity, Commodity, Demand,
+    DemandSpecificDistribution, ExistingCapacity, CapacityFactorTech,
+)
 
 # Globalise so we only have one connection
 conn: sqlite3.Connection
@@ -191,64 +195,71 @@ def aggregate_boundary_interface(in_region: str, out_region: str, interface: pd.
 
 
         ## Technology
-        curs.execute(f"""REPLACE INTO
-                    Technology(tech, flag, sector, unlim_cap, annual, description, data_id)
-                    VALUES("{tech}", "p", "electricity", 1, 1, "{desc}", "{data_id}")""")
-
+        curs.executemany(*Technology.bulk_insert_or_ignore_sql([Technology(
+            tech=tech, flag='p', sector='electricity', unlim_cap=1, annual=1,
+            description=desc, data_id=data_id,
+        )]))
 
         ## Efficiency
         eff = 1.0 - float(df_sys.loc[in_region, 'system_line_losses_percent'])
         note = f"({dem_comm['units']}/{input_comm['units']}) {in_region} system_line_losses_percent"
-
-        curs.execute(f"""REPLACE INTO
-                    Efficiency(region, input_comm, tech, vintage, output_comm, efficiency, notes, data_source, dq_cred, data_id)
-                    VALUES("{in_region}", "{input_comm['commodity']}", "{tech}", {vint},"{dem_comm['commodity']}",
-                    {eff}, "{note}", "{config.refs.get('ca_system_parameters').id}", 2, "{data_id}")""")
-        
+        curs.executemany(*Efficiency.bulk_insert_or_ignore_sql([Efficiency(
+            region=in_region, input_comm=input_comm['commodity'],
+            tech=tech, vintage=vint, output_comm=dem_comm['commodity'],
+            efficiency=eff, notes=note,
+            data_source=config.refs.get('ca_system_parameters').id, dq_cred=2,
+            data_id=data_id,
+        )]))
 
         ## CapacityToActivity
-        curs.execute(f"""REPLACE INTO
-                    CapacityToActivity(region, tech, c2a, notes, data_id)
-                    VALUES("{in_region}", "{tech}", "{config.params['c2a']}", "({config.params['c2a_unit']})", "{data_id}")""")
-        
+        curs.executemany(*CapacityToActivity.bulk_insert_or_ignore_sql([CapacityToActivity(
+            region=in_region, tech=tech, c2a=config.params['c2a'],
+            notes=f"({config.params['c2a_unit']})", data_id=data_id,
+        )]))
+
         ## Commodity
-        curs.execute(
-            f"""REPLACE INTO
-            Commodity(name, flag, description, data_id)
-            VALUES("{dem_comm['commodity']}", "d", "{dem_comm['description']}", "{data_id}")"""
-        )
+        curs.executemany(*Commodity.bulk_insert_or_ignore_sql([Commodity(
+            name=dem_comm['commodity'], flag='d',
+            description=dem_comm['description'], data_id=data_id,
+        )]))
 
+        demand_rows = []
         for period in config.model_periods:
-
-            ## Demand
-            curs.execute(f"""REPLACE INTO
-                        Demand(region, period, commodity, demand, units, notes, data_source, dq_cred, data_id)
-                        VALUES("{in_region}", {period}, "{dem_comm['commodity']}", {ann_dem}, "({dem_comm['units']})",
-                        "sum of {weather_year} hourly flows leaving the model boundary from {in_region} along all interties - {intertie_names}",
-                        "{config.refs.get("transfers").id}", 2, "{data_id}")""")
-            
+            demand_rows.append(Demand(
+                region=in_region, period=period,
+                commodity=dem_comm['commodity'], demand=ann_dem,
+                units=f"({dem_comm['units']})",
+                notes=f"sum of {weather_year} hourly flows leaving the model boundary from {in_region} along all interties - {intertie_names}",
+                data_source=config.refs.get("transfers").id, dq_cred=2, data_id=data_id,
+            ))
             ## CostVariable
             cost_tx_dx.aggregate(in_region, period, tech, vint, curs, data_id, 'tx')
-        
+        if demand_rows:
+            curs.executemany(*Demand.bulk_insert_or_ignore_sql(demand_rows))
 
         ## DemandSpecificDistribution
         note = f"{weather_year} hourly flow divided by total annual flow leaving model boundary from {in_region}"
         ref = config.refs.get("transfers")
 
-        data = []
+        dsd_rows = []
         for period in config.model_periods:
             for h, time in config.time.iterrows():
-
                 dsd = out_mwh[h] * config.units.loc['activity', 'coders_conv_fact'] / ann_dem
-
                 if time['tod'] == config.time.iloc[0]['tod']:
-                    data.append([in_region, period, time['season'], time['tod'], dem_comm['commodity'], dsd, note, ref.id, 2, data_id])
+                    dsd_rows.append(DemandSpecificDistribution(
+                        region=in_region, period=period,
+                        season=time['season'], tod=time['tod'],
+                        demand_name=dem_comm['commodity'], dsd=dsd,
+                        notes=note, data_source=ref.id, dq_cred=2, data_id=data_id,
+                    ))
                 else:
-                    data.append([in_region, period, time['season'], time['tod'], dem_comm['commodity'], dsd, None, None, None, data_id])
-
-        curs.executemany(f"""REPLACE INTO
-                    DemandSpecificDistribution(region, period, season, tod, demand_name, dsd, notes, data_source, dq_cred, data_id)
-                    VALUES(?,?,?,?,?,?,?,?,?,?)""", data)
+                    dsd_rows.append(DemandSpecificDistribution(
+                        region=in_region, period=period,
+                        season=time['season'], tod=time['tod'],
+                        demand_name=dem_comm['commodity'], dsd=dsd, data_id=data_id,
+                    ))
+        if dsd_rows:
+            curs.executemany(*DemandSpecificDistribution.bulk_insert_or_ignore_sql(dsd_rows))
     
     else:
         print(f"Got zero flow for boundary intertie from {in_region} out to {out_region}. Skipped outgoing intertie.")
@@ -271,53 +282,54 @@ def aggregate_boundary_interface(in_region: str, out_region: str, interface: pd.
 
 
         ## Technology
-        curs.execute(f"""REPLACE INTO
-                    Technology(tech, flag, sector, curtail, description, data_id)
-                    VALUES("{tech}", "p", "electricity", 1, "{desc}", "{data_id}")""")
-
+        curs.executemany(*Technology.bulk_insert_or_ignore_sql([Technology(
+            tech=tech, flag='p', sector='electricity', curtail=1,
+            description=desc, data_id=data_id,
+        )]))
 
         ## ExistingCapacity
         capacity = max(in_mwh) * config.units.loc['intertie_capacity', 'coders_conv_fact'] # MWh/h to GW
-
-        curs.execute(f"""REPLACE INTO
-                    ExistingCapacity(region, tech, vintage, capacity, units, notes, data_source, dq_cred, data_id)
-                    VALUES("{in_region}", "{tech}", {vint}, "{capacity}", "({config.units.loc['capacity', 'units']})",
-                    "max {weather_year} hourly flow entering {in_region} once summed along all interties - {intertie_names}",
-                    "{config.refs.get("transfers").id}", 2, "{data_id}")""")
-        
+        curs.executemany(*ExistingCapacity.bulk_insert_or_ignore_sql([ExistingCapacity(
+            region=in_region, tech=tech, vintage=vint, capacity=capacity,
+            units=f"({config.units.loc['capacity', 'units']})",
+            notes=f"max {weather_year} hourly flow entering {in_region} once summed along all interties - {intertie_names}",
+            data_source=config.refs.get("transfers").id, dq_cred=2, data_id=data_id,
+        )]))
 
         ## Efficiency
-        curs.execute(f"""REPLACE INTO
-                    Efficiency(region, input_comm, tech, vintage, output_comm, efficiency, notes, data_id)
-                    VALUES("{in_region}", "{input_comm['commodity']}", "{tech}", {vint}, "{output_comm['commodity']}",
-                    1, "dummy input so arbitrary", "{data_id}")""")
-        
+        curs.executemany(*Efficiency.bulk_insert_or_ignore_sql([Efficiency(
+            region=in_region, input_comm=input_comm['commodity'],
+            tech=tech, vintage=vint, output_comm=output_comm['commodity'],
+            efficiency=1, notes="dummy input so arbitrary", data_id=data_id,
+        )]))
 
         ## CapacityToActivity
-        curs.execute(f"""REPLACE INTO
-                    CapacityToActivity(region, tech, c2a, notes, data_id)
-                    VALUES("{in_region}", "{tech}", "{config.params['c2a']}", "({config.params['c2a_unit']})", "{data_id}")""")
-        
+        curs.executemany(*CapacityToActivity.bulk_insert_or_ignore_sql([CapacityToActivity(
+            region=in_region, tech=tech, c2a=config.params['c2a'],
+            notes=f"({config.params['c2a_unit']})", data_id=data_id,
+        )]))
 
-        ## CapacityFactorTech
+        ## CapacityFactorTech (no period in v4)
         note = f"{weather_year} hourly flow entering {in_region} divided by max hourly flow"
         ref = config.refs.get("transfers")
 
-        data = []
-        for period in config.model_periods:
-            for h, time in config.time.iterrows():
-
-                cf = in_mwh[h] / max(in_mwh)
-                if cf < config.params['cf_tolerance']: cf = 0
-
-                if time['tod'] == config.time.iloc[0]['tod']:
-                    data.append([in_region, period, time['season'], time['tod'], tech, cf, note, ref.id, 2, data_id])
-                else:
-                    data.append([in_region, period, time['season'], time['tod'], tech, cf, None, None, None, data_id])
-
-        curs.executemany(f"""REPLACE INTO
-                    CapacityFactorTech(region, period, season, tod, tech, factor, notes, data_source, dq_cred, data_id)
-                    VALUES(?,?,?,?,?,?,?,?,?,?)""", data)
+        cf_rows = []
+        for h, time in config.time.iterrows():
+            cf = in_mwh[h] / max(in_mwh)
+            if cf < config.params['cf_tolerance']: cf = 0
+            if time['tod'] == config.time.iloc[0]['tod']:
+                cf_rows.append(CapacityFactorTech(
+                    region=in_region, season=time['season'], tod=time['tod'],
+                    tech=tech, factor=cf, notes=note,
+                    data_source=ref.id, dq_cred=2, data_id=data_id,
+                ))
+            else:
+                cf_rows.append(CapacityFactorTech(
+                    region=in_region, season=time['season'], tod=time['tod'],
+                    tech=tech, factor=cf, data_id=data_id,
+                ))
+        if cf_rows:
+            curs.executemany(*CapacityFactorTech.bulk_insert_or_ignore_sql(cf_rows))
         
     else:
         print(f"Got zero flow for boundary intertie from {out_region} into {in_region}. Skipped incoming intertie.")
@@ -357,26 +369,27 @@ def aggregate_endogenous_interfaces(df_interfaces: pd.DataFrame):
 
 
         ## Technology
-        curs.execute(f"""REPLACE INTO
-                    Technology(tech, flag, sector, exchange, description, data_id)
-                    VALUES("{tech_config['tech']}", "p", "electricity", 1, "{tech_config['description']}", "{utils.data_id()}")""")
-
+        curs.executemany(*Technology.bulk_insert_or_ignore_sql([Technology(
+            tech=tech_config['tech'], flag='p', sector='electricity', exchange=1,
+            description=tech_config['description'], data_id=utils.data_id(),
+        )]))
 
         ## Efficiency
         eff = 1.0 - float(df_sys.loc[region_1, 'system_line_losses_percent'])
         note = f"({output_comm['units']}/{input_comm['units']}) {region_1} system_line_losses_percent"
-
-        curs.execute(f"""REPLACE INTO
-                    Efficiency(region, input_comm, tech, vintage, output_comm, efficiency, notes, data_source, dq_cred, data_id)
-                    VALUES("{r1r2}", "{input_comm['commodity']}", "{tech_config['tech']}", {vint},
-                    "{output_comm['commodity']}", {eff}, "{note}", "{config.refs.get('ca_system_parameters').id}", 2, "{data_id}")""")
-        
+        curs.executemany(*Efficiency.bulk_insert_or_ignore_sql([Efficiency(
+            region=r1r2, input_comm=input_comm['commodity'],
+            tech=tech_config['tech'], vintage=vint,
+            output_comm=output_comm['commodity'], efficiency=eff, notes=note,
+            data_source=config.refs.get('ca_system_parameters').id, dq_cred=2,
+            data_id=data_id,
+        )]))
 
         ## CapacityToActivity
-        curs.execute(f"""REPLACE INTO
-                    CapacityToActivity(region, tech, c2a, notes, data_id)
-                    VALUES("{r1r2}", "{tech_config['tech']}", "{config.params['c2a']}", "({config.params['c2a_unit']})", "{data_id}")""")
-        
+        curs.executemany(*CapacityToActivity.bulk_insert_or_ignore_sql([CapacityToActivity(
+            region=r1r2, tech=tech_config['tech'], c2a=config.params['c2a'],
+            notes=f"({config.params['c2a_unit']})", data_id=data_id,
+        )]))
 
         ## ExistingCapacity
         # Capacity in each direction is max seasonal capacity
@@ -387,36 +400,38 @@ def aggregate_endogenous_interfaces(df_interfaces: pd.DataFrame):
         # Capacity r1-r2 must equal r2-r1 by the RegionalExchangeCapacity_Constraint
         capacity = max(forward_capacity, reverse_capacity) * config.units.loc['capacity', 'coders_conv_fact'] # MW to GW
 
-        curs.execute(f"""REPLACE INTO
-                    ExistingCapacity(region, tech, vintage, capacity, units, notes, data_source, dq_cred, data_id)
-                    VALUES("{r1r2}", "{tech_config['tech']}", {vint}, "{capacity}", "({config.units.loc['capacity', 'units']})",
-                    "max of seasonal capacities in either direction - {interface['network_node_names']}",
-                    "{config.refs.get('interface_capacities').id}", 2, "{data_id}")""")
-        
+        curs.executemany(*ExistingCapacity.bulk_insert_or_ignore_sql([ExistingCapacity(
+            region=r1r2, tech=tech_config['tech'], vintage=vint, capacity=capacity,
+            units=f"({config.units.loc['capacity', 'units']})",
+            notes=f"max of seasonal capacities in either direction - {interface['network_node_names']}",
+            data_source=config.refs.get('interface_capacities').id, dq_cred=2,
+            data_id=data_id,
+        )]))
 
-        ## CapacityFactorTech
+        ## CapacityFactorTech (no period in v4)
         # Needed if capacity in either direction or season is less than max capacity
         if len({reverse_interface['ttc_summer'], reverse_interface['ttc_winter'],
             interface['ttc_summer'], interface['ttc_winter']}) > 1:
 
-            data = []
-            for period in config.model_periods:
-                for h, time in config.time.iterrows():
-
-                    cf = interface[f"ttc_{time['summer_winter']}"] * config.units.loc['capacity', 'coders_conv_fact'] / capacity
-                    if cf < config.params['cf_tolerance']: cf = 0
-
-                    if time['tod'] == config.time.iloc[0]['tod']:
-                        data.append([r1r2, period, time['season'], time['tod'], tech_config['tech'], cf,
-                                "seasonal, directional capacity divided by max capacity in either season or direction",
-                                config.refs.get('interface_capacities').id, 2, data_id])
-                    else:
-                        data.append([r1r2, period, time['season'], time['tod'], tech_config['tech'], cf,
-                                None, None, None, data_id])
-
-            curs.executemany(f"""REPLACE INTO
-                        CapacityFactorTech(region, period, season, tod, tech, factor, notes, data_source, dq_cred, data_id)
-                        VALUES(?,?,?,?,?,?,?,?,?,?)""", data)
+            cf_rows = []
+            for h, time in config.time.iterrows():
+                cf = interface[f"ttc_{time['summer_winter']}"] * config.units.loc['capacity', 'coders_conv_fact'] / capacity
+                if cf < config.params['cf_tolerance']: cf = 0
+                if time['tod'] == config.time.iloc[0]['tod']:
+                    cf_rows.append(CapacityFactorTech(
+                        region=r1r2, season=time['season'], tod=time['tod'],
+                        tech=tech_config['tech'], factor=cf,
+                        notes="seasonal, directional capacity divided by max capacity in either season or direction",
+                        data_source=config.refs.get('interface_capacities').id, dq_cred=2,
+                        data_id=data_id,
+                    ))
+                else:
+                    cf_rows.append(CapacityFactorTech(
+                        region=r1r2, season=time['season'], tod=time['tod'],
+                        tech=tech_config['tech'], factor=cf, data_id=data_id,
+                    ))
+            if cf_rows:
+                curs.executemany(*CapacityFactorTech.bulk_insert_or_ignore_sql(cf_rows))
 
 
         ## CostVariable

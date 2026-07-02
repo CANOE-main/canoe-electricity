@@ -12,6 +12,7 @@ import os
 import sqlite3
 import canoe_electricity.utils as utils
 from canoe_electricity.currency_conversion import conv_curr
+from canoe_schema.v4_0.models import Efficiency, CostInvest, CapacityFactorProcess, LimitCapacity, CostFixed
 
 atb_year = config.params['atb']['year']
 atb_ref = config.refs.add('atb', config.params['atb']['reference'])
@@ -141,46 +142,50 @@ def aggregate_wind(df_rtv: pd.DataFrame, region: str):
 
 
     ## MaxCapacity
-    note = f"Wind characterisation work done by Sutubra. Grid cells binned by ascending LCOE."
+    _lc_note = f"Wind characterisation work done by Sutubra. Grid cells binned by ascending LCOE."
+    lc_rows = []
     for cluster, rt in df_rt.iterrows():
         for period in config.model_periods:
-
             max_cap = rt['max_cap'] / 1000 # TODO MW vs GW
+            lc_rows.append(LimitCapacity(
+                region=rt['region'], period=period, tech_or_group=rt['tech'],
+                operator='le', capacity=max_cap,
+                units=f"({config.units.loc['capacity','units']})",
+                notes=_lc_note, data_source=sutubra_ref.id,
+                dq_cred=1, dq_geog=1, dq_struc=1, dq_tech=1, dq_time=3,
+                data_id=utils.data_id(rt['region']),
+            ))
+    if lc_rows:
+        curs.executemany(*LimitCapacity.bulk_insert_or_ignore_sql(lc_rows))
 
-            curs.execute(f"""REPLACE INTO
-                         LimitCapacity(region, period, tech_or_group, operator, capacity, units, notes,
-                         data_source, dq_cred, dq_geog, dq_struc, dq_tech, dq_time, data_id)
-                         VALUES("{rt['region']}", {period}, "{rt['tech']}", "le", {max_cap}, "({config.units.loc['capacity','units']})", "{note}",
-                         "{sutubra_ref.id}", 1, 1, 1, 1, 3, "{utils.data_id(rt['region'])}")""")
-
-    
     # Indexed by region, tech, and vintage
     for cluster, rtv in df_rtv.iterrows():
 
         data_year = utils.data_year(rtv['vint'])
 
         ## Efficiency
-        curs.execute(f"""REPLACE INTO
-                    Efficiency(region, input_comm, tech, vintage, output_comm, efficiency, notes, data_id)
-                    VALUES("{rtv['region']}", "{input_comm['commodity']}", "{rtv['tech']}", {rtv['vint']}, "{output_comm['commodity']}", 1,
-                    "({input_comm['units']}/{output_comm['units']}) dummy input so arbitrary", "{utils.data_id(rtv['region'])}")""")
-        
-        
+        curs.executemany(*Efficiency.bulk_insert_or_ignore_sql([Efficiency(
+            region=rtv['region'], input_comm=input_comm['commodity'],
+            tech=rtv['tech'], vintage=rtv['vint'], output_comm=output_comm['commodity'],
+            efficiency=1,
+            notes=f"({input_comm['units']}/{output_comm['units']}) dummy input so arbitrary",
+            data_id=utils.data_id(rtv['region']),
+        )]))
+
         ## CostInvest
         note = (
             f"{invest_note} - {data_year} (NREL, {atb_year}) weighted by capacity shares of turbine class "
             f"plus estimated spur line cost from existing transmissions lines. "
         )
-
         ci = df_invest.loc[str(data_year), cluster]
+        curs.executemany(*CostInvest.bulk_insert_or_ignore_sql([CostInvest(
+            region=rtv['region'], tech=rtv['tech'], vintage=rtv['vint'],
+            cost=ci, units=f"({config.units.loc['cost_invest', 'units']})",
+            notes=note, data_source=combo_ref.id, dq_cred=1,
+            data_id=utils.data_id(rtv['region']),
+        )]))
 
-        curs.execute(f"""REPLACE INTO
-                    CostInvest(region, tech, vintage, cost, units, notes, data_source, dq_cred, data_id)
-                    VALUES("{rtv['region']}", "{rtv['tech']}", {rtv['vint']}, {ci}, "({config.units.loc['cost_invest', 'units']})", "{note}",
-                    "{combo_ref.id}", 1, "{utils.data_id(rtv['region'])}")""")
-
-
-        ## CapacityFactorProcess
+        ## CapacityFactorProcess (no period in v4)
         note = (
             f"Wind characterisation work done by Sutubra. Grid cells binned by ascending LCOE. "
             f"Capacity factors further indexed to those in NREL ATB, by construction year with 2030 as base year. "
@@ -188,44 +193,45 @@ def aggregate_wind(df_rtv: pd.DataFrame, region: str):
         )
 
         cf: pd.Series = df_cf[str(cluster)] * df_cf_index.loc[str(data_year), cluster]
-        cf = cf.clip(0,1)
+        cf = cf.clip(0, 1)
         cf[cf < config.params['cf_tolerance']] = 0
         tod_0 = config.time.iloc[0]['tod']
-        
-        data = []
+
+        cf_rows = []
         for h, time in config.time.iterrows():
-            # Only add extraneous entries for first hour of each day otherwise this table is several GB per region
             if time['tod'] == tod_0:
-                data.append([rtv['region'], time['season'], time['tod'], rtv['tech'], rtv['vint'],
-                            cf.iloc[h], note, sutubra_ref.id, 1, 1, 1, 1, 3, utils.data_id(rtv['region'])])
+                cf_rows.append(CapacityFactorProcess(
+                    region=rtv['region'], season=time['season'], tod=time['tod'],
+                    tech=rtv['tech'], vintage=rtv['vint'], factor=cf.iloc[h],
+                    notes=note, data_source=sutubra_ref.id,
+                    dq_cred=1, dq_geog=1, dq_struc=1, dq_tech=1, dq_time=3,
+                    data_id=utils.data_id(rtv['region']),
+                ))
             else:
-                data.append([rtv['region'], time['season'], time['tod'], rtv['tech'], rtv['vint'],
-                            cf.iloc[h], None, None, None, None, None, None, None, utils.data_id(rtv['region'])])
-        
-        for period in config.model_periods:
-
-            if rtv['vint'] > period or rtv['vint'] + rtv['life'] <= period: continue
-
-            curs.executemany(f"""REPLACE INTO
-                        CapacityFactorProcess(region, period, season, tod, tech, vintage, factor, notes,
-                        data_source, dq_cred, dq_geog, dq_struc, dq_tech, dq_time, data_id)
-                        VALUES(?,{period},?,?,?,?,?,?,?,?,?,?,?,?,?)""", data)
-
-            
-        
+                cf_rows.append(CapacityFactorProcess(
+                    region=rtv['region'], season=time['season'], tod=time['tod'],
+                    tech=rtv['tech'], vintage=rtv['vint'], factor=cf.iloc[h],
+                    data_id=utils.data_id(rtv['region']),
+                ))
+        if cf_rows:
+            curs.executemany(*CapacityFactorProcess.bulk_insert_or_ignore_sql(cf_rows))
 
         ## CostFixed
         note = f"NREL ATB {rtv['vint']} Fixed O&M (NREL, {atb_year}) weighted by capacity shares of turbine class."
+        cf_fixed_rows = []
         for period in config.model_periods:
 
             if rtv['vint'] > period or rtv['vint'] + rtv['life'] <= period: continue
 
-            cf = df_fixed.loc[str(data_year), cluster]
-
-            curs.execute(f"""REPLACE INTO
-                        CostFixed(region, period, tech, vintage, cost, units, notes, data_source, dq_cred, data_id)
-                        VALUES("{rtv['region']}", {period}, "{rtv['tech']}", {rtv['vint']}, {cf}, "({config.units.loc['cost_fixed', 'units']})", "{note}",
-                        "{combo_ref.id}", 1, "{utils.data_id(rtv['region'])}")""")
+            cf_fixed = df_fixed.loc[str(data_year), cluster]
+            cf_fixed_rows.append(CostFixed(
+                region=rtv['region'], period=period, tech=rtv['tech'], vintage=rtv['vint'],
+                cost=cf_fixed, units=f"({config.units.loc['cost_fixed', 'units']})",
+                notes=note, data_source=combo_ref.id, dq_cred=1,
+                data_id=utils.data_id(rtv['region']),
+            ))
+        if cf_fixed_rows:
+            curs.executemany(*CostFixed.bulk_insert_or_ignore_sql(cf_fixed_rows))
 
 
     conn.commit()
@@ -327,93 +333,94 @@ def aggregate_solar(df_rtv: pd.DataFrame, region: str):
 
 
     ## MaxCapacity
-    note = f"Solar characterisation work done by Sutubra. Grid cells sorted by ascending LCOE."
+    _lc_note = f"Solar characterisation work done by Sutubra. Grid cells sorted by ascending LCOE."
+    lc_rows = []
     for cluster, rt in df_rt.iterrows():
         for period in config.model_periods:
-
             max_cap = rt['max_cap'] / 1000 # TODO MW vs GW
+            lc_rows.append(LimitCapacity(
+                region=rt['region'], period=period, tech_or_group=rt['tech'],
+                operator='le', capacity=max_cap,
+                units=f"({config.units.loc['capacity','units']})",
+                notes=_lc_note, data_source=sutubra_ref.id,
+                dq_cred=1, dq_geog=1, dq_struc=1, dq_tech=1, dq_time=3,
+                data_id=utils.data_id(rt['region']),
+            ))
+    if lc_rows:
+        curs.executemany(*LimitCapacity.bulk_insert_or_ignore_sql(lc_rows))
 
-            curs.execute(f"""REPLACE INTO
-                         LimitCapacity(region, period, tech_or_group, operator, capacity, units, notes,
-                         data_source, dq_cred, dq_geog, dq_struc, dq_tech, dq_time, data_id)
-                         VALUES("{rt['region']}", {period}, "{rt['tech']}", "le", {max_cap}, "({config.units.loc['capacity','units']})", "{note}",
-                         "{sutubra_ref.id}", 1, 1, 1, 1, 3, "{utils.data_id(rt['region'])}")""")
-
-            
     # Indexed by region, tech, and vintage
     for cluster, rtv in df_rtv.iterrows():
 
         data_year = utils.data_year(rtv['vint'])
-
         bin_config = df_bins.loc[rtv.name]
 
         ## Efficiency
-        curs.execute(f"""REPLACE INTO
-                    Efficiency(region, input_comm, tech, vintage, output_comm, efficiency, notes, data_id)
-                    VALUES("{rtv['region']}", "{input_comm['commodity']}", "{rtv['tech']}", {rtv['vint']}, "{output_comm['commodity']}", 1,
-                    "({input_comm['units']}/{output_comm['units']}) dummy input so arbitrary", "{utils.data_id(rtv['region'])}")""")
-        
-        
+        curs.executemany(*Efficiency.bulk_insert_or_ignore_sql([Efficiency(
+            region=rtv['region'], input_comm=input_comm['commodity'],
+            tech=rtv['tech'], vintage=rtv['vint'], output_comm=output_comm['commodity'],
+            efficiency=1,
+            notes=f"({input_comm['units']}/{output_comm['units']}) dummy input so arbitrary",
+            data_id=utils.data_id(rtv['region']),
+        )]))
+
         ## CostInvest
         note = (
             f"{invest_note} - {data_year}. "
             f"Plus estimated spur line cost from existing transmissions lines. "
         )
-
         cost_invest = df_invest[str(data_year)] + bin_config['Interconnection Cost ($/kW)']
         cost_invest = conv_curr(cost_invest, config.params['atb']['currency_year'], config.params['atb']['currency'])
+        curs.executemany(*CostInvest.bulk_insert_or_ignore_sql([CostInvest(
+            region=rtv['region'], tech=rtv['tech'], vintage=rtv['vint'],
+            cost=cost_invest, units=f"({config.units.loc['cost_invest', 'units']})",
+            notes=note, data_source=combo_ref.id, dq_cred=1,
+            data_id=utils.data_id(rtv['region']),
+        )]))
 
-        curs.execute(f"""REPLACE INTO
-                    CostInvest(region, tech, vintage, cost, units, notes, data_source, dq_cred, data_id)
-                    VALUES("{rtv['region']}", "{rtv['tech']}", {rtv['vint']}, {cost_invest}, "({config.units.loc['cost_invest', 'units']})", "{note}",
-                    "{combo_ref.id}", 1, "{utils.data_id(rtv['region'])}")""")
-
-
-        ## CapacityFactorProcess
+        ## CapacityFactorProcess (no period in v4; use vintage-year CF, degradation not applied)
         cf: pd.Series = df_cf[str(cluster)] * cf_index[str(data_year)]
-        cf = cf.clip(0,1)
+        cf = cf.clip(0, 1)
         cf[cf < config.params['cf_tolerance']] = 0
         tod_0 = config.time.iloc[0]['tod']
 
-        data = []
-        for period in config.model_periods:
-
-            if rtv['vint'] > period or rtv['vint'] + rtv['life'] <= period: continue
-
-            deg_fact = (1.0 - deg_rate) ** (period - rtv['vint'])
-
-            for h, time in config.time.iterrows():
-
-                _cf = cf.iloc[h]*deg_fact
-
-                # Only add extraneous entries for first hour of each day otherwise this table is several GB per region
-                if time['tod'] == tod_0:
-                    data.append([rtv['region'], period, time['season'], time['tod'], rtv['tech'], rtv['vint'],
-                                _cf, cf_note, cf_ref.id, 1, 1, 1, 1, 3, utils.data_id(rtv['region'])])
-                else:
-                    data.append([rtv['region'], period, time['season'], time['tod'], rtv['tech'], rtv['vint'],
-                                _cf, None, None, None, None, None, None, None, utils.data_id(rtv['region'])])
-        
-        curs.executemany(f"""REPLACE INTO
-                    CapacityFactorProcess(region, period, season, tod, tech, vintage, factor, notes,
-                    data_source, dq_cred, dq_geog, dq_struc, dq_tech, dq_time, data_id)
-                    VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""", data)
-        
+        cf_rows = []
+        for h, time in config.time.iterrows():
+            _cf = cf.iloc[h]
+            if time['tod'] == tod_0:
+                cf_rows.append(CapacityFactorProcess(
+                    region=rtv['region'], season=time['season'], tod=time['tod'],
+                    tech=rtv['tech'], vintage=rtv['vint'], factor=_cf,
+                    notes=cf_note, data_source=cf_ref.id,
+                    dq_cred=1, dq_geog=1, dq_struc=1, dq_tech=1, dq_time=3,
+                    data_id=utils.data_id(rtv['region']),
+                ))
+            else:
+                cf_rows.append(CapacityFactorProcess(
+                    region=rtv['region'], season=time['season'], tod=time['tod'],
+                    tech=rtv['tech'], vintage=rtv['vint'], factor=_cf,
+                    data_id=utils.data_id(rtv['region']),
+                ))
+        if cf_rows:
+            curs.executemany(*CapacityFactorProcess.bulk_insert_or_ignore_sql(cf_rows))
 
         ## CostFixed
         fixed_note += f" - {data_year}"
-
+        cf_fixed_rows = []
         for period in config.model_periods:
 
             if rtv['vint'] > period or rtv['vint'] + rtv['life'] <= period: continue
 
             cost_fixed = df_fixed[str(data_year)]
             cost_fixed = conv_curr(cost_fixed, config.params['atb']['currency_year'], config.params['atb']['currency'])
-
-            curs.execute(f"""REPLACE INTO
-                        CostFixed(region, period, tech, vintage, cost, units, notes, data_source, dq_cred, data_id)
-                        VALUES("{rtv['region']}", {period}, "{rtv['tech']}", {rtv['vint']}, {cost_fixed}, "({config.units.loc['cost_fixed', 'units']})",
-                        "{fixed_note}", "{atb_ref.id}", 1, "{utils.data_id(rtv['region'])}")""")
+            cf_fixed_rows.append(CostFixed(
+                region=rtv['region'], period=period, tech=rtv['tech'], vintage=rtv['vint'],
+                cost=cost_fixed, units=f"({config.units.loc['cost_fixed', 'units']})",
+                notes=fixed_note, data_source=atb_ref.id, dq_cred=1,
+                data_id=utils.data_id(rtv['region']),
+            ))
+        if cf_fixed_rows:
+            curs.executemany(*CostFixed.bulk_insert_or_ignore_sql(cf_fixed_rows))
 
 
     conn.commit()

@@ -13,20 +13,21 @@ from matplotlib import pyplot as pp
 import canoe_electricity.utils as utils
 import sqlite3
 import canoe_electricity.coders_api as coders_api
+from canoe_schema.v4_0.models import CapacityFactorTech
 
 weather_year = config.params['weather_year']
 df_existing: pd.DataFrame = None
 
 
 def aggregate_cfs(df_rtv: pd.DataFrame):
-    
+
     cfs, note, ref = get_capacity_factors()
 
-    # CapacityFactorTech has no vintage index
+    # CapacityFactorTech has no vintage or period index in v4
     df_rtv['end'] = df_rtv['vint'] + df_rtv['life']
     df_end = df_rtv.groupby(['region','tech','tech_code'])['end'].max()
     df_rt = df_rtv.groupby(['region','tech','tech_code']).sum(numeric_only=True).reset_index()
-    
+
     conn = sqlite3.connect(config.database_file)
     curs = conn.cursor()
 
@@ -35,26 +36,41 @@ def aggregate_cfs(df_rtv: pd.DataFrame):
         # Summing curtailed generation to get net load for capacity credit calculations
         config.exs_vre_gen[rt['region']] += cfs[rt['tech_code']].astype(float) * rt['capacity']
 
+        # Skip if tech has no vintages active in any model period
+        if df_end.loc[(rt['region'], rt['tech'], rt['tech_code'])] <= config.model_periods[0]: continue
+
         data = []
-        for period in config.model_periods:
-            
-            # Check that there exists an existing vintage that will exist in this period
-            if df_end.loc[(rt['region'], rt['tech'], rt['tech_code'])] <= period: continue
+        for h, time in config.time.iterrows():
 
-            for h, time in config.time.iterrows():
+            if time['tod'] == config.time.iloc[0]['tod']:
+                data.append(CapacityFactorTech(
+                    region=rt['region'],
+                    season=time['season'],
+                    tod=time['tod'],
+                    tech=rt['tech'],
+                    factor=cfs[rt['tech_code']][h],
+                    notes=note,
+                    data_source=ref.id,
+                    dq_cred=1,
+                    dq_geog=1,
+                    dq_struc=1,
+                    dq_tech=1,
+                    dq_time=3,
+                    data_id=utils.data_id(rt['region']),
+                ))
+            else:
+                data.append(CapacityFactorTech(
+                    region=rt['region'],
+                    season=time['season'],
+                    tod=time['tod'],
+                    tech=rt['tech'],
+                    factor=cfs[rt['tech_code']][h],
+                    data_id=utils.data_id(rt['region']),
+                ))
 
-                if time['tod'] == config.time.iloc[0]['tod']:
-                    data.append([rt['region'], period, time['season'], time['tod'], rt['tech'], cfs[rt['tech_code']][h],
-                                 note, ref.id, 1, 1, 1, 1, 3, utils.data_id(rt['region'])])
-                else:
-                    data.append([rt['region'], period, time['season'], time['tod'], rt['tech'], cfs[rt['tech_code']][h],
-                                 None, None, None, None, None, None, None, utils.data_id(rt['region'])])
+        if data:
+            curs.executemany(*CapacityFactorTech.bulk_insert_or_ignore_sql(data))
 
-        curs.executemany(f"""REPLACE INTO
-                    CapacityFactorTech(region, period, season, tod, tech, factor, notes,
-                    data_source, dq_cred, dq_geog, dq_struc, dq_tech, dq_time, data_id)
-                    VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)""", data)
-            
     conn.commit()
     conn.close()
 
@@ -64,11 +80,16 @@ def initialise():
 
     global df_existing
 
-    # Initialise existing generators data
-    if df_existing is None: df_existing, date_accessed = coders_api.get_data('generators')
-    else: return
+    if df_existing is not None: return
 
-    config.refs.add('generators', config.params['coders']['reference'].replace("<date>", date_accessed).replace("<table>","generators"))
+    _coders_kwargs = dict(
+        cache_dir=config.cache_dir,
+        force_download=config.params.get('force_download', False),
+        api_key_file=config.input_files + config.params['coders_api_key_file'],
+        debug=config.debug,
+    )
+    df_existing, date_accessed = coders_api.get_data('generators', **_coders_kwargs)
+    config.refs.add('generators', config.params['coders']['reference'].replace("<date>", date_accessed).replace("<table>", "generators"))
     df_existing = df_existing.loc[df_existing['province'].str.lower() == 'on']
 
 

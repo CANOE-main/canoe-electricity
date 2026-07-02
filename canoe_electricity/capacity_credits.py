@@ -9,6 +9,7 @@ from matplotlib import pyplot as pp
 import canoe_electricity.utils as utils
 import numpy as np
 import sqlite3
+from canoe_schema.v4_0.models import CapacityCredit
 
 # Provincial scripts
 import provincial_data.on.existing_capacity_credits as on_cc_exs
@@ -19,14 +20,14 @@ exs_ccs = dict()
 # Sends existing capacity to relevant provincial scripts
 def aggregate_existing(df_rtv: pd.DataFrame):
 
-    exs_ccs['ON'] = on_cc_exs.aggregate_capacity_credits(df_rtv) #.loc[df_rtv['region'] == 'ON']) # for now, using Ontario for all # use ontario existing capacity credits
+    exs_ccs['ON'] = on_cc_exs.aggregate_capacity_credits(df_rtv)
 
 
 # Aggregates new generators capacity credits
 def aggregate_new(df_rtv: pd.DataFrame):
 
     # Most generators same as existing
-    on_cc_exs.aggregate_capacity_credits(df_rtv) #.loc[df_rtv['region'] == 'ON']) # for now, using Ontario for all # use ontario existing capacity credits
+    on_cc_exs.aggregate_capacity_credits(df_rtv)
 
 
 # Aggregates new storage capacity credits
@@ -35,17 +36,26 @@ def aggregate_storage(df_rtv: pd.DataFrame):
     conn = sqlite3.connect(config.database_file)
     curs = conn.cursor()
 
-    # Temporary for now. CC = 1
+    rows = []
     for _idx, rtv in df_rtv.iterrows():
         for period in config.model_periods:
 
             if rtv['vint'] > period or rtv['vint'] + rtv['life'] <= period: continue
 
-            curs.execute(f"""REPLACE INTO
-                        CapacityCredit(region, period, tech, vintage, credit, notes, dq_cred, data_id)
-                        VALUES('{rtv['region']}', {period}, '{rtv['tech']}', {rtv['vint']}, 0.9,
-                        'Assumed for now. Improved method on TODO list', 5, "{utils.data_id(rtv['region'])}")""")
-            
+            rows.append(CapacityCredit(
+                region=rtv['region'],
+                period=period,
+                tech=rtv['tech'],
+                vintage=rtv['vint'],
+                credit=0.9,
+                notes='Assumed for now. Improved method on TODO list',
+                dq_cred=5,
+                data_id=utils.data_id(rtv['region']),
+            ))
+
+    if rows:
+        curs.executemany(*CapacityCredit.bulk_insert_or_ignore_sql(rows))
+
     conn.commit()
     conn.close()
 
@@ -53,7 +63,7 @@ def aggregate_storage(df_rtv: pd.DataFrame):
 
 ## Uses the NREL ReEDS method (LDC-NLDC) top 100h to calculate marginal capacity credits of VREs
 def aggregate_vre(df_rtv: pd.DataFrame, df_cf: pd.DataFrame, region: str, vint: int):
-    
+
     # Only show plots for first and last vintage, to show change
     plot = config.params['show_plots'] and vint in [config.model_periods[0], config.model_periods[-1]]
 
@@ -118,7 +128,6 @@ def aggregate_vre(df_rtv: pd.DataFrame, df_cf: pd.DataFrame, region: str, vint: 
         axes['cc'].set_ylabel(f"capacity credit (% capacity)")
         ccs = df_clusters['cc'].values.tolist()
         axes['cc'].plot(range(len(ccs)), ccs)
-        # axes['cc'].plot(range(len(ccs)+1), [exs_ccs["ON"].loc[tech_code, 'cc'], *ccs]) # TODO regionalise when better data is found
 
     ## Write capacity credits to database
     conn = sqlite3.connect(config.database_file)
@@ -132,16 +141,30 @@ def aggregate_vre(df_rtv: pd.DataFrame, df_cf: pd.DataFrame, region: str, vint: 
     )
     ref = config.refs.add('capacity_credits', config.params['capacity_credits']['reference'])
 
+    rows = []
     for _idx, rtv in df_rtv.iterrows():
         for period in config.model_periods:
 
             if rtv['vint'] > period or rtv['vint'] + rtv['life'] <= period: continue
 
-            curs.execute(f"""REPLACE INTO
-                        CapacityCredit(region, period, tech, vintage, credit, notes,
-                        data_source, dq_cred, dq_geog, dq_struc, dq_tech, dq_time, data_id)
-                        VALUES('{rtv['region']}', {period}, '{rtv['tech']}', {rtv['vint']}, {rtv['cc']}, '{note}',
-                        '{ref.id}', 3, 1, 3, 1, 3, "{utils.data_id(rtv['region'])}")""")
+            rows.append(CapacityCredit(
+                region=rtv['region'],
+                period=period,
+                tech=rtv['tech'],
+                vintage=rtv['vint'],
+                credit=rtv['cc'],
+                notes=note,
+                data_source=ref.id,
+                dq_cred=3,
+                dq_geog=1,
+                dq_struc=3,
+                dq_tech=1,
+                dq_time=3,
+                data_id=utils.data_id(rtv['region']),
+            ))
+
+    if rows:
+        curs.executemany(*CapacityCredit.bulk_insert_or_ignore_sql(rows))
 
     conn.commit()
     conn.close()

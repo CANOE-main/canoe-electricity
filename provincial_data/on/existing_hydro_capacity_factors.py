@@ -12,6 +12,7 @@ import sqlite3
 import numpy as np
 import canoe_electricity.utils as utils
 from matplotlib import pyplot as pp
+from canoe_schema.v4_0.models import CapacityFactorTech, LimitSeasonalCapacityFactor
 
 this_dir = os.path.realpath(os.path.dirname(__file__)) + "/"
 
@@ -24,60 +25,89 @@ weather_year = config.params['weather_year']
 
 
 def aggregate_cfs(df_rtv: pd.DataFrame):
-    
+
     cfs, note, ref = get_capacity_factors(weather_year)
 
     conn = sqlite3.connect(config.database_file)
     curs = conn.cursor()
 
-    # CapacityFactorTech has no vintage index but still need to validate vintages
+    # CapacityFactorTech has no vintage or period index in v4
     df_rtv['end'] = df_rtv['vint'] + df_rtv['life']
     df_end = df_rtv.groupby(['region','tech','tech_code'])['end'].max()
     df_rt = df_rtv.groupby(['region','tech','tech_code']).sum(numeric_only=True).reset_index()
 
     # Run of river hydro
     for _idx, rt in df_rt.loc[df_rt['tech_code'] == 'hydro_run'].iterrows():
-        
+
         # Summing curtailed generation to get net load for capacity credit calculations
         config.exs_vre_gen[rt['region']] += np.array(cfs['hydro_run']) * rt['capacity']
 
+        # Skip if tech has no vintages active in any model period
+        if df_end.loc[(rt['region'], rt['tech'], rt['tech_code'])] <= config.model_periods[0]: continue
+
         data = []
-        for period in config.model_periods:
+        for h, time in config.time.iterrows():
 
-            # Check that there exists an existing vintage that will exist in this period
-            if df_end.loc[(rt['region'], rt['tech'], rt['tech_code'])] <= period: continue
-            
-            for h, time in config.time.iterrows():
+            if time['tod'] == config.time.iloc[0]['tod']:
+                data.append(CapacityFactorTech(
+                    region=rt['region'],
+                    season=time['season'],
+                    tod=time['tod'],
+                    tech=rt['tech'],
+                    factor=cfs['hydro_run'][h],
+                    notes=note,
+                    data_source=ref.id,
+                    dq_cred=1,
+                    dq_geog=1,
+                    dq_struc=1,
+                    dq_tech=1,
+                    dq_time=3,
+                    data_id=utils.data_id(rt['region']),
+                ))
+            else:
+                data.append(CapacityFactorTech(
+                    region=rt['region'],
+                    season=time['season'],
+                    tod=time['tod'],
+                    tech=rt['tech'],
+                    factor=cfs['hydro_run'][h],
+                    data_id=utils.data_id(rt['region']),
+                ))
 
-                if time['tod'] == config.time.iloc[0]['tod']:
-                    data.append([rt['region'], period, time['season'], time['tod'], rt['tech'], cfs['hydro_run'][h], note,
-                            ref.id, 1, 1, 1, 1, 3, utils.data_id(rt['region'])])
-                else:
-                    data.append([rt['region'], period, time['season'], time['tod'], rt['tech'], cfs['hydro_run'][h],
-                                 None, None, None, None, None, None, None, utils.data_id(rt['region'])])
-                 
-        curs.executemany(f"""REPLACE INTO
-                        CapacityFactorTech(region, period, season, tod, tech, factor, notes,
-                        data_source, dq_cred, dq_geog, dq_struc, dq_tech, dq_time, data_id)
-                        VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)""", data)
-            
-    note += " Averaged over each day."
-            
-    # Daily storage hydro
+        if data:
+            curs.executemany(*CapacityFactorTech.bulk_insert_or_ignore_sql(data))
+
+    note_dly = note + " Averaged over each day."
+
+    # Daily storage hydro — LimitSeasonalCapacityFactor has no period in v4
     # This will break if daily hydro isn't aggregated to a single vintage
     for _idx, rt in df_rt.loc[df_rt['tech_code'] == 'hydro_daily'].iterrows():
-        for period in config.model_periods:
-            for seas in config.time['season'].unique():
 
-                hours = config.time.loc[config.time['season'] == seas].index.to_list()
-                cf_dly = np.mean(cfs['hydro_daily'][min(hours):max(hours)+1])
+        lscf_rows = []
+        for seas in config.time['season'].unique():
 
-                curs.execute(f"""REPLACE INTO
-                            LimitSeasonalCapacityFactor(region, period, season, tech, operator, factor, notes,
-                            data_source, dq_cred, dq_geog, dq_struc, dq_tech, dq_time, data_id)
-                            VALUES('{rt['region']}', {period}, '{seas}', '{rt['tech']}', "le", {cf_dly}, '{note}',
-                            '{ref.id}', 1, 1, 1, 1, 3, "{utils.data_id(rt['region'])}")""")
-    
+            hours = config.time.loc[config.time['season'] == seas].index.to_list()
+            cf_dly = np.mean(cfs['hydro_daily'][min(hours):max(hours)+1])
+
+            lscf_rows.append(LimitSeasonalCapacityFactor(
+                region=rt['region'],
+                season=seas,
+                tech_or_group=rt['tech'],
+                operator='le',
+                factor=cf_dly,
+                notes=note_dly,
+                data_source=ref.id,
+                dq_cred=1,
+                dq_geog=1,
+                dq_struc=1,
+                dq_tech=1,
+                dq_time=3,
+                data_id=utils.data_id(rt['region']),
+            ))
+
+        if lscf_rows:
+            curs.executemany(*LimitSeasonalCapacityFactor.bulk_insert_or_ignore_sql(lscf_rows))
+
     conn.commit()
     conn.close()
 
@@ -103,7 +133,7 @@ def get_capacity_factors(year: int) -> tuple[dict[str, list[float]], str, refere
     # Save as csvs so other scripts can pull from them
     pd.DataFrame(cf_dly).to_csv(this_dir + f"output_data/cf_hydro_run_{year}.csv")
     pd.DataFrame(cf_ror).to_csv(this_dir + f"output_data/cf_hydro_daily_{year}.csv")
-    
+
     # Plot if that is on
     if config.params['show_plots']:
         figure, axis = pp.subplots(2, 1, constrained_layout=True)
