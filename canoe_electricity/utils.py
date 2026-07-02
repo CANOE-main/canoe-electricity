@@ -94,11 +94,14 @@ def atb_data(tech_config, **kwargs) -> tuple[pd.DataFrame, str]:
 
     note = f"{tech_config.atb_display_name} - {tech_config.atb_scenario} - {config.atb.core_metric_case}"
 
+    # Support both model objects (.code) and pandas Series from iterrows() (.name = index)
+    code = getattr(tech_config, 'code', None) or tech_config.name
+
     # Take stored reduced table if exists otherwise reduce whole atb table
-    if tech_config.code in atb_tables.keys(): df = atb_tables[tech_config.code]
+    if code in atb_tables.keys(): df = atb_tables[code]
     else:
         df = df_atb.loc[(df_atb['display_name']==tech_config.atb_display_name) & (df_atb['scenario']==tech_config.atb_scenario)]
-        atb_tables[tech_config.code] = df
+        atb_tables[code] = df
 
     for key, value in kwargs.items():
         df: pd.DataFrame | pd.Series = df.loc[df[key] == str(value)]

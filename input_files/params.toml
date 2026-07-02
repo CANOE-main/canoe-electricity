@@ -65,6 +65,24 @@ show_plots                   = true
 c2a_unit = "PJ/GWy"
 c2a      = 31.536
 
+# ------------------------------------------------------------------
+# Notes embedded in database rows
+# ------------------------------------------------------------------
+intertie_fixed_flow_note = "Exogenous intertie fixed to <year> hourly flows"
+capacity_factor_note     = "Hourly production, from IESO public data, divded by existing capacity in <year>"
+hydro_daily_note         = "Daily production, from IESO public data, divded by existing capacity in <year>"
+
+# ------------------------------------------------------------------
+# IESO (Ontario) config
+# ------------------------------------------------------------------
+ieso_reference    = "IESO. (<year>). IESO public data. http://reports.ieso.ca/public/"
+ieso_rel_yyyy_mmm = "2025_Jun"
+ieso_rel_peak_type = "Firm"
+
+# ------------------------------------------------------------------
+# All [section] headers below — root-level keys must appear above
+# ------------------------------------------------------------------
+
 [included_emissions]
 co2e = true
 co2  = true
@@ -75,13 +93,6 @@ hg   = false
 [solar_degradation]
 rate      = 0.0085
 reference = "Jordan, D. C., Kurtz, S. R., VanSant, K., & Newmiller, J. (2016). Compendium of photovoltaic degradation rates. Progress in Photovoltaics: Research and Applications, 24(7), 978-989. https://doi.org/10.1002/pip.2744"
-
-# ------------------------------------------------------------------
-# Notes embedded in database rows
-# ------------------------------------------------------------------
-intertie_fixed_flow_note = "Exogenous intertie fixed to <year> hourly flows"
-capacity_factor_note     = "Hourly production, from IESO public data, divded by existing capacity in <year>"
-hydro_daily_note         = "Daily production, from IESO public data, divded by existing capacity in <year>"
 
 # ------------------------------------------------------------------
 # External data sources
@@ -123,13 +134,6 @@ reference    = "Sutubra"
 year         = 2024
 sort_solar_by = "lcoe"
 sort_wind_by  = "lcoe"
-
-# ------------------------------------------------------------------
-# IESO (Ontario) config
-# ------------------------------------------------------------------
-ieso_reference    = "IESO. (<year>). IESO public data. http://reports.ieso.ca/public/"
-ieso_rel_yyyy_mmm = "2025_Jun"
-ieso_rel_peak_type = "Firm"
 
 [renewables_ninja]
 reference = "Pfenninger, S., & Staffell, I. (2016). Long-term patterns of European PV output using 30 years of validated hourly reanalysis and satellite data. Energy, 114, 1251-1265. https://doi.org/10.1016/j.energy.2016.08.060"
