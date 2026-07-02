@@ -13,7 +13,7 @@ from matplotlib import pyplot as pp
 from provincial_data.on import existing_hydro_capacity_factors as on_cf
 from canoe_schema.v4_0.models import CapacityFactorTech, LimitSeasonalCapacityFactor
 
-weather_year = config.params['weather_year']
+weather_year = config.weather_year
 days_per_month = [31,28,31,30,31,30,31,31,30,31,30,31]
 
 note = (
@@ -23,7 +23,7 @@ note = (
 ref = (
     'Government of Canada, S. C. (2018, June 27). Electric power generation, monthly generation by '
     'type of electricity. https://www150.statcan.gc.ca/t1/tbl1/en/tv.action?pid=2510001501; '
-    f"{config.params['coders']['reference']}"
+    f"{config.coders.reference}"
 )
 ref = config.refs.add(
     'default_hydro_cf',
@@ -92,7 +92,7 @@ def aggregate_cfs(df_rtv: pd.DataFrame):
         hourly /= 1000 # MW to GW
 
         cf = hourly / rt['capacity'] # GW / GW
-        cf[cf < config.params['cf_tolerance']] = 0
+        cf[cf < config.cf_tolerance] = 0
         cfs[rt['region']][rt['tech_code']] = cf
 
         if rt['tech_code'] != 'hydro_run': continue # only need CFs for plotting
@@ -147,7 +147,7 @@ def aggregate_cfs(df_rtv: pd.DataFrame):
             hourly *= rt['unit_average_annual_energy'] / df_total_energy.loc[rt['region']]
             hourly /= 1000
             cf_seas = hourly / rt['capacity'] # GW / GW
-            if cf_seas < config.params['cf_tolerance']:
+            if cf_seas < config.cf_tolerance:
                 cf_seas = 0
 
             lscf_rows.append(LimitSeasonalCapacityFactor(
@@ -173,18 +173,18 @@ def aggregate_cfs(df_rtv: pd.DataFrame):
     conn.close()
 
     # Plotting if set to show
-    if config.params['show_plots']:
+    if config.show_plots:
         for region in df_rt['region'].unique():
 
             figure, axis = pp.subplots(3, 1, constrained_layout=True)
             figure.suptitle(
-                f"{region} {config.params['weather_year']} synthesized hourly capacity factors\n"
+                f"{region} {config.weather_year} synthesized hourly capacity factors\n"
                 "for existing hydroelectric capacity (real data in red, if available)"
             )
 
             # Compare to real data for Ontario
             if region == 'ON':
-                on_cfs, _, _ = on_cf.get_capacity_factors(config.params['weather_year'])
+                on_cfs, _, _ = on_cf.get_capacity_factors(config.weather_year)
                 axis[0].plot(range(8760), on_cfs['hydro_run'], 'r')
                 axis[1].plot(range(8760), on_cfs['hydro_daily'], 'r')
 

@@ -19,7 +19,7 @@ from provincial_data.default import cost_tx_dx
 # Provincial parameters
 df_sys: pd.DataFrame
 
-weather_year = config.params['weather_year']
+weather_year = config.weather_year
 
 
 
@@ -29,8 +29,8 @@ def aggregate():
 
     _coders_kwargs = dict(
         cache_dir=config.cache_dir,
-        force_download=config.params.get('force_download', False),
-        api_key_file=config.input_files + config.params['coders_api_key_file'],
+        force_download=config.force_download,
+        api_key_file=config.input_files + config.coders_api_key_file,
         debug=config.debug,
     )
 
@@ -39,10 +39,10 @@ def aggregate():
     df_sys['region'] = [config.region_map[p.lower()] for p in df_sys['province'].values]
     df_sys = df_sys.loc[df_sys['region'].isin(config.model_regions)]
     df_sys.set_index('region', inplace=True)
-    citation = config.params['coders']['reference'].replace('<table>', 'ca_system_parameters').replace('<date>', date_accessed)
+    citation = config.coders.reference.replace('<table>', 'ca_system_parameters').replace('<date>', date_accessed)
     ref = config.refs.add('ca_system_parameters', citation)
 
-    if config.params['include_reserve_margin']: aggregate_reserve_margin()
+    if config.include_reserve_margin: aggregate_reserve_margin()
     aggregate_demand()
     aggregate_transmission()
 
@@ -165,14 +165,14 @@ def aggregate_demand():
 
     _coders_kwargs = dict(
         cache_dir=config.cache_dir,
-        force_download=config.params.get('force_download', False),
-        api_key_file=config.input_files + config.params['coders_api_key_file'],
+        force_download=config.force_download,
+        api_key_file=config.input_files + config.coders_api_key_file,
         debug=config.debug,
     )
 
     # Annual demand projections
     df_annual, date_accessed = coders_api.get_data(end_point="forecasted_annual_demand", **_coders_kwargs)
-    citation = config.params['coders']['reference'].replace("<date>", date_accessed).replace("<table>", "forecasted_annual_demand")
+    citation = config.coders.reference.replace("<date>", date_accessed).replace("<table>", "forecasted_annual_demand")
     config.refs.add('forecasted_annual_demand', citation)
     df_annual['region'] = [config.region_map[p.lower()] for p in df_annual['province']]
     df_annual.set_index('region', inplace=True)
@@ -205,7 +205,7 @@ def aggregate_demand():
             continue
 
         df_hourly, date_accessed = coders_api.get_data(end_point="provincial_demand", year=weather_year, province=prov['province'], **_coders_kwargs)
-        dsd_reference = config.params['coders']['reference'].replace("<date>", date_accessed).replace("<table>", "provincial_demand")
+        dsd_reference = config.coders.reference.replace("<date>", date_accessed).replace("<table>", "provincial_demand")
         ref = config.refs.add(f"provincial_demand", dsd_reference)
 
         if df_hourly is None or (len(df_hourly) < 8760):
@@ -246,11 +246,11 @@ def aggregate_demand():
 
 
         # If not including demand, don't go any further
-        if not config.params['include_provincial_demand'] or not config.regions.loc[region, 'include_demand']: continue
+        if not config.include_provincial_demand or not config.regions.loc[region, 'include_demand']: continue
 
 
         # Apply tolerance and normalise
-        hourly_dem[hourly_dem < hourly_dem.mean() * config.params['dsd_tolerance']] = 0
+        hourly_dem[hourly_dem < hourly_dem.mean() * config.dsd_tolerance] = 0
         dsd = hourly_dem / hourly_dem.sum()
 
         # Plot provincial demand

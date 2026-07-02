@@ -65,7 +65,7 @@ def aggregate_storage(df_rtv: pd.DataFrame):
 def aggregate_vre(df_rtv: pd.DataFrame, df_cf: pd.DataFrame, region: str, vint: int):
 
     # Only show plots for first and last vintage, to show change
-    plot = config.params['show_plots'] and vint in [config.model_periods[0], config.model_periods[-1]]
+    plot = config.show_plots and vint in [config.model_periods[0], config.model_periods[-1]]
 
     tech_code = df_rtv.iloc[0]['tech_code'] # assume all are the same base tech
 
@@ -134,12 +134,12 @@ def aggregate_vre(df_rtv: pd.DataFrame, df_cf: pd.DataFrame, region: str, vint: 
     curs = conn.cursor()
 
     note = (
-        f"NREL ReEDS method (NREL, {config.params['capacity_credits']['year']}). "
+        f"NREL ReEDS method (NREL, {config.capacity_credits.year}). "
         "Marginal net load duration curve reduction at top 100 hours. "
         "Assumed capacity bins are fully built out in order of LCOE, "
         "one type of renewable at a time, for now."
     )
-    ref = config.refs.add('capacity_credits', config.params['capacity_credits']['reference'])
+    ref = config.refs.add('capacity_credits', config.capacity_credits.reference)
 
     rows = []
     for _idx, rtv in df_rtv.iterrows():

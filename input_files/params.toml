@@ -1,0 +1,143 @@
+# Configuration for aggregation of electricity sector data
+# Replaces params.yaml — loaded via tomllib (Python ≥ 3.11 built-in).
+
+# Path to CODERS API key file (must request a key at https://cme-emh.ca/en/coders/)
+coders_api_key_file = "coders_api_key.txt"
+
+period_step = 5
+
+# Ascending order required
+model_periods = [2025, 2030, 2035, 2040, 2045]
+
+base_year = 2020       # year to pull data from by default
+weather_year = 2018    # year to pull timeseries data for
+timezone = "EST"       # final model timezone
+
+data_id_prefix = "ELCHR"
+data_version = "002"
+
+# Currency — costs are exchanged and inflated in post-processing
+final_currency = "CAD"
+final_currency_year = 2020
+inflation_index = "gdp_deflator"  # gdp_deflator | general_cpi | energy_and_petroleum | industrial | construction_non_residential
+
+global_discount_rate = 0.03    # used to calculate VRE LCOEs
+dsd_tolerance = 0.02           # zero DSD below this × hourly average
+cf_tolerance = 0.01            # zero capacity factor below this
+
+sqlite_schema   = "canoe_dataset_schema.sql"
+sqlite_database = "electricity.sqlite"
+excel_template  = "Template spreadsheet (make a copy).xlsx"
+excel_output    = "electricity.xlsx"
+
+existing_capacity_threshold = 0.001   # GW — ignore aggregated capacities below this
+
+# Validation behaviour when DB content mismatches config ("error" | "warn")
+validation_behavior = "error"
+existing_periods = []   # periods that already exist in DB with flag "e"
+
+# ------------------------------------------------------------------
+# Aggregation switches
+# ------------------------------------------------------------------
+debug                        = false   # prints extra diagnostic info
+force_download               = false   # ignore cache and re-download data
+force_wipe_database          = true    # wipe this module's rows before aggregation
+full_dataset                 = true    # produce full dataset (filtered later), not a live model
+include_boundary_interfaces  = true    # exogenous in/out-of-model interfaces
+include_endogenous_interfaces = true   # exchange technologies between modelled regions
+include_imports              = false   # dummy import technologies
+include_emissions            = false
+include_existing_capacity    = true
+include_reserve_margin       = true
+include_capacity_limits      = false   # not currently used
+include_storage              = true
+include_provincial_demand    = true    # also configurable per-province in regions.csv
+include_ccs_retrofits        = true    # retrofitted techs use ATB for disaggregated emissions
+include_tech_fuel_cost       = false   # attach fuel costs as variable costs
+include_new_wind_solar       = true    # set false to skip the time-consuming VRE section
+clone_to_excel               = false
+simplify_model               = false
+show_plots                   = true
+
+[included_emissions]
+co2e = true
+co2  = true
+so2  = false
+nox  = false
+hg   = false
+
+# ------------------------------------------------------------------
+# Physics / units
+# ------------------------------------------------------------------
+c2a_unit = "PJ/GWy"
+c2a      = 31.536
+
+[solar_degradation]
+rate      = 0.0085
+reference = "Jordan, D. C., Kurtz, S. R., VanSant, K., & Newmiller, J. (2016). Compendium of photovoltaic degradation rates. Progress in Photovoltaics: Research and Applications, 24(7), 978-989. https://doi.org/10.1002/pip.2744"
+
+# ------------------------------------------------------------------
+# Notes embedded in database rows
+# ------------------------------------------------------------------
+intertie_fixed_flow_note = "Exogenous intertie fixed to <year> hourly flows"
+capacity_factor_note     = "Hourly production, from IESO public data, divded by existing capacity in <year>"
+hydro_daily_note         = "Daily production, from IESO public data, divded by existing capacity in <year>"
+
+# ------------------------------------------------------------------
+# External data sources
+# ------------------------------------------------------------------
+
+[coders]
+reference     = "Hendriks, R.M., Monroe, J., Cusi, T., Aldana, D., Griffiths, K., Dorman, T., Chhina, A., McPherson, M. (2023). Canadian Open-Source Database for Energy Research and Systems-Modelling (CODERS). Available at www.cme-emh/coders. <table> table. Accessed <date>"
+currency_year = 2020
+currency      = "CAD"
+
+[atb]
+url                          = "https://oedi-data-lake.s3.amazonaws.com/ATB/electricity/csv/2024/v3.0.0/ATBe.csv"
+reference                    = "NREL. (2024). Annual Technology Baseline. Retrieved from https://atb.nrel.gov/"
+master_url                   = "https://data.openei.org/files/6006/2024_v3_Workbook.xlsx"
+master_reference             = "NREL. (2024). Annual Technology Baseline. Excel workbook sheet <sheet>. Retrieved from https://atb.nrel.gov/"
+year                         = 2024
+core_metric_case             = "Market"
+currency_year                = 2021
+currency                     = "USD"
+cost_invest_metric           = "OCC"
+ccs_retrofit_cost_invest_metric = "Additional OCC"
+
+[atb.tsv_headers]
+"HeatRate(MMBtu/MWh)"      = "heat_rate_MMBtu_MWh"
+"OutageRates(%)Forced"     = "forced_outage_%"
+"Planned"                  = "planned_outage_%"
+"Emissions(lbs/MMBtu)SO2"  = "emissions_so2_lbs_MMBtu"
+"NOx"                      = "emissions_nox_lbs_MMBtu"
+"Hg"                       = "emissions_hg_lbs_MMBtu"
+"CO2"                      = "emissions_co2_lbs_MMBtu"
+"RampRate(%/min)"          = "ramp_rate_%_min"
+
+[capacity_credits]
+reference = "Frew, B., Cole, W., Sun, Y., Richards, J., & Mai, T. (2017). 8760-Based Method for Representing Variable Generation Capacity Value in Capacity Expansion Models: Preprint. NREL. https://www.nrel.gov/docs/fy17osti/68869.pdf"
+year      = 2017
+
+[sutubra_vre]
+reference    = "Sutubra"
+year         = 2024
+sort_solar_by = "lcoe"
+sort_wind_by  = "lcoe"
+
+[renewables_ninja]
+reference = "Pfenninger, S., & Staffell, I. (2016). Long-term patterns of European PV output using 30 years of validated hourly reanalysis and satellite data. Energy, 114, 1251-1265. https://doi.org/10.1016/j.energy.2016.08.060"
+
+# ------------------------------------------------------------------
+# IESO (Ontario) config
+# ------------------------------------------------------------------
+ieso_reference    = "IESO. (<year>). IESO public data. http://reports.ieso.ca/public/"
+ieso_rel_yyyy_mmm = "2025_Jun"
+ieso_rel_peak_type = "Firm"
+
+# ------------------------------------------------------------------
+# New wind technology classes (ATB display names by class)
+# ------------------------------------------------------------------
+[new_wind_techs]
+t1 = "Land-Based Wind - Class 7 - Technology 1"
+t2 = "Land-Based Wind - Class 8 - Technology 2"
+t3 = "Land-Based Wind - Class 9 - Technology 3"

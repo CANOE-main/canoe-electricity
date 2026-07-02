@@ -116,7 +116,7 @@ def validate_db_against_config(config, db_conn: sqlite3.Connection) -> bool:
                 CANOEElectricityConfig in Step 5).
         db_conn: open connection to the shared canoe-base database.
     """
-    behavior = config.params.get("validation_behavior", "error")
+    behavior = config.validation_behavior
 
     def _handle(message: str):
         if behavior == "error":
@@ -124,7 +124,7 @@ def validate_db_against_config(config, db_conn: sqlite3.Connection) -> bool:
         logger.warning(message)
 
     # -- Periods --
-    existing_periods = [p for p in config.params.get("existing_periods", [])]
+    existing_periods = list(config.existing_periods)
     future_periods = list(config.model_periods)
 
     missing_periods = check_missing_periods(db_conn, existing_periods, future_periods)

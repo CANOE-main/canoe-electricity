@@ -21,7 +21,7 @@ def aggregate_cfs(df_rtv: pd.DataFrame):
 
     print("Aggregating hourly capacity factors for existing VREs...")
 
-    ref = f"{config.params['renewables_ninja']['reference']}{config.refs.get('generators').citation}"
+    ref = f"{config.renewables_ninja.reference}{config.refs.get('generators').citation}"
     ref = config.refs.add('rninja-coders', ref)
 
     cfs_solar = aggregate_vre(df_rtv.loc[df_rtv['tech_code'] == 'solar'].copy(), 'cf_solar')
@@ -29,12 +29,12 @@ def aggregate_cfs(df_rtv: pd.DataFrame):
     cfs_wind_off = aggregate_vre(df_rtv.loc[df_rtv['tech_code'] == 'wind_offshore'].copy(), 'cf_wind_off')
 
     # Plotting if set to show
-    if config.params['show_plots']:
+    if config.show_plots:
         for region in df_rtv['region'].unique():
 
             figure, axis = pp.subplots(3, 1, constrained_layout=True)
             figure.suptitle(
-                f"{region} {config.params['weather_year']} synthesized hourly capacity factors\n"
+                f"{region} {config.weather_year} synthesized hourly capacity factors\n"
                 "for existing VRE (real data in red, if available)"
             )
 
@@ -108,7 +108,7 @@ def aggregate_vre(df_rtv: pd.DataFrame, cf_file: str):
         # Adjust for expected annual energy and clip to [0:1] again
         cf: pd.Series = energy_adjust * gen_mwh / rt['capacity']
         cf = cf.clip(0, 1)
-        cf[cf < config.params['cf_tolerance']] = 0
+        cf[cf < config.cf_tolerance] = 0
 
         # For net load for capacity credit calculations
         config.exs_vre_gen[rt['region']] += cf * capacity
@@ -175,8 +175,8 @@ class cf_grabber:
         # Get the existing generators from CODERS data
         _coders_kwargs = dict(
             cache_dir=config.cache_dir,
-            force_download=config.params.get('force_download', False),
-            api_key_file=config.input_files + config.params['coders_api_key_file'],
+            force_download=config.force_download,
+            api_key_file=config.input_files + config.coders_api_key_file,
             debug=config.debug,
         )
         df_existing, date_accessed = coders_api.get_data(end_point='generators', **_coders_kwargs)
@@ -277,8 +277,8 @@ class cf_grabber:
                 print(e)
         else:
             index = pd.date_range(
-                start=f"{config.params['weather_year']}-01-01 00:00:00",
-                end=f"{config.params['weather_year']}-12-31 23:00:00",
+                start=f"{config.weather_year}-01-01 00:00:00",
+                end=f"{config.weather_year}-12-31 23:00:00",
                 freq="h",
                 tz="EST"
             )
@@ -288,8 +288,8 @@ class cf_grabber:
             return df
         else:
             index = pd.date_range(
-                start=f"{config.params['weather_year']}-01-01 00:00:00",
-                end=f"{config.params['weather_year']}-12-31 23:00:00",
+                start=f"{config.weather_year}-01-01 00:00:00",
+                end=f"{config.weather_year}-12-31 23:00:00",
                 freq="h",
                 tz="EST"
             )

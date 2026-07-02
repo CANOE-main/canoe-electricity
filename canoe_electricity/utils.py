@@ -46,14 +46,15 @@ def clean_index(df):
 
 def compr_db_url(region, table_number):
 
-    return str(config.params['nrcan_url']).replace('<y>', str(config.params['base_year'])).replace('<r>', region.lower()).replace('<t>', str(table_number))
+    # TODO: add nrcan_url to params.toml / CANOEElectricityConfig
+    return str(config.nrcan_url).replace('<y>', str(config.base_year)).replace('<r>', region.lower()).replace('<t>', str(table_number))
 
 
 
 # Gets a formatted dataset ID
 def data_id(text: str = ''):
 
-    id = f"{config.params['data_id_prefix']}{text}{config.params['data_version']}"
+    id = f"{config.data_id_prefix}{text}{config.data_version}"
     config.data_ids.add(id)
     return id
 
@@ -65,9 +66,9 @@ def _initialise_atb():
     global df_atb
 
     # ATB data. CRP years is arbitrary unless using LCOE so use 20
-    df_atb = get_data(config.params['atb']['url'], dtype='unicode', index_col=0)
-    df_atb = df_atb.loc[(df_atb['core_metric_case']==config.params['atb']['core_metric_case']) & (df_atb['crpyears'].astype(int)==20)]
-    config.refs.add('atb', config.params['atb']['reference'])
+    df_atb = get_data(config.atb.url, dtype='unicode', index_col=0)
+    df_atb = df_atb.loc[(df_atb['core_metric_case']==config.atb.core_metric_case) & (df_atb['crpyears'].astype(int)==20)]
+    config.refs.add('atb', config.atb.reference)
 
 
 
@@ -78,31 +79,32 @@ def data_year(period_or_vintage: int) -> int:
         return period_or_vintage
     else:
         # New vintages take period-end data
-        return period_or_vintage + config.params['period_step']
+        return period_or_vintage + config.period_step
 
 
 
 # Just a shorthand way to get ATB data
 atb_tables = dict() # local store of reduced ATB tables by tech - saves lots of time
-def atb_data(tech_config: pd.Series, **kwargs) -> tuple[pd.DataFrame, str]:
+def atb_data(tech_config, **kwargs) -> tuple[pd.DataFrame, str]:
+    """Return filtered ATB DataFrame rows for *tech_config* (CANOEGenTech or CANOEStorageTech)."""
 
     global df_atb
 
     if df_atb is None: _initialise_atb()
 
-    note = f"{tech_config['atb_display_name']} - {tech_config['atb_scenario']} - {config.params['atb']['core_metric_case']}"
-    
+    note = f"{tech_config.atb_display_name} - {tech_config.atb_scenario} - {config.atb.core_metric_case}"
+
     # Take stored reduced table if exists otherwise reduce whole atb table
-    if tech_config.name in atb_tables.keys(): df = atb_tables[tech_config.name]
-    else: 
-        df = df_atb.loc[(df_atb['display_name']==tech_config['atb_display_name']) & (df_atb['scenario']==tech_config['atb_scenario'])]
-        atb_tables[tech_config.name] = df
+    if tech_config.code in atb_tables.keys(): df = atb_tables[tech_config.code]
+    else:
+        df = df_atb.loc[(df_atb['display_name']==tech_config.atb_display_name) & (df_atb['scenario']==tech_config.atb_scenario)]
+        atb_tables[tech_config.code] = df
 
     for key, value in kwargs.items():
         df: pd.DataFrame | pd.Series = df.loc[df[key] == str(value)]
         note += f" - {value}"
 
-    if config.debug: print(f"Getting ATB data for {note}")
+    if config.debug: print(f"Getting ATB data for {note}")  # noqa: E701
 
     if len(df.index) == 1: return df['value'], note
     elif len(df.index) > 1: return df, note
@@ -116,7 +118,7 @@ def get_statcan_table(table, save_as=None, filter:'function'=None, **kwargs):
     if save_as == None: save_as = f"statcan_{table}.csv"
     if os.path.splitext(save_as)[1] != ".csv": save_as += ".csv"
 
-    if not config.params['force_download'] and os.path.isfile(config.cache_dir + save_as):
+    if not config.force_download and os.path.isfile(config.cache_dir + save_as):
 
         try:
 
@@ -192,7 +194,7 @@ def get_data(url, file_type=None, cache_file_type=None, name=None, **kwargs) -> 
     cache_file = config.cache_dir + name
 
     data = None
-    if (not config.params['force_download'] and os.path.isfile(cache_file)):
+    if (not config.force_download and os.path.isfile(cache_file)):
         
         # Get from existing local cache
         if cache_file_type == "csv": data = pd.read_csv(cache_file, index_col=0, dtype='unicode')
@@ -274,7 +276,7 @@ def realign_timezone(df: pd.DataFrame, from_timezone:str=None, to_timezone:str=N
     # Convert to base timezone
     if to_timezone is not None: new_tz = to_timezone
     elif to_utc_offset is not None: new_tz = tz = pytz.FixedOffset(to_utc_offset*60)
-    else: new_tz = config.params['timezone']
+    else: new_tz = config.timezone
     new_time = time.tz_convert(new_tz)
 
     # Find where the zeroeth hour ended up
@@ -391,7 +393,7 @@ class database_converter:
 class renewables_ninja_api:
 
     api_base = 'https://www.renewables.ninja/api/'
-    weather_year = config.params['weather_year']
+    weather_year = config.weather_year
 
     def __init__(cls):
 

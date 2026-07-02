@@ -13,11 +13,11 @@ exchange = pd.read_csv(config.input_files + 'currency_exchange.csv', index_col=0
 inflation = pd.read_csv(config.input_files + 'cad_inflation.csv', index_col=0)
 
 # Currency and currency year for final data, converting to this
-base_curr = config.params['final_currency']
-base_year = config.params['final_currency_year']
+base_curr = config.final_currency
+base_year = config.final_currency_year
 
 # Multiplier for final currency (to normalise if not using CAD2020)
-base_fact = exchange.loc[base_year, base_curr] * inflation.loc[base_year, config.params['inflation_index']]
+base_fact = exchange.loc[base_year, base_curr] * inflation.loc[base_year, config.inflation_index]
 
 
 def conv_curr(orig_cost, orig_year: int, orig_curr: str):
@@ -33,7 +33,7 @@ def conv_curr(orig_cost, orig_year: int, orig_curr: str):
     cost = conv_curr(2500, 2010, 'USD')
     """
     
-    return orig_cost * exchange.loc[orig_year, orig_curr] * inflation.loc[orig_year, config.params['inflation_index']] / base_fact
+    return orig_cost * exchange.loc[orig_year, orig_curr] * inflation.loc[orig_year, config.inflation_index] / base_fact
 
 
 def convert_currencies():

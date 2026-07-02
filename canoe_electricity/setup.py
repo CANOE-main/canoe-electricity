@@ -1,24 +1,49 @@
 """
-Sets up configuration for electricity sector aggregation
-Written by Ian David Elder for the CANOE model
+Sets up configuration for electricity sector aggregation.
+Written by Ian David Elder for the CANOE model.
+
+Exposes `config` — a module-level CANOEElectricityConfig singleton — plus
+`open_database()` for pre-flight DB validation and selective data wipe.
 """
 
 import os
-import pandas as pd
-import yaml
 import sqlite3
-import numpy as np
+
 import canoe_electricity.atb_api as atb_api
+from canoe_electricity.config import (
+    CANOEElectricityConfig,
+    bibliography,   # re-exported for callers that import from setup
+    reference,      # re-exported for callers that import from setup
+)
 
 
+# ---------------------------------------------------------------------------
+# Module-level config singleton (loaded from TOML on first import)
+# ---------------------------------------------------------------------------
 
-def open_database():
-    """Open the shared database created by canoe-base.
+config: CANOEElectricityConfig = CANOEElectricityConfig.load()
+
+# Download ATB master workbook and stash the path on the config
+config.atb_master_file = atb_api.download_master(
+    url=config.atb.master_url,
+    cache_dir=config.cache_dir,
+    force_download=config.force_download,
+)
+
+print('Instantiated setup config.\n')
+
+
+# ---------------------------------------------------------------------------
+# Database helpers
+# ---------------------------------------------------------------------------
+
+def open_database() -> None:
+    """Validate that the shared DB exists and optionally wipe module data.
 
     The electricity module no longer creates or seeds the database — it only
     appends module-specific rows.  Run canoe-base first to produce the DB.
 
-    If params['force_wipe_database'] is True, only rows belonging to this
+    If ``config.force_wipe_database`` is True, only rows belonging to this
     module (identified by data_id prefix) are deleted before the run, leaving
     canoe-base and other modules' data intact.
     """
@@ -29,16 +54,14 @@ def open_database():
         )
 
     conn = sqlite3.connect(config.database_file)
-
-    if config.params.get('force_wipe_database', False):
+    if config.force_wipe_database:
         _wipe_module_data(conn)
-
     conn.close()
 
 
-def _wipe_module_data(conn: sqlite3.Connection):
+def _wipe_module_data(conn: sqlite3.Connection) -> None:
     """Delete only this module's rows (data_id prefix match) from the shared DB."""
-    prefix = config.params.get('data_id_prefix', 'E')
+    prefix = config.data_id_prefix
     curs = conn.cursor()
     tables = [t[0] for t in curs.execute(
         "SELECT name FROM sqlite_master WHERE type='table';"
@@ -49,180 +72,3 @@ def _wipe_module_data(conn: sqlite3.Connection):
             curs.execute(f"DELETE FROM '{table}' WHERE data_id LIKE '{prefix}%'")
     conn.commit()
     print(f"Cleared electricity module data (prefix='{prefix}') from database.\n")
-
-
-
-class reference:
-    """
-    Stores a single reference and its attributes
-    - id: the unique id for the source_id column
-    - citation: the full citation to go in the DataSource table
-    """
-
-    id: str
-    citation: str
-
-    def __init__(self, id: str, citation: str):
-        self.id = id
-        self.citation = citation
-
-
-class bibliography:
-    """This class stores references and handles unique indexing"""
-
-    references: dict[str, reference] = dict()
-
-    def __iter__(self):
-        for name, ref in self.references.items():
-            yield ref
-
-    def add(cls, name: str, citation: str) -> reference | None:
-        """Add a reference to the log and return the reference object"""
-
-        if name in cls.references:
-            return cls.references[name]
-        else:
-            num = len(cls.references.keys()) + 1
-            id = f"E{num}" if num >= 10 else f"E0{num}" # E01 -> E99 unique IDs
-            ref = reference(id=id, citation=citation)
-            cls.references[name] = ref
-            return ref
-    
-    def get(cls, name: str) -> reference | None:
-        """Returns a reference by its semantic name"""
-
-        if name not in cls.references:
-            print(f"Tried to get a reference that had not been added yet: {name}")
-            return
-        else:
-            return cls.references[name]
-
-
-
-class config:
-    """A singleton-pattern class to contain general configuration data"""
-
-    # File locations
-    _this_dir = "./"
-    input_files = _this_dir + 'input_files/'
-    cache_dir = _this_dir + "data_cache/"
-
-    if not os.path.exists(cache_dir): os.mkdir(cache_dir)
-    
-    refs: bibliography = bibliography()
-    data_ids = set()
-    provincial_demand: dict[str, np.ndarray] = {}
-
-    exs_vre_gen = dict()
-    """Regional dictionary of hourly total generation of existing VRE in the weather year in GWh"""
-
-    _instance = None # singleton pattern
-
-
-
-    def __new__(cls, *args, **kwargs):
-
-        if isinstance(cls._instance, cls): return cls._instance
-        cls._instance = super(config, cls).__new__(cls, *args, **kwargs)
-
-        if not os.path.isdir(config.cache_dir): os.mkdir(config.cache_dir)
-
-        cls._get_params(cls._instance)
-        cls._get_files(cls._instance)
-        cls._download_atb_master(cls._instance)
-
-        print('Instantiated setup config.\n')
-
-        return cls._instance
-
-        
-
-    def _get_params(cls):
-
-        stream = open(config.input_files + "params.yaml", 'r')
-        config.params = dict(yaml.load(stream, Loader=yaml.Loader))
-        config.debug = config.params['debug']
-
-        config.commodities = pd.read_csv(config.input_files + 'commodities.csv', index_col=0)
-        config.regions = pd.read_csv(config.input_files + 'regions.csv', index_col=0)
-        config.time = pd.read_csv(config.input_files + 'time.csv', index_col=0)
-        config.units = pd.read_csv(config.input_files + 'units.csv', index_col=0)
-        config.trans_techs = pd.read_csv(config.input_files + 'transmission_technologies.csv', index_col=0)
-        config.gen_techs = pd.read_csv(config.input_files + 'generator_technologies.csv', index_col=0)
-        config.storage_techs = pd.read_csv(config.input_files + 'storage_technologies.csv', index_col=0)
-        config.import_techs = pd.read_csv(config.input_files + 'import_technologies.csv', index_col=0)
-        config.ccs_techs = pd.read_csv(config.input_files + 'ccs_retrofit_technologies.csv', index_col=0)
-        config.atb_master_tables = pd.read_csv(config.input_files + 'atb_master_tables.csv', index_col=0)
-        
-        # Only want the included retrofit techs
-        config.ccs_techs = config.ccs_techs.loc[config.ccs_techs['include']]
-
-        # Fill in missing columns versus gen_techs
-        config.storage_techs['include_fuel_cost'] = False # no fuel for storage techs
-
-        # Included regions and future periods
-        config.model_periods = list(config.params['model_periods'])
-        config.model_periods.sort()
-        config.regions['endogenous'] = config.regions['endogenous'].astype('boolean').fillna(False)
-        config.model_regions = config.regions.loc[(config.regions['endogenous'])].index.unique().to_list()
-        config.model_regions.sort()
-
-        # Initialise VRE hourly generation, for calculating capacity credits
-        for region in config.model_regions: config.exs_vre_gen[region] = np.zeros(8760)
-
-        # Maps all coders gen types to canoe techs
-        config.gen_map = dict()
-        for tech_code, row in config.gen_techs.iterrows():
-            config.gen_map[row['coders_equiv']] = tech_code
-
-        # Maps all coders storage types to canoe techs
-        config.storage_map = dict()
-        for tech_code, row in config.storage_techs.iterrows():
-            key = (row['coders_equiv'], row['duration'])
-            config.storage_map[key] = tech_code
-
-        # Maps all types of coders regions to canoe regions
-        config.region_map = dict()
-        for region, row in config.regions.iterrows():
-            for coders_equiv in row['coders_equivs'].split("+"):
-                config.region_map[coders_equiv] = region
-                # else: config.region_map[coders_equiv] = 'X'
-
-        # Maps all coders existing storage types to canoe techs
-        config.existing_map = dict()
-        for tech_code, row in config.gen_techs.iterrows():
-            if pd.isna(row['coders_existing']): continue
-            for coders_equiv in row['coders_existing'].split("+"):
-                config.existing_map[coders_equiv] = tech_code
-
-        # Batched new capacities and new capacity limits
-        # Deprecated
-        # config.batched_cap = dict()
-        # config.cap_limits = dict()
-        # for region in config.model_regions:
-        #     config.batched_cap[region] = pd.read_excel(config.input_files + 'batched_new_capacity.xlsx', sheet_name=region, index_col=0, skiprows=2)
-        #     config.cap_limits[region] = pd.read_excel(config.input_files + 'capacity_limits.xlsx', sheet_name=region, index_col=0, skiprows=2)
-            
-
-
-    def _get_files(cls):
-
-        config.schema_file = config.input_files + config.params['sqlite_schema']
-        config.database_file = config.params['sqlite_database']#config._this_dir + config.params['sqlite_database']
-        config.excel_template_file = config.input_files + config.params['excel_template']
-        config.excel_target_file = config._this_dir + config.params['excel_output']
-
-    
-
-    def _download_atb_master(cls):
-
-        config.atb_master_file = atb_api.download_master(
-            url=config.params['atb']['master_url'],
-            cache_dir=config.cache_dir,
-            force_download=config.params.get('force_download', False),
-        )
-        
-
-
-# Instantiate config on import
-config()

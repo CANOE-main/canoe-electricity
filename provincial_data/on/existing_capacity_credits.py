@@ -79,8 +79,8 @@ def get_capacity_credits() -> tuple[pd.DataFrame, str, str, str]:
     this_dir = os.path.realpath(os.path.dirname(__file__)) + "/"
 
     # The most recent or desired ieso reliability outlook
-    yyyy, mmm = config.params['ieso_rel_yyyy_mmm'].split("_")
-    peak_type: str = config.params['ieso_rel_peak_type']
+    yyyy, mmm = config.ieso_rel_yyyy_mmm.split("_")
+    peak_type: str = config.ieso_rel_peak_type
 
     rel_outlook_url = f"https://www.ieso.ca/-/media/Files/IESO/Document-Library/planning-forecasts/reliability-outlook/ReliabilityOutlookTables_{yyyy}{mmm}.xlsx"
     note = f"Forecasted capability at {peak_type.lower()} summer peak divided by total installed capacity"

@@ -14,16 +14,16 @@ import canoe_electricity.utils as utils
 from canoe_electricity.currency_conversion import conv_curr
 from canoe_schema.v4_0.models import Efficiency, CostInvest, CapacityFactorProcess, LimitCapacity, CostFixed
 
-atb_year = config.params['atb']['year']
-atb_ref = config.refs.add('atb', config.params['atb']['reference'])
-sutubra_year = config.params['sutubra_vre']['year']
-sutubra_ref = config.refs.add('sutubra_vre', config.params['sutubra_vre']['reference'])
+atb_year = config.atb.year
+atb_ref = config.refs.add('atb', config.atb.reference)
+sutubra_year = config.sutubra_vre.year
+sutubra_ref = config.refs.add('sutubra_vre', config.sutubra_vre.reference)
 combo_ref = config.refs.add('atb_sut_vre', f"{atb_ref.citation}; {sutubra_ref.citation}")
 
 
 
 def aggregate(df_rtv: pd.DataFrame):
-    if config.params['include_new_wind_solar']:
+    if config.include_new_wind_solar:
         for region in config.model_regions:
             df_rtv_reg = df_rtv.loc[df_rtv['region'] == region]
             aggregate_wind(df_rtv_reg.loc[df_rtv_reg['tech_code'] == 'wind_onshore'].copy(), region)
@@ -50,16 +50,17 @@ def aggregate_wind(df_rtv: pd.DataFrame, region: str):
     df_spur_cost = pd.read_csv(wind_dir + 'Cluster Spur Costs.csv', index_col=0)
 
     ## Get cost data for each class of turbine T1-3
-    wind_config = config.gen_techs.loc['wind_onshore']
-    invest_metric = config.params['atb']['cost_invest_metric'] # which ATB metric to use for cost invest
+    wind_config = config.gen_techs_by_code['wind_onshore']
+    invest_metric = config.atb.cost_invest_metric  # which ATB metric to use for cost invest
 
     # Calculating weighted ATB data for each cluster
     class_data = {'t1': dict(), 't2': dict(), 't3': dict()}
     for wind_class, class_dict in class_data.items():
 
-        tech_config = wind_config.copy()
-        tech_config['atb_display_name'] = config.params['new_wind_techs'][wind_class]
-        tech_config.name = f"wind_onshore_{wind_class}" # atb_data method uses caching on this name
+        tech_config = wind_config.model_copy(update={
+            'atb_display_name': config.new_wind_techs[wind_class],
+            'code': f"wind_onshore_{wind_class}",  # atb_data method uses caching on this code
+        })
 
         # Get projected invest and fixed cost and capacity factor tables from ATB
         class_dict['cost_invest'], invest_note = utils.atb_data(tech_config, core_metric_parameter=invest_metric)
@@ -93,12 +94,12 @@ def aggregate_wind(df_rtv: pd.DataFrame, region: str):
     df_fixed *= config.units.loc['cost_fixed', 'atb_conv_fact']
 
     # Convert currency
-    df_invest = conv_curr(df_invest, config.params['atb']['currency_year'], config.params['atb']['currency'])
-    df_fixed = conv_curr(df_fixed, config.params['atb']['currency_year'], config.params['atb']['currency'])
+    df_invest = conv_curr(df_invest, config.atb.currency_year, config.atb.currency)
+    df_fixed = conv_curr(df_fixed, config.atb.currency_year, config.atb.currency)
 
     # Sort by LCOE, then take top n clusters where n = n_bins in generator techs csv
     l = df_rtv.iloc[0]['life']
-    i = config.params['global_discount_rate']
+    i = config.global_discount_rate
     A_P = (i*(1+i)**l)/((1+i)**l-1)
     df_comp['LCOE with Spur'] = df_comp.index.map(
         lambda cluster:
@@ -137,8 +138,8 @@ def aggregate_wind(df_rtv: pd.DataFrame, region: str):
     # Group rtv by cluster to calculate CC of each cluster (i.e. ignoring vintage)
     df_rt = df_rtv.groupby('cluster').first().sort_values('bin')
 
-    input_comm = config.commodities.loc[wind_config['in_comm']]
-    output_comm = config.commodities.loc[wind_config['out_comm']]
+    input_comm = config.commodities.loc[wind_config.in_comm]
+    output_comm = config.commodities.loc[wind_config.out_comm]
 
 
     ## MaxCapacity
@@ -194,7 +195,7 @@ def aggregate_wind(df_rtv: pd.DataFrame, region: str):
 
         cf: pd.Series = df_cf[str(cluster)] * df_cf_index.loc[str(data_year), cluster]
         cf = cf.clip(0, 1)
-        cf[cf < config.params['cf_tolerance']] = 0
+        cf[cf < config.cf_tolerance] = 0
         tod_0 = config.time.iloc[0]['tod']
 
         cf_rows = []
@@ -258,7 +259,7 @@ def aggregate_solar(df_rtv: pd.DataFrame, region: str):
     df_bins = pd.read_csv(solar_dir + 'Solar Resource Summary.csv', index_col=False).astype(float)
     
     # Sort solar bins by configured metric
-    sort_by = config.params['sutubra_vre']['sort_solar_by']
+    sort_by = config.sutubra_vre.sort_solar_by
     if sort_by == 'lcoe': df_bins = df_bins.sort_values('LCOE with Spur', ascending=True)
     elif sort_by == 'cf': df_bins = df_bins.sort_values('Capacity Factor', ascending=True)
 
@@ -272,8 +273,8 @@ def aggregate_solar(df_rtv: pd.DataFrame, region: str):
     df_rtv.index.name = 'cluster'
     df_rtv['max_cap'] = df_rtv.index.map(lambda cluster: df_bins.loc[cluster, 'Max Capacity (MW)'])
     
-    solar_config = config.gen_techs.loc['solar']
-    invest_metric = config.params['atb']['cost_invest_metric'] # which ATB metric to use for cost invest
+    solar_config = config.gen_techs_by_code['solar']
+    invest_metric = config.atb.cost_invest_metric  # which ATB metric to use for cost invest
 
     ## Get ATB projections for each bin
     df_invest, invest_note = utils.atb_data(solar_config, core_metric_parameter=invest_metric)
@@ -290,8 +291,8 @@ def aggregate_solar(df_rtv: pd.DataFrame, region: str):
     df_fixed *= config.units.loc['cost_fixed', 'atb_conv_fact']
 
     # Convert currency
-    df_invest = conv_curr(df_invest, config.params['atb']['currency_year'], config.params['atb']['currency'])
-    df_fixed = conv_curr(df_fixed, config.params['atb']['currency_year'], config.params['atb']['currency'])
+    df_invest = conv_curr(df_invest, config.atb.currency_year, config.atb.currency)
+    df_fixed = conv_curr(df_fixed, config.atb.currency_year, config.atb.currency)
     
     # Aggregate capacity credits based on projected capacity factor
     for vint in df_rtv['vint'].unique():
@@ -319,11 +320,11 @@ def aggregate_solar(df_rtv: pd.DataFrame, region: str):
     # Group rtv by cluster to calculate CC of each cluster (i.e. ignoring vintage)
     df_rt = df_rtv.groupby('cluster').first().sort_values('bin')
 
-    input_comm = config.commodities.loc[solar_config['in_comm']]
-    output_comm = config.commodities.loc[solar_config['out_comm']]
+    input_comm = config.commodities.loc[solar_config.in_comm]
+    output_comm = config.commodities.loc[solar_config.out_comm]
 
-    deg_rate = config.params['solar_degradation']['rate']
-    deg_ref = config.params['solar_degradation']['reference']
+    deg_rate = config.solar_degradation.rate
+    deg_ref = config.solar_degradation.reference
     cf_note = (
         f"Wind characterisation work done by Sutubra. Grid cells binned by ascending LCOE. "
         f"Capacity factors further indexed to those in NREL ATB, by construction year with 2030 as base year. "
@@ -370,7 +371,7 @@ def aggregate_solar(df_rtv: pd.DataFrame, region: str):
             f"Plus estimated spur line cost from existing transmissions lines. "
         )
         cost_invest = df_invest[str(data_year)] + bin_config['Interconnection Cost ($/kW)']
-        cost_invest = conv_curr(cost_invest, config.params['atb']['currency_year'], config.params['atb']['currency'])
+        cost_invest = conv_curr(cost_invest, config.atb.currency_year, config.atb.currency)
         curs.executemany(*CostInvest.bulk_insert_or_ignore_sql([CostInvest(
             region=rtv['region'], tech=rtv['tech'], vintage=rtv['vint'],
             cost=cost_invest, units=f"({config.units.loc['cost_invest', 'units']})",
@@ -381,7 +382,7 @@ def aggregate_solar(df_rtv: pd.DataFrame, region: str):
         ## CapacityFactorProcess (no period in v4; use vintage-year CF, degradation not applied)
         cf: pd.Series = df_cf[str(cluster)] * cf_index[str(data_year)]
         cf = cf.clip(0, 1)
-        cf[cf < config.params['cf_tolerance']] = 0
+        cf[cf < config.cf_tolerance] = 0
         tod_0 = config.time.iloc[0]['tod']
 
         cf_rows = []
@@ -412,7 +413,7 @@ def aggregate_solar(df_rtv: pd.DataFrame, region: str):
             if rtv['vint'] > period or rtv['vint'] + rtv['life'] <= period: continue
 
             cost_fixed = df_fixed[str(data_year)]
-            cost_fixed = conv_curr(cost_fixed, config.params['atb']['currency_year'], config.params['atb']['currency'])
+            cost_fixed = conv_curr(cost_fixed, config.atb.currency_year, config.atb.currency)
             cf_fixed_rows.append(CostFixed(
                 region=rtv['region'], period=period, tech=rtv['tech'], vintage=rtv['vint'],
                 cost=cost_fixed, units=f"({config.units.loc['cost_fixed', 'units']})",
