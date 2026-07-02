@@ -53,4 +53,4 @@ def aggregate(
         dq_time=1,
         data_id=data_id,
     )
-    curs.executemany(*CostVariable.bulk_insert_or_ignore_sql([row]))
+    curs.executemany(*CostVariable.bulk_insert_or_ignore_sql([row], include_nulls=True))

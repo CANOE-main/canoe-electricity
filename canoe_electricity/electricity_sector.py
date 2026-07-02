@@ -110,7 +110,7 @@ def prepare_test_model():
     curs.execute(f"""REPLACE INTO sector_labels(sector) VALUES('electricity')""")
 
     curs.execute(f"DELETE FROM time_season")
-    [curs.execute(f"INSERT INTO time_season(t_season) VALUES('{day}')") for day in rep_days]
+    [curs.execute(f"INSERT INTO time_season(season) VALUES('{day}')") for day in rep_days]
 
     seas_tables = [
         'CapacityFactorTech',
@@ -121,7 +121,7 @@ def prepare_test_model():
         ]
 
     for table in seas_tables:
-        curs.execute(f"DELETE FROM {table} WHERE season_name NOT IN (SELECT t_season from time_season)")
+        curs.execute(f"DELETE FROM {table} WHERE season_name NOT IN (SELECT season from time_season)")
 
     df_dsd = pd.read_sql_query("SELECT * FROM DemandSpecificDistribution", conn)
     df_dsd = df_dsd.groupby(['regions','demand_name'])

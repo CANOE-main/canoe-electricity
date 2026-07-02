@@ -115,7 +115,7 @@ class CANOEGenTech(BaseModel):
     tech_sets: str | None = None
     include_fuel_cost: bool = False
     no_retirement: bool = False
-    ccs: int = 0
+    ccs: float = 0
 
 
 class CANOEStorageTech(BaseModel):
@@ -136,7 +136,7 @@ class CANOEStorageTech(BaseModel):
     out_comm: str
     tech_sets: str | None = None
     no_retirement: bool = False
-    ccs: int = 0
+    ccs: float = 0
     include_fuel_cost: bool = False
 
 

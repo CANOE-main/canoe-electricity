@@ -69,7 +69,7 @@ def aggregate_cfs(df_rtv: pd.DataFrame):
                 ))
 
         if data:
-            curs.executemany(*CapacityFactorTech.bulk_insert_or_ignore_sql(data))
+            curs.executemany(*CapacityFactorTech.bulk_insert_or_ignore_sql(data, include_nulls=True))
 
     conn.commit()
     conn.close()

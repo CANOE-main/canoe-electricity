@@ -157,7 +157,7 @@ def aggregate_wind(df_rtv: pd.DataFrame, region: str):
                 data_id=utils.data_id(rt['region']),
             ))
     if lc_rows:
-        curs.executemany(*LimitCapacity.bulk_insert_or_ignore_sql(lc_rows))
+        curs.executemany(*LimitCapacity.bulk_insert_or_ignore_sql(lc_rows, include_nulls=True))
 
     # Indexed by region, tech, and vintage
     for cluster, rtv in df_rtv.iterrows():
@@ -215,7 +215,7 @@ def aggregate_wind(df_rtv: pd.DataFrame, region: str):
                     data_id=utils.data_id(rtv['region']),
                 ))
         if cf_rows:
-            curs.executemany(*CapacityFactorProcess.bulk_insert_or_ignore_sql(cf_rows))
+            curs.executemany(*CapacityFactorProcess.bulk_insert_or_ignore_sql(cf_rows, include_nulls=True))
 
         ## CostFixed
         note = f"NREL ATB {rtv['vint']} Fixed O&M (NREL, {atb_year}) weighted by capacity shares of turbine class."
@@ -232,7 +232,7 @@ def aggregate_wind(df_rtv: pd.DataFrame, region: str):
                 data_id=utils.data_id(rtv['region']),
             ))
         if cf_fixed_rows:
-            curs.executemany(*CostFixed.bulk_insert_or_ignore_sql(cf_fixed_rows))
+            curs.executemany(*CostFixed.bulk_insert_or_ignore_sql(cf_fixed_rows, include_nulls=True))
 
 
     conn.commit()
@@ -348,7 +348,7 @@ def aggregate_solar(df_rtv: pd.DataFrame, region: str):
                 data_id=utils.data_id(rt['region']),
             ))
     if lc_rows:
-        curs.executemany(*LimitCapacity.bulk_insert_or_ignore_sql(lc_rows))
+        curs.executemany(*LimitCapacity.bulk_insert_or_ignore_sql(lc_rows, include_nulls=True))
 
     # Indexed by region, tech, and vintage
     for cluster, rtv in df_rtv.iterrows():
@@ -403,7 +403,7 @@ def aggregate_solar(df_rtv: pd.DataFrame, region: str):
                     data_id=utils.data_id(rtv['region']),
                 ))
         if cf_rows:
-            curs.executemany(*CapacityFactorProcess.bulk_insert_or_ignore_sql(cf_rows))
+            curs.executemany(*CapacityFactorProcess.bulk_insert_or_ignore_sql(cf_rows, include_nulls=True))
 
         ## CostFixed
         fixed_note += f" - {data_year}"
@@ -421,7 +421,7 @@ def aggregate_solar(df_rtv: pd.DataFrame, region: str):
                 data_id=utils.data_id(rtv['region']),
             ))
         if cf_fixed_rows:
-            curs.executemany(*CostFixed.bulk_insert_or_ignore_sql(cf_fixed_rows))
+            curs.executemany(*CostFixed.bulk_insert_or_ignore_sql(cf_fixed_rows, include_nulls=True))
 
 
     conn.commit()

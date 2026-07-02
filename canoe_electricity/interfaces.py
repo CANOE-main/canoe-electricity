@@ -235,7 +235,7 @@ def aggregate_boundary_interface(in_region: str, out_region: str, interface: pd.
             ## CostVariable
             cost_tx_dx.aggregate(in_region, period, tech, vint, curs, data_id, 'tx')
         if demand_rows:
-            curs.executemany(*Demand.bulk_insert_or_ignore_sql(demand_rows))
+            curs.executemany(*Demand.bulk_insert_or_ignore_sql(demand_rows, include_nulls=True))
 
         ## DemandSpecificDistribution
         note = f"{weather_year} hourly flow divided by total annual flow leaving model boundary from {in_region}"
@@ -259,7 +259,7 @@ def aggregate_boundary_interface(in_region: str, out_region: str, interface: pd.
                         demand_name=dem_comm['commodity'], dsd=dsd, data_id=data_id,
                     ))
         if dsd_rows:
-            curs.executemany(*DemandSpecificDistribution.bulk_insert_or_ignore_sql(dsd_rows))
+            curs.executemany(*DemandSpecificDistribution.bulk_insert_or_ignore_sql(dsd_rows, include_nulls=True))
     
     else:
         print(f"Got zero flow for boundary intertie from {in_region} out to {out_region}. Skipped outgoing intertie.")
@@ -329,7 +329,7 @@ def aggregate_boundary_interface(in_region: str, out_region: str, interface: pd.
                     tech=tech, factor=cf, data_id=data_id,
                 ))
         if cf_rows:
-            curs.executemany(*CapacityFactorTech.bulk_insert_or_ignore_sql(cf_rows))
+            curs.executemany(*CapacityFactorTech.bulk_insert_or_ignore_sql(cf_rows, include_nulls=True))
         
     else:
         print(f"Got zero flow for boundary intertie from {out_region} into {in_region}. Skipped incoming intertie.")
@@ -431,7 +431,7 @@ def aggregate_endogenous_interfaces(df_interfaces: pd.DataFrame):
                         tech=tech_config['tech'], factor=cf, data_id=data_id,
                     ))
             if cf_rows:
-                curs.executemany(*CapacityFactorTech.bulk_insert_or_ignore_sql(cf_rows))
+                curs.executemany(*CapacityFactorTech.bulk_insert_or_ignore_sql(cf_rows, include_nulls=True))
 
 
         ## CostVariable

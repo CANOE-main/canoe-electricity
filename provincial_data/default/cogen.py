@@ -77,7 +77,7 @@ def aggregate(df_rtv: pd.DataFrame):
                 ))
 
     if rows:
-        curs.executemany(*LimitActivity.bulk_insert_or_ignore_sql(rows))
+        curs.executemany(*LimitActivity.bulk_insert_or_ignore_sql(rows, include_nulls=True))
 
     conn.commit()
     conn.close()

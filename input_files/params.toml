@@ -26,7 +26,7 @@ dsd_tolerance = 0.02           # zero DSD below this × hourly average
 cf_tolerance = 0.01            # zero capacity factor below this
 
 sqlite_schema   = "canoe_dataset_schema.sql"
-sqlite_database = "electricity.sqlite"
+sqlite_database = "electricity.new.sqlite"
 excel_template  = "Template spreadsheet (make a copy).xlsx"
 excel_output    = "electricity.xlsx"
 
@@ -59,18 +59,18 @@ clone_to_excel               = false
 simplify_model               = false
 show_plots                   = true
 
+# ------------------------------------------------------------------
+# Physics / units
+# ------------------------------------------------------------------
+c2a_unit = "PJ/GWy"
+c2a      = 31.536
+
 [included_emissions]
 co2e = true
 co2  = true
 so2  = false
 nox  = false
 hg   = false
-
-# ------------------------------------------------------------------
-# Physics / units
-# ------------------------------------------------------------------
-c2a_unit = "PJ/GWy"
-c2a      = 31.536
 
 [solar_degradation]
 rate      = 0.0085
@@ -124,15 +124,15 @@ year         = 2024
 sort_solar_by = "lcoe"
 sort_wind_by  = "lcoe"
 
-[renewables_ninja]
-reference = "Pfenninger, S., & Staffell, I. (2016). Long-term patterns of European PV output using 30 years of validated hourly reanalysis and satellite data. Energy, 114, 1251-1265. https://doi.org/10.1016/j.energy.2016.08.060"
-
 # ------------------------------------------------------------------
 # IESO (Ontario) config
 # ------------------------------------------------------------------
 ieso_reference    = "IESO. (<year>). IESO public data. http://reports.ieso.ca/public/"
 ieso_rel_yyyy_mmm = "2025_Jun"
 ieso_rel_peak_type = "Firm"
+
+[renewables_ninja]
+reference = "Pfenninger, S., & Staffell, I. (2016). Long-term patterns of European PV output using 30 years of validated hourly reanalysis and satellite data. Energy, 114, 1251-1265. https://doi.org/10.1016/j.energy.2016.08.060"
 
 # ------------------------------------------------------------------
 # New wind technology classes (ATB display names by class)

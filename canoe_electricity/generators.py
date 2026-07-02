@@ -203,7 +203,7 @@ def aggregate_new_storage():
                     notes=f"{eff_units} Following assumptions in NREL ATB",
                     data_source=ref.id, dq_cred=1, data_id=utils.data_id(region),
                 ))
-            curs.executemany(*Efficiency.bulk_insert_or_ignore_sql(eff_rows))
+            curs.executemany(*Efficiency.bulk_insert_or_ignore_sql(eff_rows, include_nulls=True))
 
     conn.commit()
     conn.close()
@@ -314,7 +314,7 @@ def aggregate_existing_generators() -> pd.DataFrame:
             data_id=utils.data_id(),
         ))
     if tech_rows:
-        curs.executemany(*Technology.bulk_insert_or_ignore_sql(tech_rows))
+        curs.executemany(*Technology.bulk_insert_or_ignore_sql(tech_rows, include_nulls=True))
 
     # Iterate over aggregated existing capacity
     ec_rows = []
@@ -329,12 +329,12 @@ def aggregate_existing_generators() -> pd.DataFrame:
             data_id=utils.data_id(row['region']),
         ))
     if ec_rows:
-        curs.executemany(*ExistingCapacity.bulk_insert_or_ignore_sql(ec_rows))
+        curs.executemany(*ExistingCapacity.bulk_insert_or_ignore_sql(ec_rows, include_nulls=True))
 
     ## time_periods
     tp_rows = [TimePeriod(period=int(vint), flag='e') for vint in df_rtv['vint'].unique()]
     if tp_rows:
-        curs.executemany(*TimePeriod.bulk_insert_or_ignore_sql(tp_rows))
+        curs.executemany(*TimePeriod.bulk_insert_or_ignore_sql(tp_rows, include_nulls=True))
         
     conn.commit()
     conn.close()
@@ -477,15 +477,15 @@ def aggregate_existing_storage():
             data_id=utils.data_id(row['region']),
         ))
 
-    if tech_rows: curs.executemany(*Technology.bulk_insert_or_ignore_sql(tech_rows))
-    if eff_rows: curs.executemany(*Efficiency.bulk_insert_or_ignore_sql(eff_rows))
-    if ec_rows: curs.executemany(*ExistingCapacity.bulk_insert_or_ignore_sql(ec_rows))
-    if sd_rows: curs.executemany(*StorageDuration.bulk_insert_or_ignore_sql(sd_rows))
+    if tech_rows: curs.executemany(*Technology.bulk_insert_or_ignore_sql(tech_rows, include_nulls=True))
+    if eff_rows: curs.executemany(*Efficiency.bulk_insert_or_ignore_sql(eff_rows, include_nulls=True))
+    if ec_rows: curs.executemany(*ExistingCapacity.bulk_insert_or_ignore_sql(ec_rows, include_nulls=True))
+    if sd_rows: curs.executemany(*StorageDuration.bulk_insert_or_ignore_sql(sd_rows, include_nulls=True))
 
     ## time_periods
     tp_rows = [TimePeriod(period=int(vint), flag='e') for vint in df_rtdv['vint'].unique()]
     if tp_rows:
-        curs.executemany(*TimePeriod.bulk_insert_or_ignore_sql(tp_rows))
+        curs.executemany(*TimePeriod.bulk_insert_or_ignore_sql(tp_rows, include_nulls=True))
         
 
     conn.commit()
@@ -608,7 +608,7 @@ def aggregate_rt_all(region, tech, tech_config):
             data_source=config.refs.get('generation_generic').id, dq_cred=2,
             data_id=utils.data_id(region),
         )
-    curs.executemany(*LifetimeTech.bulk_insert_or_ignore_sql([lt_row]))
+    curs.executemany(*LifetimeTech.bulk_insert_or_ignore_sql([lt_row], include_nulls=True))
 
     ## CapacityToActivity
     curs.executemany(*CapacityToActivity.bulk_insert_or_ignore_sql([CapacityToActivity(
@@ -656,8 +656,8 @@ def aggregate_rt_atb(region, tech, tech_config):
                 note = f"({config.units.loc['ramp_rate', 'units']}) {tsv_note} ramp_rate_%_min times {config.units.loc['ramp_rate', 'coders_conv_fact']}"
 
                 _kwargs = dict(region=region, tech=tech, rate=ramp_rate, notes=note, data_source=config.refs.get(tsv_note).id, dq_cred=1, data_id=utils.data_id(region))
-                curs.executemany(*RampUpHourly.bulk_insert_or_ignore_sql([RampUpHourly(**_kwargs)]))
-                curs.executemany(*RampDownHourly.bulk_insert_or_ignore_sql([RampDownHourly(**_kwargs)]))
+                curs.executemany(*RampUpHourly.bulk_insert_or_ignore_sql([RampUpHourly(**_kwargs)], include_nulls=True))
+                curs.executemany(*RampDownHourly.bulk_insert_or_ignore_sql([RampDownHourly(**_kwargs)], include_nulls=True))
 
 
     ## CostInvest
@@ -887,8 +887,8 @@ def aggregate_ramp_rt_coders(region, tech, tech_config):
             note = f"({config.units.loc['ramp_rate', 'units']}) {tech_config.coders_equiv} ramp_rate_percent_per_min times {config.units.loc['ramp_rate', 'coders_conv_fact']}"
 
             _kwargs = dict(region=region, tech=tech, rate=ramp_rate, notes=note, data_source=config.refs.get('generation_generic').id, dq_cred=2, data_id=utils.data_id(region))
-            curs.executemany(*RampUpHourly.bulk_insert_or_ignore_sql([RampUpHourly(**_kwargs)]))
-            curs.executemany(*RampDownHourly.bulk_insert_or_ignore_sql([RampDownHourly(**_kwargs)]))
+            curs.executemany(*RampUpHourly.bulk_insert_or_ignore_sql([RampUpHourly(**_kwargs)], include_nulls=True))
+            curs.executemany(*RampDownHourly.bulk_insert_or_ignore_sql([RampDownHourly(**_kwargs)], include_nulls=True))
 
 
 
@@ -1360,7 +1360,7 @@ def setup_monthly_hydro(df_rtv: pd.DataFrame):
             for region in df_rtv.loc[df_rtv['tech'] == base_tech]['region'].unique()
         ]
         if sd_rows:
-            curs.executemany(*StorageDuration.bulk_insert_or_ignore_sql(sd_rows))
+            curs.executemany(*StorageDuration.bulk_insert_or_ignore_sql(sd_rows, include_nulls=True))
 
     conn.commit()
     conn.close()

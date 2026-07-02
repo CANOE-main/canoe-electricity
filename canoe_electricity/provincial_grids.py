@@ -65,7 +65,7 @@ def aggregate_reserve_margin():
         for region, row in df_sys.iterrows()
     ]
     if rows:
-        curs.executemany(*PlanningReserveMargin.bulk_insert_or_ignore_sql(rows))
+        curs.executemany(*PlanningReserveMargin.bulk_insert_or_ignore_sql(rows, include_nulls=True))
 
     print(f"Planning reserve margin aggregated into {os.path.basename(config.database_file)}\n")
 
@@ -98,7 +98,7 @@ def aggregate_transmission():
         )
         for code in ['tx_to_dx', 'dx_to_dem']
     ]
-    curs.executemany(*Technology.bulk_insert_or_ignore_sql(tech_rows))
+    curs.executemany(*Technology.bulk_insert_or_ignore_sql(tech_rows, include_nulls=True))
 
     ## CostVariable
     for region, row in df_sys.iterrows():
@@ -147,7 +147,7 @@ def aggregate_transmission():
             data_id=utils.data_id(region),
         ))
 
-    curs.executemany(*Efficiency.bulk_insert_or_ignore_sql(eff_rows))
+    curs.executemany(*Efficiency.bulk_insert_or_ignore_sql(eff_rows, include_nulls=True))
 
     print(f"Transmission aggregated into {os.path.basename(config.database_file)}\n")
 
@@ -229,7 +229,7 @@ def aggregate_demand():
             description=tech_config['description'],
             data_id=utils.data_id(),
         )
-        curs.executemany(*Technology.bulk_insert_or_ignore_sql([tech_row]))
+        curs.executemany(*Technology.bulk_insert_or_ignore_sql([tech_row], include_nulls=True))
 
         ## Efficiency
         eff_row = Efficiency(
@@ -242,7 +242,7 @@ def aggregate_demand():
             notes="dummy tech",
             data_id=data_id,
         )
-        curs.executemany(*Efficiency.bulk_insert_or_ignore_sql([eff_row]))
+        curs.executemany(*Efficiency.bulk_insert_or_ignore_sql([eff_row], include_nulls=True))
 
 
         # If not including demand, don't go any further
@@ -289,11 +289,14 @@ def aggregate_demand():
                         tod=time['tod'],
                         demand_name=dem_comm['commodity'],
                         dsd=dsd[h],
+                        notes=dsd_note,
+                        data_source=ref.id,
+                        dq_cred=2,
                         data_id=data_id,
                     ))
 
         if dsd_rows:
-            curs.executemany(*DemandSpecificDistribution.bulk_insert_or_ignore_sql(dsd_rows))
+            curs.executemany(*DemandSpecificDistribution.bulk_insert_or_ignore_sql(dsd_rows, include_nulls=True))
 
 
         """
@@ -322,7 +325,7 @@ def aggregate_demand():
             ))
 
         if demand_rows:
-            curs.executemany(*Demand.bulk_insert_or_ignore_sql(demand_rows))
+            curs.executemany(*Demand.bulk_insert_or_ignore_sql(demand_rows, include_nulls=True))
 
 
     conn.commit()
