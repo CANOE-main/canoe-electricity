@@ -13,8 +13,8 @@ from canoe_schema.v4_0.models import Commodity, DataSource, DataSet, Technology,
 
 def process():
 
-    if config.params['include_imports']: aggregate_imports()
-    if config.params['include_capacity_limits']: aggregate_capacity_limits()
+    if config.include_imports: aggregate_imports()
+    if config.include_capacity_limits: aggregate_capacity_limits()
 
     conn = sqlite3.connect(config.database_file)
     curs = conn.cursor()

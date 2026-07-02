@@ -15,7 +15,7 @@ import sqlite3
 import canoe_electricity.coders_api as coders_api
 from canoe_schema.v4_0.models import CapacityFactorTech
 
-weather_year = config.params['weather_year']
+weather_year = config.weather_year
 df_existing: pd.DataFrame = None
 
 
@@ -84,12 +84,12 @@ def initialise():
 
     _coders_kwargs = dict(
         cache_dir=config.cache_dir,
-        force_download=config.params.get('force_download', False),
-        api_key_file=config.input_files + config.params['coders_api_key_file'],
+        force_download=config.force_download,
+        api_key_file=config.input_files + config.coders_api_key_file,
         debug=config.debug,
     )
     df_existing, date_accessed = coders_api.get_data('generators', **_coders_kwargs)
-    config.refs.add('generators', config.params['coders']['reference'].replace("<date>", date_accessed).replace("<table>", "generators"))
+    config.refs.add('generators', config.coders.reference.replace("<date>", date_accessed).replace("<table>", "generators"))
     df_existing = df_existing.loc[df_existing['province'].str.lower() == 'on']
 
 
@@ -109,8 +109,8 @@ def get_capacity_factors() -> tuple[dict[str, np.ndarray], str, reference]:
     cf_wind = np.clip(hourly_wind / np.mean(hourly_wind) * cf_ann_wind, 0, 1)
     cf_solar = np.clip(hourly_solar / np.mean(hourly_solar) * cf_ann_solar, 0, 1)
 
-    cf_wind[cf_wind < config.params['cf_tolerance']] = 0
-    cf_solar[cf_solar < config.params['cf_tolerance']] = 0
+    cf_wind[cf_wind < config.cf_tolerance] = 0
+    cf_solar[cf_solar < config.cf_tolerance] = 0
 
     # Save as csv for readability
     this_dir = os.path.realpath(os.path.dirname(__file__)) + "/"
@@ -118,7 +118,7 @@ def get_capacity_factors() -> tuple[dict[str, np.ndarray], str, reference]:
     pd.DataFrame(cf_solar).to_csv(this_dir + f"output_data/cf_solar_{weather_year}.csv")
 
     # Plotting if set to show
-    if config.params['show_plots']:
+    if config.show_plots:
         figure, axis = pp.subplots(2, 1, constrained_layout=True)
         figure.suptitle(f"Ontario {weather_year} historical capacity factors")
 
@@ -135,7 +135,7 @@ def get_capacity_factors() -> tuple[dict[str, np.ndarray], str, reference]:
     note = f"{weather_year} hourly generation by fuel for generators >20MW (IESO) divided by preexisting capacities >20MW (CODERS)"
     ref = config.refs.add(
         'ieso_exs_vre',
-        f"{config.params['ieso_reference'].replace('<year>', str(weather_year))}GenOutputbyFuelHourly/; {config.refs.get('generators').citation}"
+        f"{config.ieso_reference.replace('<year>', str(weather_year))}GenOutputbyFuelHourly/; {config.refs.get('generators').citation}"
     )
 
     return {'wind_onshore': cf_wind, 'wind_offshore': cf_wind, 'solar': cf_solar}, note, ref
@@ -170,7 +170,7 @@ def get_historical_hourly() -> tuple[np.ndarray, np.ndarray]:
 def get_average_annual_cf(gen_code: str) -> int:
 
     # CODERs equivalent names for this generator type
-    coders_equivs = config.gen_techs.loc[gen_code, 'coders_existing'].split('+')
+    coders_equivs = config.gen_techs_by_code[gen_code].coders_existing.split('+')
     df_exs = df_existing.loc[(df_existing['gen_type'].str.lower().isin(coders_equivs))]
 
     # IESO data only includes generators > 20MW

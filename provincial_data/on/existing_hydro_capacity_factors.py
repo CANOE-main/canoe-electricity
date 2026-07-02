@@ -20,7 +20,7 @@ this_dir = os.path.realpath(os.path.dirname(__file__)) + "/"
 # This file was made by manually cross-referencing generators with CODERS
 df_types = pd.read_csv(this_dir + 'hydro_types.csv', index_col=0)
 
-weather_year = config.params['weather_year']
+weather_year = config.weather_year
 
 
 
@@ -127,15 +127,15 @@ def get_capacity_factors(year: int) -> tuple[dict[str, list[float]], str, refere
     cf_dly = cf_dly[0:8760]
     cf_ror = cf_ror[0:8760]
 
-    [cf * (cf < config.params['cf_tolerance']) for cf in cf_dly]
-    [cf * (cf < config.params['cf_tolerance']) for cf in cf_ror]
+    [cf * (cf < config.cf_tolerance) for cf in cf_dly]
+    [cf * (cf < config.cf_tolerance) for cf in cf_ror]
 
     # Save as csvs so other scripts can pull from them
     pd.DataFrame(cf_dly).to_csv(this_dir + f"output_data/cf_hydro_run_{year}.csv")
     pd.DataFrame(cf_ror).to_csv(this_dir + f"output_data/cf_hydro_daily_{year}.csv")
 
     # Plot if that is on
-    if config.params['show_plots']:
+    if config.show_plots:
         figure, axis = pp.subplots(2, 1, constrained_layout=True)
         figure.suptitle(f"Ontario {year} historical capacity factors")
 
@@ -149,7 +149,7 @@ def get_capacity_factors(year: int) -> tuple[dict[str, list[float]], str, refere
 
     # Referencing
     note = f"{year} hourly generator output divided by capability."
-    ref = config.refs.add('ieso_exs_monthly', f"{config.params['ieso_reference'].replace('<year>', str(year))}GenOutputCapabilityMonth/")
+    ref = config.refs.add('ieso_exs_monthly', f"{config.ieso_reference.replace('<year>', str(year))}GenOutputCapabilityMonth/")
 
     return {'hydro_daily': cf_dly, 'hydro_run': cf_ror}, note, ref
 
@@ -192,7 +192,7 @@ def get_annual_cfs_before_2019(year) -> tuple[list[float], list[float]]:
 
     # CF is total output over total available capacity per hour
     df_cf = df_out / df_cap
-    df_cf.index = pd.date_range('2018-01-01', '2019-01-01', freq='1h', inclusive='left', tz=config.params['timezone']) # timezone index
+    df_cf.index = pd.date_range('2018-01-01', '2019-01-01', freq='1h', inclusive='left', tz=config.timezone)  # timezone index
     df_cf.to_csv(this_dir + "output_data/cf_all_hydro_2018.csv") # save to file
 
 

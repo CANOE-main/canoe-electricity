@@ -23,7 +23,7 @@ curs: sqlite3.Cursor
 
 # Vintage is always last existing period as interties do not retire
 vint = config.model_periods[0] - 1
-weather_year = config.params['weather_year']
+weather_year = config.weather_year
 
 # Provincial parameters for line loss
 df_sys: pd.DataFrame
@@ -41,8 +41,8 @@ def aggregate():
 
     _coders_kwargs = dict(
         cache_dir=config.cache_dir,
-        force_download=config.params.get('force_download', False),
-        api_key_file=config.input_files + config.params['coders_api_key_file'],
+        force_download=config.force_download,
+        api_key_file=config.input_files + config.coders_api_key_file,
         debug=config.debug,
     )
 
@@ -50,11 +50,11 @@ def aggregate():
     df_sys, date_accessed = coders_api.get_data(end_point='CA_system_parameters', **_coders_kwargs)
     df_sys['region'] = [config.region_map[p.lower()] for p in df_sys['province'].values]
     df_sys.set_index('region', inplace=True)
-    config.refs.add('ca_system_parameters', config.params['coders']['reference'].replace('<table>', 'ca_system_parameters').replace('<date>', date_accessed))
+    config.refs.add('ca_system_parameters', config.coders.reference.replace('<table>', 'ca_system_parameters').replace('<date>', date_accessed))
 
     # Get interfaces data for seasonal capacity limits and associated interties
     df_interfaces, date_accessed = coders_api.get_data(end_point='interface_capacities', **_coders_kwargs)
-    config.refs.add('interface_capacities', config.params['coders']['reference'].replace("<date>", date_accessed).replace("<table>","interface_capacities"))
+    config.refs.add('interface_capacities', config.coders.reference.replace("<date>", date_accessed).replace("<table>","interface_capacities"))
 
     # Want to group by region set (order agnostic) so get canoe regions but do not sort horizontally
     df_interfaces[['region_1','region_2']] = [[config.region_map[ft[0].lower()], config.region_map[ft[1].lower()]]
@@ -69,8 +69,8 @@ def aggregate():
     # For concatenating associated interties
     df_interfaces['network_node_names'] = df_interfaces['network_node_names'].str.removesuffix(' - ')
 
-    if config.params['include_boundary_interfaces']: aggregate_boundary_interfaces(df_interfaces)
-    if config.params['include_endogenous_interfaces']: aggregate_endogenous_interfaces(df_interfaces)
+    if config.include_boundary_interfaces: aggregate_boundary_interfaces(df_interfaces)
+    if config.include_endogenous_interfaces: aggregate_endogenous_interfaces(df_interfaces)
 
     conn.commit()
     conn.close()
@@ -93,8 +93,8 @@ def aggregate_boundary_interfaces(df_interfaces):
     #df_interties = pd.read_csv(config.input_files + 'interties.csv')
     _coders_kwargs = dict(
         cache_dir=config.cache_dir,
-        force_download=config.params.get('force_download', False),
-        api_key_file=config.input_files + config.params['coders_api_key_file'],
+        force_download=config.force_download,
+        api_key_file=config.input_files + config.coders_api_key_file,
         debug=config.debug,
     )
     df_prov, _date = coders_api.get_data('interprovincial_transfers', **_coders_kwargs)
@@ -118,7 +118,7 @@ def aggregate_boundary_interfaces(df_interfaces):
     df_interties['intertie_names'] = [df_interfaces.loc[(r1_r2[0], r1_r2[1]), 'network_node_names'] for r1_r2 in df_interties[['region_1','region_2']].values]
     
     # Only want boundary interfaces
-    if config.params['full_dataset']:
+    if config.full_dataset:
         # If either region is in the model, aggregate the data in that direction
         for (r1, r2), interface in df_interties.groupby(['region_1','region_2']):
             if r1 in config.model_regions: aggregate_boundary_interface(r1, r2, interface)
@@ -213,8 +213,8 @@ def aggregate_boundary_interface(in_region: str, out_region: str, interface: pd.
 
         ## CapacityToActivity
         curs.executemany(*CapacityToActivity.bulk_insert_or_ignore_sql([CapacityToActivity(
-            region=in_region, tech=tech, c2a=config.params['c2a'],
-            notes=f"({config.params['c2a_unit']})", data_id=data_id,
+            region=in_region, tech=tech, c2a=config.c2a,
+            notes=f"({config.c2a_unit})", data_id=data_id,
         )]))
 
         ## Commodity
@@ -305,8 +305,8 @@ def aggregate_boundary_interface(in_region: str, out_region: str, interface: pd.
 
         ## CapacityToActivity
         curs.executemany(*CapacityToActivity.bulk_insert_or_ignore_sql([CapacityToActivity(
-            region=in_region, tech=tech, c2a=config.params['c2a'],
-            notes=f"({config.params['c2a_unit']})", data_id=data_id,
+            region=in_region, tech=tech, c2a=config.c2a,
+            notes=f"({config.c2a_unit})", data_id=data_id,
         )]))
 
         ## CapacityFactorTech (no period in v4)
@@ -316,7 +316,7 @@ def aggregate_boundary_interface(in_region: str, out_region: str, interface: pd.
         cf_rows = []
         for h, time in config.time.iterrows():
             cf = in_mwh[h] / max(in_mwh)
-            if cf < config.params['cf_tolerance']: cf = 0
+            if cf < config.cf_tolerance: cf = 0
             if time['tod'] == config.time.iloc[0]['tod']:
                 cf_rows.append(CapacityFactorTech(
                     region=in_region, season=time['season'], tod=time['tod'],
@@ -339,7 +339,7 @@ def aggregate_boundary_interface(in_region: str, out_region: str, interface: pd.
 def aggregate_endogenous_interfaces(df_interfaces: pd.DataFrame):
 
     # This gets only fully endogenous interfaces
-    if config.params['full_dataset']:
+    if config.full_dataset:
         # Only interfaces between Canadian regions
         df_endogenous = df_interfaces.loc[['USA' not in r1_r2 for r1_r2 in df_interfaces.index]]
     else:
@@ -387,8 +387,8 @@ def aggregate_endogenous_interfaces(df_interfaces: pd.DataFrame):
 
         ## CapacityToActivity
         curs.executemany(*CapacityToActivity.bulk_insert_or_ignore_sql([CapacityToActivity(
-            region=r1r2, tech=tech_config['tech'], c2a=config.params['c2a'],
-            notes=f"({config.params['c2a_unit']})", data_id=data_id,
+            region=r1r2, tech=tech_config['tech'], c2a=config.c2a,
+            notes=f"({config.c2a_unit})", data_id=data_id,
         )]))
 
         ## ExistingCapacity
@@ -416,7 +416,7 @@ def aggregate_endogenous_interfaces(df_interfaces: pd.DataFrame):
             cf_rows = []
             for h, time in config.time.iterrows():
                 cf = interface[f"ttc_{time['summer_winter']}"] * config.units.loc['capacity', 'coders_conv_fact'] / capacity
-                if cf < config.params['cf_tolerance']: cf = 0
+                if cf < config.cf_tolerance: cf = 0
                 if time['tod'] == config.time.iloc[0]['tod']:
                     cf_rows.append(CapacityFactorTech(
                         region=r1r2, season=time['season'], tod=time['tod'],
@@ -449,12 +449,12 @@ def aggregate_endogenous_interfaces(df_interfaces: pd.DataFrame):
 # Gets MWh transferred for each hour of the base year along a given intertie
 def get_transfered_mwh(region_1, region_2, intertie_type) -> tuple[np.ndarray, np.ndarray]:
 
-    data_year = config.params['weather_year']
+    data_year = config.weather_year
 
     _coders_kwargs = dict(
         cache_dir=config.cache_dir,
-        force_download=config.params.get('force_download', False),
-        api_key_file=config.input_files + config.params['coders_api_key_file'],
+        force_download=config.force_download,
+        api_key_file=config.input_files + config.coders_api_key_file,
         debug=config.debug,
     )
     if intertie_type == 'international':
@@ -467,7 +467,7 @@ def get_transfered_mwh(region_1, region_2, intertie_type) -> tuple[np.ndarray, n
         return None, None
     
     # Add reference for both directions for ease of pulling
-    reference = config.params['coders']['reference'].replace("<date>", date_accessed).replace("<table>","international_transfers, interprovincial_transfers")
+    reference = config.coders.reference.replace("<date>", date_accessed).replace("<table>","international_transfers, interprovincial_transfers")
     config.refs.add(f"transfers", reference)
   
     hourly_mwh = df_transfers['transfers_MWh'].iloc[0:8760].astype(float).ffill().to_numpy()
