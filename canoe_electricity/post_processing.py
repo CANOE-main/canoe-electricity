@@ -48,7 +48,7 @@ def process():
         if comm['commodity'] in used_comms
     ]
     if rows:
-        curs.executemany(*Commodity.bulk_insert_or_ignore_sql(rows))
+        curs.executemany(*Commodity.bulk_insert_or_ignore_sql(rows, include_nulls=True))
 
 
     """
@@ -82,7 +82,7 @@ def process():
 
     rows = [DataSource(source_id=ref.id, source=ref.citation, data_id=utils.data_id()) for ref in config.refs]
     if rows:
-        curs.executemany(*DataSource.bulk_insert_or_ignore_sql(rows))
+        curs.executemany(*DataSource.bulk_insert_or_ignore_sql(rows, include_nulls=True))
 
 
     """
@@ -93,7 +93,7 @@ def process():
 
     rows = [DataSet(data_id=id) for id in sorted(config.data_ids)]
     if rows:
-        curs.executemany(*DataSet.bulk_insert_or_ignore_sql(rows))
+        curs.executemany(*DataSet.bulk_insert_or_ignore_sql(rows, include_nulls=True))
 
     # Check for missing data IDs
     tables = [t[0] for t in curs.execute("SELECT name FROM sqlite_master WHERE type='table';").fetchall()]
@@ -205,11 +205,11 @@ def aggregate_imports():
                 ))
 
     if tech_rows:
-        curs.executemany(*Technology.bulk_insert_or_ignore_sql(tech_rows))
+        curs.executemany(*Technology.bulk_insert_or_ignore_sql(tech_rows, include_nulls=True))
     if eff_rows:
-        curs.executemany(*Efficiency.bulk_insert_or_ignore_sql(eff_rows))
+        curs.executemany(*Efficiency.bulk_insert_or_ignore_sql(eff_rows, include_nulls=True))
     if life_rows:
-        curs.executemany(*LifetimeTech.bulk_insert_or_ignore_sql(life_rows))
+        curs.executemany(*LifetimeTech.bulk_insert_or_ignore_sql(life_rows, include_nulls=True))
 
     conn.commit()
     conn.close()

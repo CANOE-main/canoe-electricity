@@ -44,7 +44,7 @@ def aggregate_capacity_credits(df_rtv: pd.DataFrame):
             ))
 
         if cc_rows:
-            curs.executemany(*CapacityCredit.bulk_insert_or_ignore_sql(cc_rows))
+            curs.executemany(*CapacityCredit.bulk_insert_or_ignore_sql(cc_rows, include_nulls=True))
 
             # ReserveCapacityDerate has no period in v4 — write once per (rtv, season)
             rcd_rows = [
@@ -65,7 +65,7 @@ def aggregate_capacity_credits(df_rtv: pd.DataFrame):
                 )
                 for season in config.time['season'].unique()
             ]
-            curs.executemany(*ReserveCapacityDerate.bulk_insert_or_ignore_sql(rcd_rows))
+            curs.executemany(*ReserveCapacityDerate.bulk_insert_or_ignore_sql(rcd_rows, include_nulls=True))
 
     conn.commit()
     conn.close()

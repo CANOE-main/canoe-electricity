@@ -37,9 +37,9 @@ def aggregate(df_rtv: pd.DataFrame):
         down_rows.append(RampDownHourly(**kwargs))
 
     if up_rows:
-        curs.executemany(*RampUpHourly.bulk_insert_or_ignore_sql(up_rows))
+        curs.executemany(*RampUpHourly.bulk_insert_or_ignore_sql(up_rows, include_nulls=True))
     if down_rows:
-        curs.executemany(*RampDownHourly.bulk_insert_or_ignore_sql(down_rows))
+        curs.executemany(*RampDownHourly.bulk_insert_or_ignore_sql(down_rows, include_nulls=True))
 
     conn.commit()
     conn.close()

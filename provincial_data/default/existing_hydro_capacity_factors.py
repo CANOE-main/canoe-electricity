@@ -133,7 +133,7 @@ def aggregate_cfs(df_rtv: pd.DataFrame):
                 ))
 
         if data:
-            curs.executemany(*CapacityFactorTech.bulk_insert_or_ignore_sql(data))
+            curs.executemany(*CapacityFactorTech.bulk_insert_or_ignore_sql(data, include_nulls=True))
 
     # Daily and monthly storage hydro — LimitSeasonalCapacityFactor has no period in v4
     # This will break if hydro isn't aggregated to a single vintage
@@ -167,7 +167,7 @@ def aggregate_cfs(df_rtv: pd.DataFrame):
             ))
 
         if lscf_rows:
-            curs.executemany(*LimitSeasonalCapacityFactor.bulk_insert_or_ignore_sql(lscf_rows))
+            curs.executemany(*LimitSeasonalCapacityFactor.bulk_insert_or_ignore_sql(lscf_rows, include_nulls=True))
 
     conn.commit()
     conn.close()

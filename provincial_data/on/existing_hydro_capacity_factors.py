@@ -75,7 +75,7 @@ def aggregate_cfs(df_rtv: pd.DataFrame):
                 ))
 
         if data:
-            curs.executemany(*CapacityFactorTech.bulk_insert_or_ignore_sql(data))
+            curs.executemany(*CapacityFactorTech.bulk_insert_or_ignore_sql(data, include_nulls=True))
 
     note_dly = note + " Averaged over each day."
 
@@ -106,7 +106,7 @@ def aggregate_cfs(df_rtv: pd.DataFrame):
             ))
 
         if lscf_rows:
-            curs.executemany(*LimitSeasonalCapacityFactor.bulk_insert_or_ignore_sql(lscf_rows))
+            curs.executemany(*LimitSeasonalCapacityFactor.bulk_insert_or_ignore_sql(lscf_rows, include_nulls=True))
 
     conn.commit()
     conn.close()

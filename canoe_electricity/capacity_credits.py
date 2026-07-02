@@ -54,7 +54,7 @@ def aggregate_storage(df_rtv: pd.DataFrame):
             ))
 
     if rows:
-        curs.executemany(*CapacityCredit.bulk_insert_or_ignore_sql(rows))
+        curs.executemany(*CapacityCredit.bulk_insert_or_ignore_sql(rows, include_nulls=True))
 
     conn.commit()
     conn.close()
@@ -164,7 +164,7 @@ def aggregate_vre(df_rtv: pd.DataFrame, df_cf: pd.DataFrame, region: str, vint: 
             ))
 
     if rows:
-        curs.executemany(*CapacityCredit.bulk_insert_or_ignore_sql(rows))
+        curs.executemany(*CapacityCredit.bulk_insert_or_ignore_sql(rows, include_nulls=True))
 
     conn.commit()
     conn.close()

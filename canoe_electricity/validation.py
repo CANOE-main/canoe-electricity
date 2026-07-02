@@ -79,8 +79,8 @@ def check_missing_seasons(
         return []
     placeholders = ", ".join("?" * len(seasons))
     cur.execute(
-        f"SELECT t_season FROM {TimeSeason.__table_name__}"
-        f" WHERE t_season IN ({placeholders})",
+        f"SELECT season FROM {TimeSeason.__table_name__}"
+        f" WHERE season IN ({placeholders})",
         seasons,
     )
     found = {row[0] for row in cur.fetchall()}
