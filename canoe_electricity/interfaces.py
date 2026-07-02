@@ -50,13 +50,13 @@ def aggregate():
                                               for ft in df_interfaces[['from_province_state','to_province_state']].values]
     
     # For concatenating associated interties
-    df_interfaces['associated_interties'] = df_interfaces['associated_interties'].str.replace('; ',' - ') + ' - '
+    df_interfaces['network_node_names'] = df_interfaces['network_node_names'].str.replace('; ',' - ') + ' - '
 
     # Aggregate interfaces by regional boundary
-    df_interfaces = df_interfaces.groupby(['region_1','region_2']).sum()[['associated_interties','ttc_summer','ttc_winter']]
+    df_interfaces = df_interfaces.groupby(['region_1','region_2']).sum()[['network_node_names','ttc_summer','ttc_winter']]
 
     # For concatenating associated interties
-    df_interfaces['associated_interties'] = df_interfaces['associated_interties'].str.removesuffix(' - ')
+    df_interfaces['network_node_names'] = df_interfaces['network_node_names'].str.removesuffix(' - ')
 
     if config.params['include_boundary_interfaces']: aggregate_boundary_interfaces(df_interfaces)
     if config.params['include_endogenous_interfaces']: aggregate_endogenous_interfaces(df_interfaces)
@@ -98,7 +98,7 @@ def aggregate_boundary_interfaces(df_interfaces):
                                                         for ft in df_interties[['coders_from','coders_to']].values]
     
     # Get associated intertie names for each boundary interface
-    df_interties['intertie_names'] = [df_interfaces.loc[(r1_r2[0], r1_r2[1]), 'associated_interties'] for r1_r2 in df_interties[['region_1','region_2']].values]
+    df_interties['intertie_names'] = [df_interfaces.loc[(r1_r2[0], r1_r2[1]), 'network_node_names'] for r1_r2 in df_interties[['region_1','region_2']].values]
     
     # Only want boundary interfaces
     if config.params['full_dataset']:
@@ -377,7 +377,7 @@ def aggregate_endogenous_interfaces(df_interfaces: pd.DataFrame):
         curs.execute(f"""REPLACE INTO
                     ExistingCapacity(region, tech, vintage, capacity, units, notes, data_source, dq_cred, data_id)
                     VALUES("{r1r2}", "{tech_config['tech']}", {vint}, "{capacity}", "({config.units.loc['capacity', 'units']})",
-                    "max of seasonal capacities in either direction - {interface['associated_interties']}",
+                    "max of seasonal capacities in either direction - {interface['network_node_names']}",
                     "{config.refs.get('interface_capacities').id}", 2, "{data_id}")""")
         
 
