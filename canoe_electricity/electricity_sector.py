@@ -43,6 +43,15 @@ def build_database(cfg: CANOEElectricityConfig | None = None) -> None:
     # 3. Validate DB schema against config expectations
     conn = sqlite3.connect(cfg.database_file)
     validation.validate_db_against_config(cfg, conn)
+
+    # Use the discount rate from the shared DB so all modules agree on one value.
+    row = conn.execute(
+        "SELECT value FROM metadata_real WHERE element = 'global_discount_rate'"
+    ).fetchone()
+    if row is not None:
+        cfg.global_discount_rate = float(row[0])
+        print(f"global_discount_rate = {cfg.global_discount_rate} (from database metadata_real)\n")
+
     conn.close()
 
     # 4. Provincial grids — must precede generators so demand data is ready for capacity credits
