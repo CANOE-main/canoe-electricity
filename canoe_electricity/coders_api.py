@@ -57,7 +57,7 @@ def get_data(
     api_key_file: str | None = None,
     debug: bool = False,
     **kwargs,
-) -> tuple[pd.DataFrame, str] | None:
+) -> tuple[pd.DataFrame | None, str]:
     """Fetch a CODERS table, using a local CSV cache where available.
 
     Args:
