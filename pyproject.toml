@@ -22,7 +22,7 @@ dependencies = [
     "xlrd",
     "xmltodict",
     "loguru",
-    "canoe_schema @ git+ssh://git@github.com/CANOE-main/canoe-schema.git@e8bcbb5aad51bbe04fe0fbd74e02465af2bd3332"
+    "canoe_schema @ git+https://github.com/CANOE-main/canoe-schema.git@e8bcbb5aad51bbe04fe0fbd74e02465af2bd3332"
 ]
 
 [project.optional-dependencies]
@@ -39,7 +39,7 @@ Repository = "https://github.com/CANOE-main/canoe-electricity"
 
 # NOTE: Version is declared statically in [project].
 # Remove Hatch file-based version configuration to avoid ambiguity.
-[tool.hatch.metadata] 
+[tool.hatch.metadata]
 allow-direct-references = true
 
 [tool.ruff]
