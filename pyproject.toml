@@ -21,6 +21,7 @@ dependencies = [
     "scipy",
     "xlrd",
     "xmltodict",
+    "loguru",
     "canoe_schema @ git+ssh://git@github.com/CANOE-main/canoe-schema.git@e8bcbb5aad51bbe04fe0fbd74e02465af2bd3332"
 ]
 
