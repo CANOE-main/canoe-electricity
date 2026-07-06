@@ -289,9 +289,6 @@ def aggregate_demand():
                         tod=time['tod'],
                         demand_name=dem_comm['commodity'],
                         dsd=dsd[h],
-                        notes=dsd_note,
-                        data_source=ref.id,
-                        dq_cred=2,
                         data_id=data_id,
                     ))
 
