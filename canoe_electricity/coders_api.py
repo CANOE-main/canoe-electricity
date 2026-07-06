@@ -28,6 +28,7 @@ from datetime import date
 
 import pandas as pd
 import requests
+from loguru import logger
 
 CODERS_ROOT = "https://api.sesit.ca/"
 
@@ -114,6 +115,9 @@ def get_data(
         print(f"No local cache for endpoint={end_point}. Downloading instead.")
 
     api_key = _read_api_key(api_key_file) if api_key_file else None
+    if api_key is None:
+        logger.error("No Coders API key was provided")
+        return None, date_accessed
 
     try:
         data_json = requests.get(CODERS_ROOT + query + f"key={api_key}").json()
