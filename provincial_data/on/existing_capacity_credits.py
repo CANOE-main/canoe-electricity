@@ -4,15 +4,16 @@ Written by Ian David Elder for the CANOE model
 """
 
 import sqlite3
-import utils
+import canoe_electricity.utils as utils
 import os
-from setup import config
+from canoe_electricity.setup import config
 import pandas as pd
+from canoe_schema.v4_0.models import CapacityCredit, ReserveCapacityDerate
 
 
 
 def aggregate_capacity_credits(df_rtv: pd.DataFrame):
-    
+
     df_cc, note, year = get_capacity_credits()
     ref = config.refs.get('cc')
 
@@ -20,29 +21,52 @@ def aggregate_capacity_credits(df_rtv: pd.DataFrame):
     curs = conn.cursor()
 
     for _idx, rtv in df_rtv.iterrows():
+
+        cc_rows = []
         for period in config.model_periods:
 
             if rtv['vint'] > period or rtv['vint'] + rtv['life'] <= period: continue
 
-            # For static reserve margin
-            curs.execute(
-                f"""REPLACE INTO
-                CapacityCredit(region, period, tech, vintage, credit, notes,
-                data_source, dq_cred, dq_geog, dq_struc, dq_tech, dq_time, data_id)
-                VALUES('{rtv['region']}', {period}, '{rtv['tech']}', {rtv['vint']}, {float(df_cc.loc[rtv['tech_code']].iloc[0])}, '{note}',
-                '{ref.id}', 1, 1, 2, 2, 3, "{utils.data_id(rtv['region'])}")"""
-            )
-            
-            # For dynamic reserve margin
-            for season in config.time['season'].unique():
-                curs.execute(
-                    f"""REPLACE INTO
-                    ReserveCapacityDerate(region, period, season, tech, vintage, factor, notes,
-                    data_source, dq_cred, dq_geog, dq_struc, dq_tech, dq_time, data_id)
-                    VALUES('{rtv['region']}', {period}, '{season}', '{rtv['tech']}', {rtv['vint']}, {float(df_cc.loc[rtv['tech_code']].iloc[0])}, '{note}',
-                    '{ref.id}', 1, 1, 2, 2, 3, "{utils.data_id(rtv['region'])}")"""
+            cc_rows.append(CapacityCredit(
+                region=rtv['region'],
+                period=period,
+                tech=rtv['tech'],
+                vintage=rtv['vint'],
+                credit=float(df_cc.loc[rtv['tech_code']].iloc[0]),
+                notes=note,
+                data_source=ref.id,
+                dq_cred=1,
+                dq_geog=1,
+                dq_struc=2,
+                dq_tech=2,
+                dq_time=3,
+                data_id=utils.data_id(rtv['region']),
+            ))
+
+        if cc_rows:
+            curs.executemany(*CapacityCredit.bulk_insert_or_ignore_sql(cc_rows, include_nulls=True))
+
+            # ReserveCapacityDerate has no period in v4 — write once per (rtv, season)
+            rcd_rows = [
+                ReserveCapacityDerate(
+                    region=rtv['region'],
+                    season=season,
+                    tech=rtv['tech'],
+                    vintage=rtv['vint'],
+                    factor=float(df_cc.loc[rtv['tech_code']].iloc[0]),
+                    notes=note,
+                    data_source=ref.id,
+                    dq_cred=1,
+                    dq_geog=1,
+                    dq_struc=2,
+                    dq_tech=2,
+                    dq_time=3,
+                    data_id=utils.data_id(rtv['region']),
                 )
-            
+                for season in config.time['season'].unique()
+            ]
+            curs.executemany(*ReserveCapacityDerate.bulk_insert_or_ignore_sql(rcd_rows, include_nulls=True))
+
     conn.commit()
     conn.close()
 
@@ -55,8 +79,8 @@ def get_capacity_credits() -> tuple[pd.DataFrame, str, str, str]:
     this_dir = os.path.realpath(os.path.dirname(__file__)) + "/"
 
     # The most recent or desired ieso reliability outlook
-    yyyy, mmm = config.params['ieso_rel_yyyy_mmm'].split("_")
-    peak_type: str = config.params['ieso_rel_peak_type']
+    yyyy, mmm = config.ieso_rel_yyyy_mmm.split("_")
+    peak_type: str = config.ieso_rel_peak_type
 
     rel_outlook_url = f"https://www.ieso.ca/-/media/Files/IESO/Document-Library/planning-forecasts/reliability-outlook/ReliabilityOutlookTables_{yyyy}{mmm}.xlsx"
     note = f"Forecasted capability at {peak_type.lower()} summer peak divided by total installed capacity"

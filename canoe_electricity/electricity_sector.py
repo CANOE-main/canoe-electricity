@@ -3,48 +3,77 @@ Builds the electricity sector database to be merged into the larger model
 Written by Ian David Elder for the CANOE model
 """
 
+from __future__ import annotations
+
 import re
 import sqlite3
-import utils
-import pre_processing
-import post_processing
+import canoe_electricity.utils as utils
+import canoe_electricity.post_processing as post_processing
 import os
-import interfaces
-import setup
-import currency_conversion
-import generators
-import provincial_grids
+import canoe_electricity.interfaces as interfaces
+import canoe_electricity.setup as setup
+import canoe_electricity.generators as generators
+import canoe_electricity.provincial_grids as provincial_grids
+import canoe_electricity.validation as validation
 import pandas as pd
-from setup import config
+from canoe_electricity.config import CANOEElectricityConfig
+from canoe_electricity.setup import config as _default_config
 from matplotlib import pyplot as pp
 
 
 
-def build_database():
+def build_database(cfg: CANOEElectricityConfig | None = None) -> None:
+    """Orchestrate electricity sector aggregation.
 
-    print(f"Aggregating electricity sector into {os.path.basename(config.database_file)}...\n")
+    1. Resolve config (use supplied cfg or module-level default).
+    2. Validate database pre-conditions.
+    3. Aggregate provincial grids (demand, transmission, reserve margin).
+    4. Aggregate generators (existing + new) and storage.
+    5. Aggregate intertie interfaces.
+    6. Run post-processing (commodities, references, data IDs).
+    7. Optionally clone to Excel and save plots.
+    """
+    cfg = cfg or _default_config
 
-    setup.instantiate_database()
+    print(f"Aggregating electricity sector into {os.path.basename(cfg.database_file)}...\n")
 
-    pre_processing.process()
+    # 2. Pre-flight: ensure DB exists; optionally wipe stale module rows
+    setup.open_database()
 
-    provincial_grids.aggregate() # Must go before generators to get provincial demand for capacity credits
+    # 3. Validate DB schema against config expectations
+    conn = sqlite3.connect(cfg.database_file)
+    validation.validate_db_against_config(cfg, conn)
+
+    # Use the discount rate from the shared DB so all modules agree on one value.
+    row = conn.execute(
+        "SELECT value FROM metadata_real WHERE element = 'global_discount_rate'"
+    ).fetchone()
+    if row is not None:
+        cfg.global_discount_rate = float(row[0])
+        print(f"global_discount_rate = {cfg.global_discount_rate} (from database metadata_real)\n")
+
+    conn.close()
+
+    # 4. Provincial grids — must precede generators so demand data is ready for capacity credits
+    provincial_grids.aggregate()
+
+    # 5. Generators and storage
     generators.aggregate()
+
+    # 6. Intertie interfaces
     interfaces.aggregate()
 
-    # currency_conversion.convert_currencies() # no longer used
-    if config.params['simplify_model']: model_reduction.simplify_model()
-    
+    # 7. Post-processing: commodities, references, data IDs; optional capacity limits / imports
     post_processing.process()
-    
-    if config.params['clone_to_excel']: utils.database_converter().clone_sqlite_to_excel()
 
-    print(f"Electricity sector aggregated into {os.path.basename(config.database_file)}\n")
+    # 8. Optional Excel clone
+    if cfg.clone_to_excel:
+        utils.database_converter().clone_sqlite_to_excel()
 
-    # TODO temp for prototyping
-    #prepare_test_model()
-    
-    if config.params['show_plots']:
+    print(f"Electricity sector aggregated into {os.path.basename(cfg.database_file)}\n")
+
+    # 9. Save plots produced during aggregation
+    if cfg.show_plots:
         save_plots()
 
 
@@ -74,6 +103,7 @@ def save_plots(output_dir='output_plots'):
 
 def prepare_test_model():
 
+    config = _default_config
     conn = sqlite3.connect(config.database_file)
     curs = conn.cursor()
       
@@ -89,7 +119,7 @@ def prepare_test_model():
     curs.execute(f"""REPLACE INTO sector_labels(sector) VALUES('electricity')""")
 
     curs.execute(f"DELETE FROM time_season")
-    [curs.execute(f"INSERT INTO time_season(t_season) VALUES('{day}')") for day in rep_days]
+    [curs.execute(f"INSERT INTO time_season(season) VALUES('{day}')") for day in rep_days]
 
     seas_tables = [
         'CapacityFactorTech',
@@ -100,7 +130,7 @@ def prepare_test_model():
         ]
 
     for table in seas_tables:
-        curs.execute(f"DELETE FROM {table} WHERE season_name NOT IN (SELECT t_season from time_season)")
+        curs.execute(f"DELETE FROM {table} WHERE season_name NOT IN (SELECT season from time_season)")
 
     df_dsd = pd.read_sql_query("SELECT * FROM DemandSpecificDistribution", conn)
     df_dsd = df_dsd.groupby(['regions','demand_name'])

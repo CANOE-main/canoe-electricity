@@ -9,4 +9,4 @@ ON,ontario.b+ontario.a+ontario+ontario north+ontario south+on,ontario,TRUE,TRUE
 PEI,prince edward island.a+prince edward island+pei+pe,prince edward island,TRUE,TRUE
 QC,quebec.a+quebec.b+québec+quebec south+quebec north+qc(hvdc)+qc+quebec+qc(highgate),quebec,TRUE,TRUE
 SK,saskatchewan.a+saskatchewan+saskatchewan north+saskatchewan south+sk+saskatachewan,saskatchewan,TRUE,TRUE
-USA,isone(highgate)+isone(hvdc)+isone(maine)+isone+maine+michigan+minnesota+minnesota / north dakota+miso(dakota)+miso(michigan)+miso(minnesota)+montana+new england+new york+new york niagara+new york st. lawrence+nmisa(northernmaine)+north dakota+nyiso(hq)dakota+northern +maine+nyiso(hq)+nyiso(west)+us(montana)+us(northwest)+washington,,,
+USA,isone(highgate)+isone(hvdc)+isone(maine)+isone(nmisa)+isone+maine+michigan+minnesota+minnesota / north dakota+miso(dakota)+miso(michigan)+miso(minnesota)+montana+new england+new york+new york niagara+new york st. lawrence+nmisa(northernmaine)+north dakota+nyiso(hq)dakota+northern +maine+nyiso(hq)+nyiso(west)+us(montana)+us(northwest)+washington,,,

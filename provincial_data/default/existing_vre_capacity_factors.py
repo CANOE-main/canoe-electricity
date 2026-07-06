@@ -1,6 +1,6 @@
-import utils
-import coders_api
-from setup import config
+import canoe_electricity.utils as utils
+import canoe_electricity.coders_api as coders_api
+from canoe_electricity.setup import config
 import pandas as pd
 import os
 import time
@@ -8,6 +8,7 @@ import numpy as np
 import sqlite3
 from datetime import datetime
 from matplotlib import pyplot as pp
+from canoe_schema.v4_0.models import CapacityFactorTech
 
 
 note = (
@@ -20,7 +21,7 @@ def aggregate_cfs(df_rtv: pd.DataFrame):
 
     print("Aggregating hourly capacity factors for existing VREs...")
 
-    ref = f"{config.params['renewables_ninja']['reference']}{config.refs.get('generators').citation}"
+    ref = f"{config.renewables_ninja.reference}{config.refs.get('generators').citation}"
     ref = config.refs.add('rninja-coders', ref)
 
     cfs_solar = aggregate_vre(df_rtv.loc[df_rtv['tech_code'] == 'solar'].copy(), 'cf_solar')
@@ -28,12 +29,12 @@ def aggregate_cfs(df_rtv: pd.DataFrame):
     cfs_wind_off = aggregate_vre(df_rtv.loc[df_rtv['tech_code'] == 'wind_offshore'].copy(), 'cf_wind_off')
 
     # Plotting if set to show
-    if config.params['show_plots']:
+    if config.show_plots:
         for region in df_rtv['region'].unique():
-            
+
             figure, axis = pp.subplots(3, 1, constrained_layout=True)
             figure.suptitle(
-                f"{region} {config.params['weather_year']} synthesized hourly capacity factors\n"
+                f"{region} {config.weather_year} synthesized hourly capacity factors\n"
                 "for existing VRE (real data in red, if available)"
             )
 
@@ -73,17 +74,17 @@ def aggregate_vre(df_rtv: pd.DataFrame, cf_file: str):
             cf_grabber().gather_cfs()
     df_cf = pd.read_csv(cf_file, index_col=0).fillna(0)
 
-    # Using CapacityFactorTech which does not have a vintage index
+    # CapacityFactorTech has no vintage or period index in v4
     df_rtv['end'] = df_rtv['vint'] + df_rtv['life']
     df_end = df_rtv.groupby(['region','tech'])['end'].max()
     df_rt = df_rtv.groupby(['region', 'tech'])[['facilities','capacity','unit_average_annual_energy']].sum(numeric_only=False).reset_index()
 
     conn = sqlite3.connect(config.database_file)
     curs = conn.cursor()
-    
+
     cfs = {region: np.zeros(8760) for region in config.model_regions}
     for _idx, rt in df_rt.iterrows():
-        
+
         # Sum up facility-specific hourly generation
         gen_mwh = np.zeros(8760)
         facilities = rt['facilities'].split(';')[0:-1]
@@ -107,33 +108,48 @@ def aggregate_vre(df_rtv: pd.DataFrame, cf_file: str):
         # Adjust for expected annual energy and clip to [0:1] again
         cf: pd.Series = energy_adjust * gen_mwh / rt['capacity']
         cf = cf.clip(0, 1)
-        cf[cf < config.params['cf_tolerance']] = 0
-        
+        cf[cf < config.cf_tolerance] = 0
+
         # For net load for capacity credit calculations
         config.exs_vre_gen[rt['region']] += cf * capacity
 
         cfs[rt['region']] = cf
 
+        # Skip if tech has no vintages active in any model period
+        if df_end.loc[(rt['region'], rt['tech'])] <= config.model_periods[0]: continue
+
         data = []
-        for period in config.model_periods:
-            
-            # Check that there exists an existing vintage that will exist in this period
-            if df_end.loc[(rt['region'], rt['tech'])] <= period: continue
+        for h, time in config.time.iterrows():
 
-            for h, time in config.time.iterrows():
+            if time['tod'] == config.time.iloc[0]['tod']:
+                data.append(CapacityFactorTech(
+                    region=rt['region'],
+                    season=time['season'],
+                    tod=time['tod'],
+                    tech=rt['tech'],
+                    factor=cf.iloc[h],
+                    notes=note,
+                    data_source=ref.id,
+                    dq_cred=3,
+                    dq_geog=1,
+                    dq_struc=2,
+                    dq_tech=2,
+                    dq_time=3,
+                    data_id=utils.data_id(rt['region']),
+                ))
+            else:
+                data.append(CapacityFactorTech(
+                    region=rt['region'],
+                    season=time['season'],
+                    tod=time['tod'],
+                    tech=rt['tech'],
+                    factor=cf.iloc[h],
+                    data_id=utils.data_id(rt['region']),
+                ))
 
-                if time['tod'] == config.time.iloc[0]['tod']:
-                    data.append([rt['region'], period, time['season'], time['tod'], rt['tech'], cf.iloc[h],
-                                 note, ref.id, 3, 1, 2, 2, 3, utils.data_id(rt['region'])])
-                else:
-                    data.append([rt['region'], period, time['season'], time['tod'], rt['tech'], cf.iloc[h],
-                                 None, None, None, None, None, None, None, utils.data_id(rt['region'])])
+        if data:
+            curs.executemany(*CapacityFactorTech.bulk_insert_or_ignore_sql(data, include_nulls=True))
 
-        curs.executemany(f"""REPLACE INTO
-                    CapacityFactorTech(region, period, season, tod, tech, factor, notes,
-                    data_source, dq_cred, dq_geog, dq_struc, dq_tech, dq_time, data_id)
-                    VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)""", data)
-            
     conn.commit()
     conn.close()
 
@@ -157,7 +173,13 @@ class cf_grabber:
     def gather_cfs(cls):
 
         # Get the existing generators from CODERS data
-        df_existing, date_accessed = coders_api.get_data(end_point='generators')
+        _coders_kwargs = dict(
+            cache_dir=config.cache_dir,
+            force_download=config.force_download,
+            api_key_file=config.input_files + config.coders_api_key_file,
+            debug=config.debug,
+        )
+        df_existing, date_accessed = coders_api.get_data(end_point='generators', **_coders_kwargs)
 
         # Convert to CANOE tech codes and regions
         df_existing['tech_code'] = df_existing['gen_type'].str.lower().map(config.existing_map)
@@ -245,7 +267,7 @@ class cf_grabber:
 
 
     def _get_cf_file(cls, file: str):
-        
+
         df = None
         if os.path.isfile(file):
             try:
@@ -255,24 +277,24 @@ class cf_grabber:
                 print(e)
         else:
             index = pd.date_range(
-                start=f"{config.params['weather_year']}-01-01 00:00:00",
-                end=f"{config.params['weather_year']}-12-31 23:00:00",
+                start=f"{config.weather_year}-01-01 00:00:00",
+                end=f"{config.weather_year}-12-31 23:00:00",
                 freq="h",
                 tz="EST"
             )
             pd.DataFrame(index=index).to_csv(file)
-        
+
         if df is not None:
             return df
         else:
             index = pd.date_range(
-                start=f"{config.params['weather_year']}-01-01 00:00:00",
-                end=f"{config.params['weather_year']}-12-31 23:00:00",
+                start=f"{config.weather_year}-01-01 00:00:00",
+                end=f"{config.weather_year}-12-31 23:00:00",
                 freq="h",
                 tz="EST"
             )
             return pd.DataFrame(index=index)
-        
+
 
     def _save_cf_file(cls, file: str, df_cf: pd.DataFrame):
 
