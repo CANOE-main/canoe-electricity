@@ -146,7 +146,7 @@ def aggregate_cfs(df_rtv: pd.DataFrame):
             hourly = df_daily.loc[seas, rt['region']] / 24.0
             hourly *= rt['unit_average_annual_energy'] / df_total_energy.loc[rt['region']]
             hourly /= 1000
-            cf_seas = hourly / rt['capacity'] # GW / GW
+            cf_seas = np.clip(hourly / rt['capacity'], 0, 1) # GW / GW
             if cf_seas < config.cf_tolerance:
                 cf_seas = 0
 
