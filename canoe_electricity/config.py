@@ -167,7 +167,6 @@ class CANOEElectricityConfig(BaseModel):
     dsd_tolerance: float
     cf_tolerance: float
     sqlite_database: str = 'electricity.sqlite'
-    sqlite_schema: str = 'canoe_dataset_schema.sql'
     excel_template: str = ''
     excel_output: str = 'electricity.xlsx'
     validation_behavior: str = 'error'
