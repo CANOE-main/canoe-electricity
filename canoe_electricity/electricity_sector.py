@@ -5,21 +5,23 @@ Written by Ian David Elder for the CANOE model
 
 from __future__ import annotations
 
+import os
 import re
 import sqlite3
-import canoe_electricity.utils as utils
-import canoe_electricity.post_processing as post_processing
-import os
-import canoe_electricity.interfaces as interfaces
-import canoe_electricity.setup as setup
-import canoe_electricity.generators as generators
-import canoe_electricity.provincial_grids as provincial_grids
-import canoe_electricity.validation as validation
+
 import pandas as pd
-from canoe_electricity.config import CANOEElectricityConfig
-from canoe_electricity.setup import config as _default_config
 from matplotlib import pyplot as pp
 
+import canoe_electricity.generators as generators
+import canoe_electricity.interfaces as interfaces
+import canoe_electricity.post_processing as post_processing
+import canoe_electricity.provincial_grids as provincial_grids
+import canoe_electricity.setup as setup
+import canoe_electricity.utils as utils
+import canoe_electricity.validation as validation
+from canoe_electricity import patch_solar_wind
+from canoe_electricity.config import CANOEElectricityConfig
+from canoe_electricity.setup import config as _default_config
 
 
 def build_database(cfg: CANOEElectricityConfig | None = None) -> None:
@@ -66,7 +68,20 @@ def build_database(cfg: CANOEElectricityConfig | None = None) -> None:
     # 7. Post-processing: commodities, references, data IDs; optional capacity limits / imports
     post_processing.process()
 
-    # 8. Optional Excel clone
+    # 8. Patch solar/wind data
+    patch_solar_wind.replace_from_parquet(
+        parquet_paths=[f"{cfg.input_files}/renewables_cache/{val}.parquet" for val in
+            ["capacity_credit",
+            "capacity_factor",
+            "cost_fixed",
+            "cost_invest",
+            "max_capacity"]],
+        table_names={"max_capacity": "limit_capacity", "capacity_factor": "capacity_factor_process"},
+        new_suffix_version=cfg.data_version,
+        target_db_path=cfg.database_file,
+    )
+
+    # 9. Optional Excel clone
     if cfg.clone_to_excel:
         utils.database_converter().clone_sqlite_to_excel()
 
@@ -106,7 +121,7 @@ def prepare_test_model():
     config = _default_config
     conn = sqlite3.connect(config.database_file)
     curs = conn.cursor()
-      
+
     rep_days = [
         'D006', # Coldest day ON 2018
         'D035',
@@ -116,9 +131,9 @@ def prepare_test_model():
         'D185' # Hottest day ON 2018
     ]
 
-    curs.execute(f"""REPLACE INTO sector_labels(sector) VALUES('electricity')""")
+    curs.execute("""REPLACE INTO sector_labels(sector) VALUES('electricity')""")
 
-    curs.execute(f"DELETE FROM time_season")
+    curs.execute("DELETE FROM time_season")
     [curs.execute(f"INSERT INTO time_season(season) VALUES('{day}')") for day in rep_days]
 
     seas_tables = [

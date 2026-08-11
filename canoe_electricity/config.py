@@ -8,7 +8,7 @@ from typing import Any
 
 import numpy as np
 import pandas as pd
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
 # ---------------------------------------------------------------------------
@@ -166,7 +166,7 @@ class CANOEElectricityConfig(BaseModel):
     global_discount_rate: float
     dsd_tolerance: float
     cf_tolerance: float
-    sqlite_database: str = 'electricity.sqlite'
+    sqlite_database: Path = 'electricity.sqlite'
     excel_template: str = ''
     excel_output: str = 'electricity.xlsx'
     validation_behavior: str = 'error'
@@ -284,6 +284,11 @@ class CANOEElectricityConfig(BaseModel):
     @property
     def excel_target_file(self) -> str:
         return self.excel_output
+
+    @field_validator("sqlite_database")
+    @classmethod
+    def expand_path(cls, v: Path) -> Path:
+        return v.expanduser()
 
     # --- Factory ---
 

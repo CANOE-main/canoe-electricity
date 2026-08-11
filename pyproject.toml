@@ -22,7 +22,9 @@ dependencies = [
     "xlrd",
     "xmltodict",
     "loguru",
-    "canoe_schema @ git+https://github.com/CANOE-main/canoe-schema.git@e8bcbb5aad51bbe04fe0fbd74e02465af2bd3332"
+    "duckdb",
+    "fastparquet",
+    "canoe_schema @ git+https://github.com/CANOE-main/canoe-schema.git"
 ]
 
 [project.optional-dependencies]
