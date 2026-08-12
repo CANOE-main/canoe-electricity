@@ -14,7 +14,7 @@ weather_year = 2018    # year to pull timeseries data for
 timezone = "EST"       # final model timezone
 
 data_id_prefix = "ELCHR"
-data_version = "002"
+data_version = "003"
 
 # Currency — costs are exchanged and inflated in post-processing
 final_currency = "CAD"
@@ -41,7 +41,7 @@ existing_periods = []   # periods that already exist in DB with flag "e"
 # ------------------------------------------------------------------
 debug                        = false   # prints extra diagnostic info
 force_download               = false   # ignore cache and re-download data
-force_wipe_database          = true    # wipe this module's rows before aggregation
+force_wipe_database          = false    # wipe this module's rows before aggregation
 full_dataset                 = true    # produce full dataset (filtered later), not a live model
 include_boundary_interfaces  = true    # exogenous in/out-of-model interfaces
 include_endogenous_interfaces = true   # exchange technologies between modelled regions
