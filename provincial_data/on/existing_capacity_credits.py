@@ -47,6 +47,9 @@ def aggregate_capacity_credits(df_rtv: pd.DataFrame):
             curs.executemany(*CapacityCredit.bulk_insert_or_ignore_sql(cc_rows, include_nulls=True))
 
             # ReserveCapacityDerate has no period in v4 — write once per (rtv, season)
+            techs_to_avoid = ["E_HYD_ROR-EXS", "E_SOL_PV-EXS", "E_WND_ON-EXS"]
+            if rtv['tech'] in techs_to_avoid and rtv['vintage'] < 2025:
+                continue
             rcd_rows = [
                 ReserveCapacityDerate(
                     region=rtv['region'],
