@@ -1,8 +1,9 @@
-from setup import config
+from canoe_electricity.setup import config
 import pandas as pd
 import sqlite3
-import utils
-import currency_conversion
+import canoe_electricity.utils as utils
+import canoe_electricity.currency_conversion as currency_conversion
+from canoe_schema.v4_0.models import CostVariable
 
 df_cost: pd.DataFrame = pd.read_csv('provincial_data/default/cost_tx_dx.csv', index_col=0)
 df_cost = currency_conversion.conv_curr(df_cost, 2024, 'USD')
@@ -23,7 +24,7 @@ def aggregate(
     """
     Apply default levelised transmission and distribution costs from AEO
     """
-    
+
     cost = df_cost[str(utils.data_year(period))]
 
     match dx_tx:
@@ -37,10 +38,19 @@ def aggregate(
             cost = cost['transmission'] + cost['distribution']
             _note = note + ' - transmission and distribution cost'
 
-    curs.execute(
-        f"""REPLACE INTO
-        CostVariable(region, period, tech, vintage, cost, units, notes,
-        data_source, dq_cred, dq_geog, dq_struc, dq_time, data_id)
-        VALUES('{region}', {period}, '{tech}', {vintage}, {cost}, '{config.units.loc['cost_variable','units']}',
-        '{_note}', '{ref.id}', 1, 3, 4, 1, '{data_id}')"""
+    row = CostVariable(
+        region=region,
+        period=period,
+        tech=tech,
+        vintage=vintage,
+        cost=cost,
+        units=config.units.loc['cost_variable', 'units'],
+        notes=_note,
+        data_source=ref.id,
+        dq_cred=1,
+        dq_geog=3,
+        dq_struc=4,
+        dq_time=1,
+        data_id=data_id,
     )
+    curs.executemany(*CostVariable.bulk_insert_or_ignore_sql([row], include_nulls=True))

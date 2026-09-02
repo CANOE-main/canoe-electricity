@@ -7,26 +7,27 @@ Written by Ian David Elder for the CANOE model
 import os
 import numpy as np
 import pandas as pd
-from setup import config
-from setup import reference
+from canoe_electricity.setup import config
+from canoe_electricity.setup import reference
 from matplotlib import pyplot as pp
-import utils
+import canoe_electricity.utils as utils
 import sqlite3
-import coders_api
+import canoe_electricity.coders_api as coders_api
+from canoe_schema.v4_0.models import CapacityFactorTech
 
-weather_year = config.params['weather_year']
+weather_year = config.weather_year
 df_existing: pd.DataFrame = None
 
 
 def aggregate_cfs(df_rtv: pd.DataFrame):
-    
+
     cfs, note, ref = get_capacity_factors()
 
-    # CapacityFactorTech has no vintage index
+    # CapacityFactorTech has no vintage or period index in v4
     df_rtv['end'] = df_rtv['vint'] + df_rtv['life']
     df_end = df_rtv.groupby(['region','tech','tech_code'])['end'].max()
     df_rt = df_rtv.groupby(['region','tech','tech_code']).sum(numeric_only=True).reset_index()
-    
+
     conn = sqlite3.connect(config.database_file)
     curs = conn.cursor()
 
@@ -35,26 +36,41 @@ def aggregate_cfs(df_rtv: pd.DataFrame):
         # Summing curtailed generation to get net load for capacity credit calculations
         config.exs_vre_gen[rt['region']] += cfs[rt['tech_code']].astype(float) * rt['capacity']
 
+        # Skip if tech has no vintages active in any model period
+        if df_end.loc[(rt['region'], rt['tech'], rt['tech_code'])] <= config.model_periods[0]: continue
+
         data = []
-        for period in config.model_periods:
-            
-            # Check that there exists an existing vintage that will exist in this period
-            if df_end.loc[(rt['region'], rt['tech'], rt['tech_code'])] <= period: continue
+        for h, time in config.time.iterrows():
 
-            for h, time in config.time.iterrows():
+            if time['tod'] == config.time.iloc[0]['tod']:
+                data.append(CapacityFactorTech(
+                    region=rt['region'],
+                    season=time['season'],
+                    tod=time['tod'],
+                    tech=rt['tech'],
+                    factor=cfs[rt['tech_code']][h],
+                    notes=note,
+                    data_source=ref.id,
+                    dq_cred=1,
+                    dq_geog=1,
+                    dq_struc=1,
+                    dq_tech=1,
+                    dq_time=3,
+                    data_id=utils.data_id(rt['region']),
+                ))
+            else:
+                data.append(CapacityFactorTech(
+                    region=rt['region'],
+                    season=time['season'],
+                    tod=time['tod'],
+                    tech=rt['tech'],
+                    factor=cfs[rt['tech_code']][h],
+                    data_id=utils.data_id(rt['region']),
+                ))
 
-                if time['tod'] == config.time.iloc[0]['tod']:
-                    data.append([rt['region'], period, time['season'], time['tod'], rt['tech'], cfs[rt['tech_code']][h],
-                                 note, ref.id, 1, 1, 1, 1, 3, utils.data_id(rt['region'])])
-                else:
-                    data.append([rt['region'], period, time['season'], time['tod'], rt['tech'], cfs[rt['tech_code']][h],
-                                 None, None, None, None, None, None, None, utils.data_id(rt['region'])])
+        if data:
+            curs.executemany(*CapacityFactorTech.bulk_insert_or_ignore_sql(data, include_nulls=True))
 
-        curs.executemany(f"""REPLACE INTO
-                    CapacityFactorTech(region, period, season, tod, tech, factor, notes,
-                    data_source, dq_cred, dq_geog, dq_struc, dq_tech, dq_time, data_id)
-                    VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)""", data)
-            
     conn.commit()
     conn.close()
 
@@ -64,11 +80,16 @@ def initialise():
 
     global df_existing
 
-    # Initialise existing generators data
-    if df_existing is None: df_existing, date_accessed = coders_api.get_data('generators')
-    else: return
+    if df_existing is not None: return
 
-    config.refs.add('generators', config.params['coders']['reference'].replace("<date>", date_accessed).replace("<table>","generators"))
+    _coders_kwargs = dict(
+        cache_dir=config.cache_dir,
+        force_download=config.force_download,
+        api_key_file=config.input_files + config.coders_api_key_file,
+        debug=config.debug,
+    )
+    df_existing, date_accessed = coders_api.get_data('generators', **_coders_kwargs)
+    config.refs.add('generators', config.coders.reference.replace("<date>", date_accessed).replace("<table>", "generators"))
     df_existing = df_existing.loc[df_existing['province'].str.lower() == 'on']
 
 
@@ -88,8 +109,8 @@ def get_capacity_factors() -> tuple[dict[str, np.ndarray], str, reference]:
     cf_wind = np.clip(hourly_wind / np.mean(hourly_wind) * cf_ann_wind, 0, 1)
     cf_solar = np.clip(hourly_solar / np.mean(hourly_solar) * cf_ann_solar, 0, 1)
 
-    cf_wind[cf_wind < config.params['cf_tolerance']] = 0
-    cf_solar[cf_solar < config.params['cf_tolerance']] = 0
+    cf_wind[cf_wind < config.cf_tolerance] = 0
+    cf_solar[cf_solar < config.cf_tolerance] = 0
 
     # Save as csv for readability
     this_dir = os.path.realpath(os.path.dirname(__file__)) + "/"
@@ -97,7 +118,7 @@ def get_capacity_factors() -> tuple[dict[str, np.ndarray], str, reference]:
     pd.DataFrame(cf_solar).to_csv(this_dir + f"output_data/cf_solar_{weather_year}.csv")
 
     # Plotting if set to show
-    if config.params['show_plots']:
+    if config.show_plots:
         figure, axis = pp.subplots(2, 1, constrained_layout=True)
         figure.suptitle(f"Ontario {weather_year} historical capacity factors")
 
@@ -114,7 +135,7 @@ def get_capacity_factors() -> tuple[dict[str, np.ndarray], str, reference]:
     note = f"{weather_year} hourly generation by fuel for generators >20MW (IESO) divided by preexisting capacities >20MW (CODERS)"
     ref = config.refs.add(
         'ieso_exs_vre',
-        f"{config.params['ieso_reference'].replace('<year>', str(weather_year))}GenOutputbyFuelHourly/; {config.refs.get('generators').citation}"
+        f"{config.ieso_reference.replace('<year>', str(weather_year))}GenOutputbyFuelHourly/; {config.refs.get('generators').citation}"
     )
 
     return {'wind_onshore': cf_wind, 'wind_offshore': cf_wind, 'solar': cf_solar}, note, ref
@@ -149,7 +170,7 @@ def get_historical_hourly() -> tuple[np.ndarray, np.ndarray]:
 def get_average_annual_cf(gen_code: str) -> int:
 
     # CODERs equivalent names for this generator type
-    coders_equivs = config.gen_techs.loc[gen_code, 'coders_existing'].split('+')
+    coders_equivs = config.gen_techs_by_code[gen_code].coders_existing.split('+')
     df_exs = df_existing.loc[(df_existing['gen_type'].str.lower().isin(coders_equivs))]
 
     # IESO data only includes generators > 20MW
