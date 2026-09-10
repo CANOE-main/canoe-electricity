@@ -803,6 +803,22 @@ li input[type="checkbox"] { margin-right: 0.4rem; }
 <p>For new non-renewable, non-VRE generators, no capacity factors are set (the optimiser freely dispatches within their other constraints).</p>
 <p>For new hydro (daily, run-of-river), Ontario existing hydro capacity factors are currently used as a proxy for all regions. This is a known limitation flagged with a TODO.</p>
 <hr>
+
+<h3 id="75-existing-hydroelectric-ontario">7.5 Wind and solar capacity factors</h3>
+<p>
+  Maximum capacities for new wind and solar were derived from a geospatial assessment of developable land in Ontario. The province was divided into grid cells of approximately 25 km, matching the ERA5 reanalysis data (Hersbach et al., 2020) used for hourly wind and solar resources. Within each cell, water, wetlands, built-up areas (Natural Resources Canada, 2022), protected areas (Environment and Climate Change Canada, 2023), and existing wind farms (Natural Resources Canada, 2020) were excluded, with cropland additionally excluded for solar. The remaining area was converted to installable capacity using the land-use intensities of Palmer-Wilson et al. (2019). Cells were then ranked by levelized cost of electricity, including connection to the nearest transmission line (OpenStreetMap contributors, 2024), and grouped into the resource bins used in CANOE. Each bin's capacity limit is the sum of installable capacity across its cells.
+</p>
+
+<h2>References</h2>
+<ul class="references">
+  <li>Environment and Climate Change Canada. (2023). <em>Canadian Protected and Conserved Areas Database (CPCAD)</em>. <a href="https://www.canada.ca/en/environment-climate-change/services/national-wildlife-areas/protected-conserved-areas-database.html" target="_blank" rel="noopener">https://www.canada.ca/en/environment-climate-change/services/national-wildlife-areas/protected-conserved-areas-database.html</a></li>
+  <li>Hersbach, H., et al. (2020). The ERA5 global reanalysis. <em>Quarterly Journal of the Royal Meteorological Society, 146</em>(730), 1999–2049. <a href="https://doi.org/10.1002/qj.3803" target="_blank" rel="noopener">https://doi.org/10.1002/qj.3803</a></li>
+  <li>Natural Resources Canada. (2020). <em>Canadian Wind Turbine Database</em>. <a href="https://open.canada.ca/data/en/dataset/79fdad93-9025-49ad-ba16-c26d718cc070" target="_blank" rel="noopener">https://open.canada.ca/data/en/dataset/79fdad93-9025-49ad-ba16-c26d718cc070</a></li>
+  <li>Natural Resources Canada. (2022). <em>2020 Land Cover of Canada</em>. <a href="https://open.canada.ca/data/en/dataset/ee1580ab-a23d-4f86-a09b-79763677eb47" target="_blank" rel="noopener">https://open.canada.ca/data/en/dataset/ee1580ab-a23d-4f86-a09b-79763677eb47</a></li>
+  <li>OpenStreetMap contributors. (2024). <em>OpenStreetMap</em>. <a href="https://www.openstreetmap.org" target="_blank" rel="noopener">https://www.openstreetmap.org</a></li>
+  <li>Palmer-Wilson, K., et al. (2019). Impact of land requirements on electricity system decarbonisation pathways. <em>Energy Policy, 129</em>, 193–205. <a href="https://doi.org/10.1016/j.enpol.2019.01.071" target="_blank" rel="noopener">https://doi.org/10.1016/j.enpol.2019.01.071</a></li>
+</ul>
+
 <h2 id="8-capacity-credits-and-reserve-margin">8. Capacity Credits and Reserve Margin</h2>
 <p><strong>Module</strong>: <code>capacity_credits.py</code>, <code>provincial_data/on/existing_capacity_credits.py</code></p>
 <p>Capacity credits express how much firm capacity each technology contributes toward meeting the planning reserve margin.</p>
@@ -1714,8 +1730,8 @@ IESO. ({year}, {month}). Reliability Outlook. https://www.ieso.ca/en/Sector-Part
 <li>Re-run aggregation — the tool will prompt for confirmation before initiating API collection.</li>
 </ol>
 <h3 id="citation_1">Citation</h3>
-<div class="codehilite"><pre><span></span><code>Pfenninger, S., &amp; Staffell, I. (2016). Long-term patterns of European PV output using 30 years 
-of validated hourly reanalysis and satellite data. Energy, 114, 1251–1265. 
+<div class="codehilite"><pre><span></span><code>Pfenninger, S., &amp; Staffell, I. (2016). Long-term patterns of European PV output using 30 years
+of validated hourly reanalysis and satellite data. Energy, 114, 1251–1265.
 https://doi.org/10.1016/j.energy.2016.08.060
 </code></pre></div>
 
@@ -1757,7 +1773,7 @@ https://doi.org/10.1016/j.energy.2016.08.060
 <li>Update the reference URL in <code>cost_tx_dx.py</code>.</li>
 </ol>
 <h3 id="citation_2">Citation</h3>
-<div class="codehilite"><pre><span></span><code>U.S. Energy Information Administration. Annual Energy Outlook {year}. 
+<div class="codehilite"><pre><span></span><code>U.S. Energy Information Administration. Annual Energy Outlook {year}.
 https://www.eia.gov/outlooks/aeo/data/browser/
 </code></pre></div>
 
@@ -1862,7 +1878,7 @@ https://www.eia.gov/outlooks/aeo/data/browser/
 </tbody>
 </table>
 <p><strong>Citation</strong>:</p>
-<div class="codehilite"><pre><span></span><code>Dolter, B., &amp; Rivers, N. (2018). The cost of decarbonizing the Canadian electricity system. 
+<div class="codehilite"><pre><span></span><code>Dolter, B., &amp; Rivers, N. (2018). The cost of decarbonizing the Canadian electricity system.
 Energy Policy, 113, 135–148. https://doi.org/10.1016/j.enpol.2017.10.040
 </code></pre></div>
 
@@ -1890,7 +1906,7 @@ Energy Policy, 113, 135–148. https://doi.org/10.1016/j.enpol.2017.10.040
 </tbody>
 </table>
 <p><strong>Citation</strong>:</p>
-<div class="codehilite"><pre><span></span><code>Jordan, D. C., Kurtz, S. R., VanSant, K., &amp; Newmiller, J. (2016). Compendium of photovoltaic 
+<div class="codehilite"><pre><span></span><code>Jordan, D. C., Kurtz, S. R., VanSant, K., &amp; Newmiller, J. (2016). Compendium of photovoltaic
 degradation rates. Progress in Photovoltaics, 24(7), 978–989. https://doi.org/10.1002/pip.2744
 </code></pre></div>
 
